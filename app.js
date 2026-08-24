@@ -1,474 +1,81 @@
 
-const STORAGE_KEY = "ptchild_mvp_v04";
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-function uid() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
-function seedData() {
-  return {
-    patients: [
-      {
-        id: uid(),
-        firstName: "Ян",
-        age: "11 месяцев",
-        sex: "Мальчик",
-        complaint: "Стойка у опоры преимущественно на переднем отделе стоп.",
-        createdAt: new Date().toISOString(),
-        goals: [
-          {
-            id: uid(),
-            title: "Стоять у опоры с полной опорой стоп в 4 из 5 наблюдаемых попыток",
-            criterion: "4 из 5 попыток",
-            deadline: "3 недели",
-            progress: 40
-          }
-        ],
-        sessions: [
-          {
-            id: uid(),
-            date: new Date().toISOString().slice(0,10),
-            note: "Переходы в стойку у опоры, перенос веса, контроль положения стоп.",
-            tolerance: "Хорошая"
-          }
-        ],
-        assessment: {
-          complaint: "Мама отмечает стойку у опоры на носках и редкое самостоятельное опускание пяток.",
-          pregnancy: "",
-          birth: "",
-          development: "",
-          observation: "",
-          neuro: "",
-          conclusion: ""
-        }
-      }
-    ]
-  };
-}
-
-function loadData() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const data = seedData();
-    saveData(data);
-    return data;
-  }
-  try { return JSON.parse(raw); }
-  catch {
-    const data = seedData();
-    saveData(data);
-    return data;
-  }
-}
-
-function saveData(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-let data = loadData();
-let state = { view: "patients", patientId: data.patients[0]?.id || null, tab: "overview" };
-
-const app = document.getElementById("app");
-document.getElementById("homeBtn").addEventListener("click", () => {
-  state = { view: "patients", patientId: null, tab: "overview" };
-  render();
+const SUPABASE_URL = "https://bpacboofedxhdjhiizpy.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Mo3Tk3_hyPGlBl_V48u82Q_7DQkXL9g";
+const sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }
 });
 
-function esc(value="") {
-  return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const app = document.getElementById('app');
+const headerActions = document.getElementById('headerActions');
+let session=null, user=null;
+let state={patientId:null,tab:'overview',patients:[],goals:[],sessions:[],assessment:null};
+
+const esc=(v='')=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const fmtDate=v=>{if(!v)return'дата не указана';const d=new Date(v+'T12:00:00');return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})};
+const ageFromDob=dob=>{if(!dob)return'Возраст не указан';const b=new Date(dob+'T12:00:00'),n=new Date();let m=(n.getFullYear()-b.getFullYear())*12+n.getMonth()-b.getMonth();if(n.getDate()<b.getDate())m--;if(m<24)return `${m} мес.`;const y=Math.floor(m/12),r=m%12;return r?`${y} г. ${r} мес.`:`${y} г.`};
+const sexLabel=v=>v==='male'?'Мальчик':v==='female'?'Девочка':'Не указано';
+const toleranceLabel=v=>({good:'Хорошая',medium:'Средняя',low:'Низкая',unclear:'Трудно оценить'}[v]||'Не указана');
+
+function flash(type,msg){const el=document.getElementById('flash');if(el)el.innerHTML=`<div class="${type}">${esc(msg)}</div>`}
+function renderHeader(){if(!user){headerActions.innerHTML='';return}headerActions.innerHTML=`<div class="user-pill">${esc(user.email||'')}</div><button class="link" id="logoutBtn">Выйти</button>`;document.getElementById('logoutBtn').onclick=()=>sb.auth.signOut()}
+
+async function init(){
+  const {data}=await sb.auth.getSession();session=data.session;user=session?.user||null;renderHeader();
+  sb.auth.onAuthStateChange(async(_e,s)=>{session=s;user=s?.user||null;renderHeader();if(user){await loadPatients();await renderPatients()}else renderLogin()});
+  if(user){await loadPatients();await renderPatients()}else renderLogin();
 }
 
-function fmtDate(dateStr) {
-  if (!dateStr) return "дата не указана";
-  const d = new Date(dateStr + "T12:00:00");
-  return d.toLocaleDateString("ru-RU", {day:"numeric", month:"long", year:"numeric"});
+function renderLogin(){
+  app.innerHTML=`<div class="auth-wrap"><div class="card"><h2>Вход специалиста</h2><div id="flash"></div><form id="loginForm"><label>Email</label><input type="email" name="email" required autocomplete="email"><label>Пароль PT Child</label><input type="password" name="password" required autocomplete="current-password"><div class="actions"><button class="btn primary full" type="submit">Войти</button></div></form></div><div class="note">Используйте тестовую учётную запись, созданную в Supabase Authentication.</div></div>`;
+  document.getElementById('loginForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target);const {error}=await sb.auth.signInWithPassword({email:fd.get('email').trim(),password:fd.get('password')});if(error)flash('error','Не удалось войти: '+error.message)};
 }
 
-function currentPatient() {
-  return data.patients.find(p => p.id === state.patientId);
+async function loadPatients(){
+  const {data,error}=await sb.from('patients').select('id,display_name,date_of_birth,sex,primary_complaint,status,created_at').order('created_at',{ascending:false});
+  if(error)throw new Error(error.message);state.patients=data||[];
+}
+async function countsForPatients(){
+  const ids=state.patients.map(p=>p.id);if(!ids.length)return{};
+  const [g,s]=await Promise.all([sb.from('goals').select('patient_id').in('patient_id',ids),sb.from('sessions').select('patient_id').in('patient_id',ids)]);
+  const out={};ids.forEach(id=>out[id]={goals:0,sessions:0});(g.data||[]).forEach(x=>out[x.patient_id].goals++);(s.data||[]).forEach(x=>out[x.patient_id].sessions++);return out;
+}
+async function renderPatients(){
+  const counts=await countsForPatients();
+  app.innerHTML=`<div class="topline"><div><h2 style="margin-bottom:2px">Пациенты</h2><div class="muted tiny">Облачная база · ${state.patients.length} пациентов</div></div><button class="btn primary small" id="addPatient">＋ Ребёнок</button></div><div id="flash"></div><div class="patient-list">${state.patients.map(p=>`<button class="patient-card" data-pid="${p.id}"><div class="patient-top"><div><div class="name">${esc(p.display_name)}</div><div class="meta">${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}</div></div><span class="badge">активное ведение</span></div><div class="item-sub" style="margin-top:9px">${esc(p.primary_complaint||'Причина обращения пока не заполнена')}</div><div class="metric-grid"><div class="metric"><b>${counts[p.id]?.goals||0}</b><span>целей</span></div><div class="metric"><b>${counts[p.id]?.sessions||0}</b><span>занятий</span></div></div></button>`).join('')||`<div class="card empty">В облачной базе пока нет пациентов.</div>`}</div>`;
+  document.getElementById('addPatient').onclick=renderNewPatient;
+  document.querySelectorAll('[data-pid]').forEach(b=>b.onclick=async()=>{state.patientId=b.dataset.pid;state.tab='overview';await loadPatientData();renderPatient()});
 }
 
-function render() {
-  if (state.view === "patients") renderPatients();
-  else if (state.view === "newPatient") renderNewPatient();
-  else if (state.view === "patient") renderPatient();
+function renderNewPatient(){
+  app.innerHTML=`<div class="topline"><h2 style="margin:0">Новый ребёнок</h2><button class="link" id="cancel">Отмена</button></div><div id="flash"></div><form class="card" id="patientForm"><label>Имя / псевдоним для теста</label><input name="display_name" required><div class="row"><div><label>Дата рождения</label><input type="date" name="date_of_birth"></div><div><label>Пол</label><select name="sex"><option value="unspecified">Не указано</option><option value="male">Мальчик</option><option value="female">Девочка</option></select></div></div><label>Основная причина обращения</label><textarea name="primary_complaint"></textarea><div class="actions"><button class="btn primary full" type="submit">Сохранить в облако</button></div></form>`;
+  document.getElementById('cancel').onclick=renderPatients;
+  document.getElementById('patientForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target);const payload={display_name:fd.get('display_name').trim(),date_of_birth:fd.get('date_of_birth')||null,sex:fd.get('sex'),primary_complaint:fd.get('primary_complaint').trim()||null};const {data,error}=await sb.from('patients').insert(payload).select().single();if(error)return flash('error',error.message);await loadPatients();state.patientId=data.id;state.tab='overview';await loadPatientData();renderPatient()};
 }
 
-function renderPatients() {
-  app.innerHTML = `
-    <div class="topline">
-      <div>
-        <h2 style="margin-bottom:2px">Пациенты</h2>
-        <div class="muted small">${data.patients.length} в демо-базе</div>
-      </div>
-      <button class="btn primary small-btn" id="addPatientBtn">＋ Ребёнок</button>
-    </div>
-
-    <div class="patient-list">
-      ${data.patients.map(p => `
-        <button class="patient-card" data-patient-id="${p.id}">
-          <div class="patient-top">
-            <div>
-              <div class="patient-name">${esc(p.firstName)}</div>
-              <div class="patient-meta">${esc(p.age || "Возраст не указан")} · ${esc(p.sex || "Пол не указан")}</div>
-            </div>
-            <span class="badge">активное ведение</span>
-          </div>
-          <div class="item-sub" style="margin-top:9px">${esc(p.complaint || "Причина обращения пока не заполнена")}</div>
-          <div class="metric-grid">
-            <div class="metric"><b>${p.goals?.length || 0}</b><span>целей</span></div>
-            <div class="metric"><b>${p.sessions?.length || 0}</b><span>занятий</span></div>
-          </div>
-        </button>
-      `).join("") || `<div class="card empty">Пока нет пациентов. Создайте первого тестового ребёнка.</div>`}
-    </div>
-  `;
-
-  document.getElementById("addPatientBtn").onclick = () => {
-    state.view = "newPatient";
-    render();
-  };
-
-  document.querySelectorAll("[data-patient-id]").forEach(el => {
-    el.onclick = () => {
-      state.view = "patient";
-      state.patientId = el.dataset.patientId;
-      state.tab = "overview";
-      render();
-    };
-  });
+const currentPatient=()=>state.patients.find(p=>p.id===state.patientId);
+async function loadPatientData(){
+  const pid=state.patientId;
+  const [g,s,a]=await Promise.all([sb.from('goals').select('*').eq('patient_id',pid).order('created_at',{ascending:false}),sb.from('sessions').select('*').eq('patient_id',pid).order('session_date',{ascending:false}),sb.from('assessments').select('*').eq('patient_id',pid).eq('assessment_type','initial').order('created_at',{ascending:false}).limit(1)]);
+  if(g.error||s.error||a.error)throw new Error((g.error||s.error||a.error).message);state.goals=g.data||[];state.sessions=s.data||[];state.assessment=(a.data||[])[0]||null;
 }
-
-function renderNewPatient() {
-  app.innerHTML = `
-    <div class="topline">
-      <h2 style="margin:0">Новый ребёнок</h2>
-      <button class="link-btn" id="cancelNew">Отмена</button>
-    </div>
-    <form class="card" id="newPatientForm">
-      <label>Имя / псевдоним для демо</label>
-      <input name="firstName" required placeholder="Например: Ян" />
-
-      <div class="row">
-        <div>
-          <label>Возраст</label>
-          <input name="age" placeholder="11 месяцев" />
-        </div>
-        <div>
-          <label>Пол</label>
-          <select name="sex">
-            <option>Не указано</option>
-            <option>Мальчик</option>
-            <option>Девочка</option>
-          </select>
-        </div>
-      </div>
-
-      <label>Основная причина обращения</label>
-      <textarea name="complaint" placeholder="Краткая жалоба родителя"></textarea>
-
-      <div class="actions">
-        <button class="btn primary full" type="submit">Создать карточку</button>
-      </div>
-    </form>
-  `;
-  document.getElementById("cancelNew").onclick = () => {
-    state.view = "patients"; render();
-  };
-  document.getElementById("newPatientForm").onsubmit = (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const patient = {
-      id: uid(),
-      firstName: fd.get("firstName").trim(),
-      age: fd.get("age").trim(),
-      sex: fd.get("sex"),
-      complaint: fd.get("complaint").trim(),
-      createdAt: new Date().toISOString(),
-      goals: [],
-      sessions: [],
-      assessment: {complaint:"",pregnancy:"",birth:"",development:"",observation:"",neuro:"",conclusion:""}
-    };
-    data.patients.unshift(patient);
-    saveData(data);
-    state = {view:"patient", patientId:patient.id, tab:"overview"};
-    render();
-  };
+function goalsHtml(goals,deletable=false){
+  if(!goals.length)return`<div class="empty">Целей пока нет.</div>`;
+  return goals.map(g=>`<div class="goal"><div class="goal-top"><div class="item-title">${esc(g.title)}</div><div class="goal-pct">${g.progress}%</div></div><div class="progress"><span style="width:${Math.max(0,Math.min(100,g.progress))}%"></span></div><div class="item-sub">${esc(g.criterion||'Критерий не указан')} · ${g.deadline?fmtDate(g.deadline):'срок не указан'}</div>${deletable?`<button class="link" style="color:#9b3333;margin-top:7px" data-del-goal="${g.id}">Удалить цель</button>`:''}</div>`).join('');
 }
-
-function renderPatient() {
-  const p = currentPatient();
-  if (!p) {
-    state.view = "patients"; render(); return;
-  }
-
-  const tabs = [
-    ["overview","Обзор"],["assessment","Оценка"],["goals","Цели"],
-    ["sessions","Занятия"],["progress","Динамика"]
-  ];
-
-  app.innerHTML = `
-    <div class="card">
-      <div class="patient-top">
-        <div>
-          <div class="muted small">Карточка ребёнка</div>
-          <h1>${esc(p.firstName)}</h1>
-          <div class="patient-meta">${esc(p.age || "Возраст не указан")} · ${esc(p.sex || "Пол не указан")}</div>
-        </div>
-        <span class="badge">активное ведение</span>
-      </div>
-      <div class="sep"></div>
-      <div class="item-title">${esc(p.complaint || "Причина обращения пока не заполнена")}</div>
-    </div>
-
-    <div class="tabs">
-      ${tabs.map(([key,label]) => `<button class="tab ${state.tab===key?"active":""}" data-tab="${key}">${label}</button>`).join("")}
-    </div>
-
-    <div id="tabContent"></div>
-  `;
-
-  document.querySelectorAll("[data-tab]").forEach(btn => {
-    btn.onclick = () => { state.tab = btn.dataset.tab; renderPatient(); };
-  });
-
-  renderTab(p);
+function renderPatient(){
+  const p=currentPatient();if(!p)return renderPatients();
+  const tabs=[['overview','Обзор'],['assessment','Оценка'],['goals','Цели'],['sessions','Занятия'],['progress','Динамика']];
+  app.innerHTML=`<div class="card"><div class="patient-top"><div><div class="muted tiny">Карточка ребёнка</div><h1>${esc(p.display_name)}</h1><div class="meta">${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}</div></div><span class="badge">облако</span></div><div class="sep"></div><div class="item-title">${esc(p.primary_complaint||'Причина обращения пока не заполнена')}</div><div class="actions"><button class="btn full" id="backPatients">← К пациентам</button></div></div><div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${state.tab===k?'active':''}" data-tab="${k}">${l}</button>`).join('')}</div><div id="flash"></div><div id="tabContent"></div>`;
+  document.getElementById('backPatients').onclick=renderPatients;document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;renderPatient()});renderTab(p);
 }
-
-function renderTab(p) {
-  const box = document.getElementById("tabContent");
-  if (state.tab === "overview") {
-    box.innerHTML = `
-      <div class="card">
-        <h3>Сводка</h3>
-        <div class="metric-grid">
-          <div class="metric"><b>${p.goals.length}</b><span>активных целей</span></div>
-          <div class="metric"><b>${p.sessions.length}</b><span>записей занятий</span></div>
-        </div>
-        <div class="actions">
-          <button class="btn primary" id="quickSession">＋ Занятие</button>
-          <button class="btn" id="quickGoal">＋ Цель</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Последнее занятие</h3>
-        ${p.sessions.length ? `
-          <div class="item-title">${fmtDate(p.sessions[p.sessions.length-1].date)}</div>
-          <div class="item-sub">${esc(p.sessions[p.sessions.length-1].note)}</div>
-        ` : `<div class="empty">Занятий пока нет.</div>`}
-      </div>
-
-      <div class="card">
-        <h3>Текущие цели</h3>
-        ${goalListHtml(p.goals)}
-      </div>
-
-      <div class="danger-zone">
-        <button class="btn danger" id="deletePatient">Удалить тестовую карточку</button>
-      </div>
-    `;
-    document.getElementById("quickSession").onclick = () => { state.tab="sessions"; renderPatient(); };
-    document.getElementById("quickGoal").onclick = () => { state.tab="goals"; renderPatient(); };
-    document.getElementById("deletePatient").onclick = () => {
-      if (confirm("Удалить эту тестовую карточку и все её локальные данные?")) {
-        data.patients = data.patients.filter(x => x.id !== p.id);
-        saveData(data);
-        state = {view:"patients",patientId:null,tab:"overview"};
-        render();
-      }
-    };
-  }
-
-  if (state.tab === "assessment") {
-    const a = p.assessment || {};
-    box.innerHTML = `
-      <form class="card" id="assessmentForm">
-        <h3>Первичная оценка</h3>
-
-        <label>Жалоба</label>
-        <textarea name="complaint">${esc(a.complaint || "")}</textarea>
-
-        <label>Беременность / анамнез</label>
-        <textarea name="pregnancy" placeholder="Как проходила беременность...">${esc(a.pregnancy || "")}</textarea>
-
-        <label>Роды / ранний период</label>
-        <textarea name="birth" placeholder="Срок, способ родоразрешения, осложнения...">${esc(a.birth || "")}</textarea>
-
-        <label>Моторное развитие</label>
-        <textarea name="development" placeholder="Контроль головы, перевороты, сидение, ползание...">${esc(a.development || "")}</textarea>
-
-        <label>Осмотр / спонтанная моторика</label>
-        <textarea name="observation" placeholder="Переходы, симметрия, положение тела, стопы...">${esc(a.observation || "")}</textarea>
-
-        <label>Неврологические наблюдения</label>
-        <textarea name="neuro" placeholder="Тонус, рефлексы, подошвенный ответ, клонус...">${esc(a.neuro || "")}</textarea>
-
-        <label>Физиотерапевтическое заключение</label>
-        <textarea name="conclusion" placeholder="Подтверждается специалистом">${esc(a.conclusion || "")}</textarea>
-
-        <div class="actions">
-          <button class="btn primary full" type="submit">Сохранить оценку</button>
-        </div>
-      </form>
-      <div class="note">
-        В следующей версии вернём детализированные поля и быстрые кнопки из v0.2, но уже с реальным сохранением.
-      </div>
-    `;
-    document.getElementById("assessmentForm").onsubmit = (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      p.assessment = Object.fromEntries(fd.entries());
-      saveData(data);
-      alert("Оценка сохранена на этом устройстве.");
-    };
-  }
-
-  if (state.tab === "goals") {
-    box.innerHTML = `
-      <div class="card">
-        <h3>Активные цели</h3>
-        ${goalListHtml(p.goals)}
-      </div>
-
-      <form class="card" id="goalForm">
-        <h3>＋ Новая цель</h3>
-        <label>Функциональная цель</label>
-        <textarea name="title" required placeholder="Что ребёнок должен уметь делать"></textarea>
-        <div class="row">
-          <div><label>Критерий</label><input name="criterion" placeholder="4 из 5 попыток" /></div>
-          <div><label>Срок</label><input name="deadline" placeholder="6 недель" /></div>
-        </div>
-        <label>Текущий прогресс</label>
-        <select name="progress">
-          <option value="0">0%</option>
-          <option value="20">20%</option>
-          <option value="40">40%</option>
-          <option value="60">60%</option>
-          <option value="80">80%</option>
-          <option value="100">100%</option>
-        </select>
-        <div class="actions"><button class="btn primary full" type="submit">Добавить цель</button></div>
-      </form>
-    `;
-    document.getElementById("goalForm").onsubmit = (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      p.goals.push({
-        id:uid(),
-        title:fd.get("title").trim(),
-        criterion:fd.get("criterion").trim(),
-        deadline:fd.get("deadline").trim(),
-        progress:Number(fd.get("progress"))
-      });
-      saveData(data);
-      renderPatient();
-    };
-    bindGoalDeletes(p);
-  }
-
-  if (state.tab === "sessions") {
-    box.innerHTML = `
-      <form class="card" id="sessionForm">
-        <h3>＋ Новое занятие</h3>
-        <label>Дата</label>
-        <input type="date" name="date" value="${new Date().toISOString().slice(0,10)}" />
-        <label>Запись занятия</label>
-        <textarea name="note" required placeholder="Что делали, реакция ребёнка, что получилось..."></textarea>
-        <label>Переносимость</label>
-        <select name="tolerance">
-          <option>Хорошая</option>
-          <option>Средняя</option>
-          <option>Низкая</option>
-          <option>Трудно оценить</option>
-        </select>
-        <div class="actions"><button class="btn primary full" type="submit">Сохранить занятие</button></div>
-      </form>
-
-      <div class="card">
-        <h3>История занятий</h3>
-        ${p.sessions.slice().reverse().map(s => `
-          <div class="item">
-            <div class="item-title">${fmtDate(s.date)} · ${esc(s.tolerance)}</div>
-            <div class="item-sub">${esc(s.note)}</div>
-            <button class="link-btn" data-del-session="${s.id}" style="margin-top:7px;color:#9b3333">Удалить</button>
-          </div>
-        `).join("") || `<div class="empty">Занятий пока нет.</div>`}
-      </div>
-    `;
-    document.getElementById("sessionForm").onsubmit = (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      p.sessions.push({
-        id:uid(),
-        date:fd.get("date"),
-        note:fd.get("note").trim(),
-        tolerance:fd.get("tolerance")
-      });
-      saveData(data);
-      renderPatient();
-    };
-    document.querySelectorAll("[data-del-session]").forEach(btn => {
-      btn.onclick = () => {
-        p.sessions = p.sessions.filter(s => s.id !== btn.dataset.delSession);
-        saveData(data); renderPatient();
-      };
-    });
-  }
-
-  if (state.tab === "progress") {
-    box.innerHTML = `
-      <div class="card">
-        <h3>Динамика по целям</h3>
-        ${p.goals.length ? p.goals.map(g => `
-          <div class="goal-box">
-            <div class="goal-top">
-              <div class="item-title">${esc(g.title)}</div>
-              <div class="goal-pct">${g.progress}%</div>
-            </div>
-            <div class="progress"><span style="width:${Math.max(0,Math.min(100,g.progress))}%"></span></div>
-            <div class="item-sub">${esc(g.criterion || "Критерий не указан")} · ${esc(g.deadline || "Срок не указан")}</div>
-          </div>
-        `).join("") : `<div class="empty">Добавьте хотя бы одну цель, чтобы видеть динамику.</div>`}
-      </div>
-
-      <div class="card">
-        <h3>Активность</h3>
-        <div class="metric-grid">
-          <div class="metric"><b>${p.sessions.length}</b><span>всего занятий</span></div>
-          <div class="metric"><b>${p.goals.filter(g=>g.progress>=100).length}</b><span>достигнутых целей</span></div>
-        </div>
-      </div>
-
-      <div class="note">
-        Следующий этап: повторные измерения, сопоставимые ROM-показатели, результаты стандартизированных тестов и графики изменения во времени.
-      </div>
-    `;
-  }
+function renderTab(p){
+  const box=document.getElementById('tabContent');
+  if(state.tab==='overview'){box.innerHTML=`<div class="card"><h3>Сводка</h3><div class="metric-grid"><div class="metric"><b>${state.goals.filter(g=>g.status==='active').length}</b><span>активных целей</span></div><div class="metric"><b>${state.sessions.length}</b><span>занятий</span></div></div><div class="actions"><button class="btn primary" id="goSession">＋ Занятие</button><button class="btn" id="goGoal">＋ Цель</button></div></div><div class="card"><h3>Последнее занятие</h3>${state.sessions[0]?`<div class="item-title">${fmtDate(state.sessions[0].session_date)} · ${esc(toleranceLabel(state.sessions[0].tolerance))}</div><div class="item-sub">${esc(state.sessions[0].note||'')}</div>`:`<div class="empty">Занятий пока нет.</div>`}</div><div class="card"><h3>Текущие цели</h3>${goalsHtml(state.goals)}</div>`;document.getElementById('goSession').onclick=()=>{state.tab='sessions';renderPatient()};document.getElementById('goGoal').onclick=()=>{state.tab='goals';renderPatient()}}
+  if(state.tab==='assessment'){const a=state.assessment||{};box.innerHTML=`<form class="card" id="assessmentForm"><h3>Первичная оценка</h3><label>Жалоба</label><textarea name="complaint">${esc(a.complaint||'')}</textarea><label>Беременность / анамнез</label><textarea name="pregnancy_history">${esc(a.pregnancy_history||'')}</textarea><label>Роды / ранний период</label><textarea name="birth_history">${esc(a.birth_history||'')}</textarea><label>Моторное развитие</label><textarea name="motor_development">${esc(a.motor_development||'')}</textarea><label>Осмотр / спонтанная моторика</label><textarea name="observation">${esc(a.observation||'')}</textarea><label>Неврологические наблюдения</label><textarea name="neuro_observations">${esc(a.neuro_observations||'')}</textarea><label>Физиотерапевтическое заключение</label><textarea name="conclusion">${esc(a.conclusion||'')}</textarea><div class="actions"><button class="btn primary full" type="submit">Сохранить оценку в облако</button></div></form>`;document.getElementById('assessmentForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),payload=Object.fromEntries(fd.entries());payload.patient_id=p.id;payload.assessment_type='initial';let r=state.assessment?.id?await sb.from('assessments').update(payload).eq('id',state.assessment.id).select().single():await sb.from('assessments').insert(payload).select().single();if(r.error)return flash('error',r.error.message);state.assessment=r.data;flash('ok','Оценка сохранена в Supabase.')}}
+  if(state.tab==='goals'){box.innerHTML=`<div class="card"><h3>Активные цели</h3>${goalsHtml(state.goals,true)}</div><form class="card" id="goalForm"><h3>＋ Новая цель</h3><label>Функциональная цель</label><textarea name="title" required></textarea><label>Исходное состояние</label><textarea name="baseline"></textarea><label>Критерий достижения</label><input name="criterion"><label>Срок</label><input type="date" name="deadline"><label>Прогресс</label><select name="progress"><option value="0">0%</option><option value="20">20%</option><option value="40">40%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option></select><div class="actions"><button class="btn primary full" type="submit">Добавить цель</button></div></form>`;document.getElementById('goalForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),payload={patient_id:p.id,title:fd.get('title').trim(),baseline:fd.get('baseline').trim()||null,criterion:fd.get('criterion').trim()||null,deadline:fd.get('deadline')||null,progress:Number(fd.get('progress')),status:'active'};const {error}=await sb.from('goals').insert(payload);if(error)return flash('error',error.message);await loadPatientData();renderPatient()};document.querySelectorAll('[data-del-goal]').forEach(b=>b.onclick=async()=>{const {error}=await sb.from('goals').delete().eq('id',b.dataset.delGoal);if(error)return flash('error',error.message);await loadPatientData();renderPatient()})}
+  if(state.tab==='sessions'){box.innerHTML=`<form class="card" id="sessionForm"><h3>＋ Новое занятие</h3><label>Дата</label><input type="date" name="session_date" value="${new Date().toISOString().slice(0,10)}"><label>Запись занятия</label><textarea name="note" required></textarea><label>Переносимость</label><select name="tolerance"><option value="good">Хорошая</option><option value="medium">Средняя</option><option value="low">Низкая</option><option value="unclear">Трудно оценить</option></select><div class="actions"><button class="btn primary full" type="submit">Сохранить занятие</button></div></form><div class="card"><h3>История занятий</h3>${state.sessions.map(s=>`<div class="item"><div class="item-title">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</div><div class="item-sub">${esc(s.note||'')}</div><button class="link" style="color:#9b3333;margin-top:7px" data-del-session="${s.id}">Удалить</button></div>`).join('')||`<div class="empty">Занятий пока нет.</div>`}</div>`;document.getElementById('sessionForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target),payload={patient_id:p.id,session_date:fd.get('session_date'),note:fd.get('note').trim(),tolerance:fd.get('tolerance')};const {error}=await sb.from('sessions').insert(payload);if(error)return flash('error',error.message);await loadPatientData();renderPatient()};document.querySelectorAll('[data-del-session]').forEach(b=>b.onclick=async()=>{const {error}=await sb.from('sessions').delete().eq('id',b.dataset.delSession);if(error)return flash('error',error.message);await loadPatientData();renderPatient()})}
+  if(state.tab==='progress'){box.innerHTML=`<div class="card"><h3>Динамика по целям</h3>${state.goals.length?state.goals.map(g=>`<div class="goal"><div class="goal-top"><div class="item-title">${esc(g.title)}</div><div class="goal-pct">${g.progress}%</div></div><div class="progress"><span style="width:${Math.max(0,Math.min(100,g.progress))}%"></span></div><div class="item-sub">${esc(g.criterion||'Критерий не указан')} · ${g.deadline?fmtDate(g.deadline):'срок не указан'}</div></div>`).join(''):`<div class="empty">Нет целей для динамики.</div>`}</div><div class="card"><div class="metric-grid"><div class="metric"><b>${state.sessions.length}</b><span>занятий</span></div><div class="metric"><b>${state.goals.filter(g=>g.progress>=100).length}</b><span>целей 100%</span></div></div></div>`}
 }
-
-function goalListHtml(goals) {
-  if (!goals.length) return `<div class="empty">Целей пока нет.</div>`;
-  return goals.map(g => `
-    <div class="goal-box">
-      <div class="goal-top">
-        <div class="item-title">${esc(g.title)}</div>
-        <div class="goal-pct">${g.progress}%</div>
-      </div>
-      <div class="progress"><span style="width:${Math.max(0,Math.min(100,g.progress))}%"></span></div>
-      <div class="item-sub">${esc(g.criterion || "Критерий не указан")} · ${esc(g.deadline || "Срок не указан")}</div>
-      ${state.tab==="goals" ? `<button class="link-btn" data-del-goal="${g.id}" style="margin-top:7px;color:#9b3333">Удалить цель</button>` : ""}
-    </div>
-  `).join("");
-}
-
-function bindGoalDeletes(p) {
-  document.querySelectorAll("[data-del-goal]").forEach(btn => {
-    btn.onclick = () => {
-      p.goals = p.goals.filter(g => g.id !== btn.dataset.delGoal);
-      saveData(data); renderPatient();
-    };
-  });
-}
-
-render();
+init().catch(err=>{app.innerHTML=`<div class="error">Ошибка запуска приложения: ${esc(err.message)}</div>`});

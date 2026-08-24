@@ -3,28 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#f5f6f8" />
-  <title>PT Child MVP v0.4</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>PT Child v0.5</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="app-shell">
-    <header class="app-header">
+  <div class="shell">
+    <header class="header">
       <div>
         <div class="brand">PT Child</div>
-        <div class="muted small">MVP v0.4 · локальное демо</div>
+        <div class="muted tiny">MVP v0.5 · Supabase cloud</div>
       </div>
-      <button class="icon-btn" id="homeBtn" aria-label="На главную">⌂</button>
+      <div id="headerActions"></div>
     </header>
-
-    <div class="warning">
-      Демо-версия хранит данные только в браузере этого устройства. Не вводите реальные ФИО, диагнозы, документы или иные медицинские данные пациентов.
-    </div>
-
-    <main id="app"></main>
+    <div class="warning">Тестовая версия. Пока используйте только вымышленные данные пациентов.</div>
+    <main id="app"><div class="card center">Загрузка…</div></main>
   </div>
-
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
