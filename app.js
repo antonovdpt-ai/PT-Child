@@ -102,7 +102,83 @@ function renderPatient(){
   const tabs=[['overview','Обзор'],['assessment','Оценка'],['goals','Цели'],['sessions','Занятия'],['progress','Динамика']];
   app.innerHTML=`<div class="card"><div class="patient-top"><div><div class="muted tiny">Карточка ребёнка</div><h1>${esc(p.display_name)}</h1><div class="meta">${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}</div></div><span class="badge">облако</span></div><div class="sep"></div><div class="item-title">${esc(p.primary_complaint||'Причина обращения пока не заполнена')}</div><div class="actions"><button class="btn full" id="backPatients">← К пациентам</button></div></div><div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${state.tab===k?'active':''}" data-tab="${k}">${l}</button>`).join('')}</div><div id="flash"></div><div id="tabContent"></div>`;
   document.getElementById('backPatients').onclick=renderPatients;document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.tab=b.dataset.tab;renderPatient()});renderTab(p);
-}
+  const actions = app.querySelector(".actions");
+
+  const aiBtn = document.createElement("button");
+  aiBtn.id = "aiAnalyzeBtn";
+  aiBtn.className = "primary";
+  aiBtn.textContent = "✨ Анализ ИИ";
+  actions.prepend(aiBtn);
+
+  const aiResult = document.createElement("div");
+  aiResult.className = "card";
+  aiResult.style.display = "none";
+  aiResult.style.marginTop = "12px";
+  aiResult.style.whiteSpace = "pre-wrap";
+
+  const tabContent = document.getElementById("tabContent");
+  tabContent.parentNode.insertBefore(aiResult, tabContent);
+
+  aiBtn.onclick = async () => {
+    aiBtn.disabled = true;
+    aiBtn.textContent = "⏳ Анализирую...";
+    aiResult.style.display = "block";
+    aiResult.textContent = "ИИ анализирует данные ребёнка...";
+
+    try {
+      const patientData = {
+        age: ageFromDob(p.date_of_birth),
+        sex: sexLabel(p.sex),
+        complaint: p.primary_complaint || "",
+        assessment: state.assessment || null,
+        goals: state.goals || [],
+        sessions: state.sessions || []
+      };
+
+      const prompt = `
+Проанализируй клинические данные ребёнка как помощник детского физического терапевта.
+
+Важно:
+- не ставь диагноз по недостаточным данным;
+- не выдумывай отсутствующие сведения;
+- явно указывай, каких данных не хватает;
+- отделяй факты от предположений;
+- учитывай функциональный подход и участие ребёнка в повседневной жизни.
+
+Данные:
+${JSON.stringify(patientData, null, 2)}
+
+Дай ответ по структуре:
+
+1. Краткое клиническое резюме
+2. Основные функциональные проблемы
+3. Какие данные ещё нужно собрать или уточнить
+4. Приоритеты физической терапии
+5. Варианты измеримых целей
+6. Что дополнительно оценить
+7. Красные флаги или причины для направления к врачу, если они есть
+8. Ограничения и степень уверенности анализа
+`;
+
+      const answer = await callAI(prompt);
+
+      aiResult.textContent = answer;
+      aiBtn.textContent = "✓ Анализ готов";
+
+      setTimeout(() => {
+        aiBtn.textContent = "✨ Анализ ИИ";
+        aiBtn.disabled = false;
+      }, 1200);
+
+    } catch (error) {
+      console.error(error);
+      aiResult.textContent =
+        "Не удалось выполнить анализ ИИ. Попробуйте ещё раз.";
+
+      aiBtn.textContent = "Повторить анализ";
+      aiBtn.disabled = false;
+    }
+  };}
 
 function option(value,label,current){return `<option value="${value}" ${String(current??'')===String(value)?'selected':''}>${label}</option>`}
 function milestoneRow(key,label,milestones){
