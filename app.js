@@ -19,6 +19,31 @@ const sexLabel=v=>v==='male'?'Мальчик':v==='female'?'Девочка':'Н�
 const toleranceLabel=v=>({good:'Хорошая',medium:'Средняя',low:'Низкая',unclear:'Трудно оценить'}[v]||'Не указана');
 
 function flash(type,msg){const el=document.getElementById('flash');if(el)el.innerHTML=`<div class="${type}">${esc(msg)}</div>`}
+
+async function callAI(prompt) {
+  const cleanPrompt = String(prompt || "").trim();
+
+  if (!cleanPrompt) {
+    throw new Error("Пустой запрос к ИИ");
+  }
+
+  const { data, error } = await sb.functions.invoke("ptchild-ai", {
+    body: { prompt: cleanPrompt }
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data?.text) {
+    throw new Error("ИИ не вернул ответ");
+  }
+
+  return data.text;
+}
+
+// Временно для проверки из консоли браузера
+window.callAI = callAI;
 function renderHeader(){if(!user){headerActions.innerHTML='';return}headerActions.innerHTML=`<div class="user-pill">${esc(user.email||'')}</div><button class="link" id="logoutBtn">Выйти</button>`;document.getElementById('logoutBtn').onclick=()=>sb.auth.signOut()}
 
 function setButtonSaving(btn,text='Сохраняю…'){btn.disabled=true;btn.classList.remove('saved');btn.classList.add('saving');btn.textContent=text}
