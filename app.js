@@ -280,6 +280,22 @@ ${JSON.stringify(patientData, null, 2)}
           "ИИ выполнил анализ, но сохранить его не удалось: " + saveAiError.message
         );
       }
+      const { error: historyError } = await sb
+  .from("ai_analysis_history")
+  .insert({
+    patient_id: p.id,
+    therapist_id: user.id,
+    analysis: answer,
+    patient_snapshot: patientData,
+    created_at: analysisUpdatedAt
+  });
+
+if (historyError) {
+  throw new Error(
+    "Анализ сохранён в карточке, но добавить его в историю не удалось: " +
+      historyError.message
+  );
+}
 
       p.ai_analysis = answer;
       p.ai_analysis_updated_at = analysisUpdatedAt;
