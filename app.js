@@ -45,6 +45,34 @@ async function callAI(prompt) {
 // Временно для проверки из консоли браузера
 window.callAI = callAI;
 
+function formatAIAnalysisDate(value) {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function formatAIAnalysisBlock(text, updatedAt) {
+  const dateText = formatAIAnalysisDate(updatedAt);
+
+  const dateHtml = dateText
+    ? `<div class="muted tiny" style="margin-bottom:10px">
+        Последний анализ ИИ: ${dateText}
+      </div>`
+    : "";
+
+  return dateHtml + formatAIResult(text);
+}
+
 function formatAIResult(text) {
   const safe = String(text || "")
     .replace(/&/g, "&amp;")
@@ -172,7 +200,10 @@ function renderPatient() {
 
   if (p.ai_analysis) {
     aiResult.style.display = "block";
-    aiResult.innerHTML = formatAIResult(p.ai_analysis);
+    aiResult.innerHTML = formatAIAnalysisBlock(
+  p.ai_analysis,
+  p.ai_analysis_updated_at
+);
     aiBtn.textContent = "✨ Обновить анализ ИИ";
   }
 
@@ -253,7 +284,10 @@ ${JSON.stringify(patientData, null, 2)}
       p.ai_analysis = answer;
       p.ai_analysis_updated_at = analysisUpdatedAt;
 
-      aiResult.innerHTML = formatAIResult(answer);
+    aiResult.innerHTML = formatAIAnalysisBlock(
+  answer,
+  analysisUpdatedAt
+);
       aiBtn.textContent = "✓ Анализ готов";
 
       setTimeout(() => {
