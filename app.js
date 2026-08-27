@@ -220,6 +220,73 @@ aiBtn.insertAdjacentElement("afterend", historyBtn);
   const tabContent = document.getElementById("tabContent");
   tabContent.parentNode.insertBefore(aiResult, tabContent);
 
+  const historyPanel = document.createElement("div");
+historyPanel.className = "card";
+historyPanel.style.display = "none";
+historyPanel.style.marginTop = "12px";
+
+aiResult.parentNode.insertBefore(historyPanel, aiResult);
+
+historyBtn.onclick = async () => {
+  if (historyPanel.style.display === "block") {
+    historyPanel.style.display = "none";
+    return;
+  }
+
+  historyBtn.disabled = true;
+  historyBtn.textContent = "⏳ Загружаю...";
+
+  try {
+    const history = await loadAiAnalysisHistory(p.id);
+
+    historyPanel.innerHTML = "";
+
+    const title = document.createElement("h3");
+    title.textContent = "🕘 История анализов";
+    historyPanel.appendChild(title);
+
+    if (!history.length) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.textContent = "Сохранённых анализов пока нет.";
+      historyPanel.appendChild(empty);
+    } else {
+      history.forEach((item, index) => {
+        const btn = document.createElement("button");
+        btn.className = "btn full";
+        btn.style.marginTop = "8px";
+
+        const dateText =
+          formatAIAnalysisDate(item.created_at) || "Дата неизвестна";
+
+        btn.textContent =
+          `${index === 0 ? "● " : ""}${dateText}` +
+          `${index === 0 ? " — последний" : ""}`;
+
+        btn.onclick = () => {
+          aiResult.style.display = "block";
+          aiResult.innerHTML = formatAIAnalysisBlock(
+            item.analysis,
+            item.created_at
+          );
+        };
+
+        historyPanel.appendChild(btn);
+      });
+    }
+
+    historyPanel.style.display = "block";
+  } catch (error) {
+    console.error(error);
+    historyPanel.innerHTML =
+      '<div class="muted">Не удалось загрузить историю анализов.</div>';
+    historyPanel.style.display = "block";
+  } finally {
+    historyBtn.disabled = false;
+    historyBtn.textContent = "🕘 История анализов";
+  }
+};
+
   if (p.ai_analysis) {
     aiResult.style.display = "block";
     aiResult.innerHTML = formatAIAnalysisBlock(
