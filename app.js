@@ -18,6 +18,25 @@ const ageFromDob = dob => { if (!dob) return 'Возраст не указан';
 const sexLabel = v => v === 'male' ? 'Мальчик' : v === 'female' ? 'Девочка' : 'Не указано';
 const toleranceLabel = v => ({ good: 'Хорошая', medium: 'Средняя', low: 'Низкая', unclear: 'Трудно оценить' }[v] || 'Не указана');
 
+const dynamicsLabel = v => ({
+  improved: 'Улучшение',
+  stable: 'Без значимых изменений',
+  worse: 'Ухудшение',
+  unclear: 'Трудно оценить'
+}[v] || 'Не указано');
+
+function sessionDynamicsHtml(s) {
+  const dynamics = s.dynamics_status
+    ? `<div class="item-sub"><b>Динамика:</b> ${esc(dynamicsLabel(s.dynamics_status))}</div>`
+    : '';
+
+  const changes = s.function_changes
+    ? `<div class="item-sub"><b>Изменения функции:</b> ${esc(s.function_changes)}</div>`
+    : '';
+
+  return dynamics + changes;
+}
+
 function flash(type, msg) { const el = document.getElementById('flash'); if (el) el.innerHTML = `<div class="${type}">${esc(msg)}</div>` }
 
 async function callAI(prompt) {
@@ -594,7 +613,7 @@ function renderTab(p) {
   placeholder="Например: стал отпускать опору на 3–4 секунды, появились самостоятельные шаги"
 ></textarea>
 
-<div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form><div class="card"><h3>История занятий</h3>${state.sessions.map(s => `<div class="item"><div class="item-title">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</div><div class="item-sub">${esc(s.note || '')}</div><button class="link" style="color:#9b3333;margin-top:7px" data-del-session="${s.id}">Удалить</button></div>`).join('') || `<div class="empty">Занятий пока нет.</div>`}</div>`;
+<div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form><div class="card"><h3>История занятий</h3>${state.sessions.map(s => `<div class="item"><div class="item-title">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</div><div class="item-sub">${esc(s.note || '')}</div>${sessionDynamicsHtml(s)}<button class="link" style="color:#9b3333;margin-top:7px" data-del-session="${s.id}">Удалить</button></div>`).join('') || `<div class="empty">Занятий пока нет.</div>`}</div>`;
     const form = document.getElementById('sessionForm'), btn = document.getElementById('sessionSaveBtn'), status = document.getElementById('sessionStatus'); watchFormDirty(form, btn, 'Сохранить занятие');
     form.onsubmit = async e => { e.preventDefault(); setButtonSaving(btn); const fd = new FormData(e.target);
 
