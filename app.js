@@ -205,11 +205,11 @@ function renderPatient() {
   actions.prepend(aiBtn);
 
   const historyBtn = document.createElement("button");
-historyBtn.id = "aiHistoryBtn";
-historyBtn.className = "btn";
-historyBtn.textContent = "🕘 История анализов";
+  historyBtn.id = "aiHistoryBtn";
+  historyBtn.className = "btn";
+  historyBtn.textContent = "🕘 История анализов";
 
-aiBtn.insertAdjacentElement("afterend", historyBtn);
+  aiBtn.insertAdjacentElement("afterend", historyBtn);
 
   const aiResult = document.createElement("div");
   aiResult.className = "card";
@@ -221,79 +221,79 @@ aiBtn.insertAdjacentElement("afterend", historyBtn);
   tabContent.parentNode.insertBefore(aiResult, tabContent);
 
   const historyPanel = document.createElement("div");
-historyPanel.className = "card";
-historyPanel.style.display = "none";
-historyPanel.style.marginTop = "12px";
+  historyPanel.className = "card";
+  historyPanel.style.display = "none";
+  historyPanel.style.marginTop = "12px";
 
-aiResult.parentNode.insertBefore(historyPanel, aiResult);
+  aiResult.parentNode.insertBefore(historyPanel, aiResult);
 
-historyBtn.onclick = async () => {
-  if (historyPanel.style.display === "block") {
-    historyPanel.style.display = "none";
-    return;
-  }
-
-  historyBtn.disabled = true;
-  historyBtn.textContent = "⏳ Загружаю...";
-
-  try {
-    const history = await loadAiAnalysisHistory(p.id);
-
-    historyPanel.innerHTML = "";
-
-    const title = document.createElement("h3");
-    title.textContent = "🕘 История анализов";
-    historyPanel.appendChild(title);
-
-    if (!history.length) {
-      const empty = document.createElement("div");
-      empty.className = "muted";
-      empty.textContent = "Сохранённых анализов пока нет.";
-      historyPanel.appendChild(empty);
-    } else {
-      history.forEach((item, index) => {
-        const btn = document.createElement("button");
-        btn.className = "btn full";
-        btn.style.marginTop = "8px";
-
-        const dateText =
-          formatAIAnalysisDate(item.created_at) || "Дата неизвестна";
-
-        btn.textContent =
-          `${index === 0 ? "● " : ""}${dateText}` +
-          `${index === 0 ? " — последний" : ""}`;
-
-        btn.onclick = () => {
-          aiResult.style.display = "block";
-          aiResult.innerHTML = formatAIAnalysisBlock(
-            item.analysis,
-            item.created_at,
-           "Архивный анализ ИИ"
-        );
-        };
-
-        historyPanel.appendChild(btn);
-      });
+  historyBtn.onclick = async () => {
+    if (historyPanel.style.display === "block") {
+      historyPanel.style.display = "none";
+      return;
     }
 
-    historyPanel.style.display = "block";
-  } catch (error) {
-    console.error(error);
-    historyPanel.innerHTML =
-      '<div class="muted">Не удалось загрузить историю анализов.</div>';
-    historyPanel.style.display = "block";
-  } finally {
-    historyBtn.disabled = false;
-    historyBtn.textContent = "🕘 История анализов";
-  }
-};
+    historyBtn.disabled = true;
+    historyBtn.textContent = "⏳ Загружаю...";
+
+    try {
+      const history = await loadAiAnalysisHistory(p.id);
+
+      historyPanel.innerHTML = "";
+
+      const title = document.createElement("h3");
+      title.textContent = "🕘 История анализов";
+      historyPanel.appendChild(title);
+
+      if (!history.length) {
+        const empty = document.createElement("div");
+        empty.className = "muted";
+        empty.textContent = "Сохранённых анализов пока нет.";
+        historyPanel.appendChild(empty);
+      } else {
+        history.forEach((item, index) => {
+          const btn = document.createElement("button");
+          btn.className = "btn full";
+          btn.style.marginTop = "8px";
+
+          const dateText =
+            formatAIAnalysisDate(item.created_at) || "Дата неизвестна";
+
+          btn.textContent =
+            `${index === 0 ? "● " : ""}${dateText}` +
+            `${index === 0 ? " — последний" : ""}`;
+
+          btn.onclick = () => {
+            aiResult.style.display = "block";
+            aiResult.innerHTML = formatAIAnalysisBlock(
+              item.analysis,
+              item.created_at,
+              "Архивный анализ ИИ"
+            );
+          };
+
+          historyPanel.appendChild(btn);
+        });
+      }
+
+      historyPanel.style.display = "block";
+    } catch (error) {
+      console.error(error);
+      historyPanel.innerHTML =
+        '<div class="muted">Не удалось загрузить историю анализов.</div>';
+      historyPanel.style.display = "block";
+    } finally {
+      historyBtn.disabled = false;
+      historyBtn.textContent = "🕘 История анализов";
+    }
+  };
 
   if (p.ai_analysis) {
     aiResult.style.display = "block";
     aiResult.innerHTML = formatAIAnalysisBlock(
-  p.ai_analysis,
-  p.ai_analysis_updated_at
-);
+      p.ai_analysis,
+      p.ai_analysis_updated_at
+    );
     aiBtn.textContent = "✨ Обновить анализ ИИ";
   }
 
@@ -371,37 +371,37 @@ ${JSON.stringify(patientData, null, 2)}
         );
       }
       const { error: historyError } = await sb
-  .from("ai_analysis_history")
-  .insert({
-    patient_id: p.id,
-    therapist_id: user.id,
-    analysis: answer,
-    patient_snapshot: patientData,
-    created_at: analysisUpdatedAt
-  });
+        .from("ai_analysis_history")
+        .insert({
+          patient_id: p.id,
+          therapist_id: user.id,
+          analysis: answer,
+          patient_snapshot: patientData,
+          created_at: analysisUpdatedAt
+        });
 
-if (historyError) {
-  throw new Error(
-    "Анализ сохранён в карточке, но добавить его в историю не удалось: " +
-      historyError.message
-  );
-}
+      if (historyError) {
+        throw new Error(
+          "Анализ сохранён в карточке, но добавить его в историю не удалось: " +
+          historyError.message
+        );
+      }
 
       p.ai_analysis = answer;
       p.ai_analysis_updated_at = analysisUpdatedAt;
 
-    aiResult.innerHTML = formatAIAnalysisBlock(
-  answer,
-  analysisUpdatedAt
-);
+      aiResult.innerHTML = formatAIAnalysisBlock(
+        answer,
+        analysisUpdatedAt
+      );
       aiBtn.textContent = "✓ Анализ готов";
 
       setTimeout(() => {
-  aiBtn.textContent = p.ai_analysis
-    ? "✨ Обновить анализ ИИ"
-    : "✨ Анализ ИИ";
-  aiBtn.disabled = false;
-}, 1200);
+        aiBtn.textContent = p.ai_analysis
+          ? "✨ Обновить анализ ИИ"
+          : "✨ Анализ ИИ";
+        aiBtn.disabled = false;
+      }, 1200);
 
     } catch (error) {
       console.error(error);
@@ -576,10 +576,38 @@ function renderTab(p) {
     document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () => { const { error } = await sb.from('goals').delete().eq('id', b.dataset.delGoal); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
   }
   if (state.tab === 'sessions') {
-    box.innerHTML = `<form class="card" id="sessionForm"><h3>＋ Новое занятие</h3><label>Дата</label><input type="date" name="session_date" value="${new Date().toISOString().slice(0, 10)}"><label>Запись занятия</label><textarea name="note" required></textarea><label>Переносимость</label><select name="tolerance"><option value="good">Хорошая</option><option value="medium">Средняя</option><option value="low">Низкая</option><option value="unclear">Трудно оценить</option></select><div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form><div class="card"><h3>История занятий</h3>${state.sessions.map(s => `<div class="item"><div class="item-title">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</div><div class="item-sub">${esc(s.note || '')}</div><button class="link" style="color:#9b3333;margin-top:7px" data-del-session="${s.id}">Удалить</button></div>`).join('') || `<div class="empty">Занятий пока нет.</div>`}</div>`;
+    box.innerHTML = `<form class="card" id="sessionForm"><h3>＋ Новое занятие</h3><label>Дата</label><input type="date" name="session_date" value="${new Date().toISOString().slice(0, 10)}"><label>Запись занятия</label><textarea name="note" required></textarea><label>Переносимость</label><select name="tolerance"><option value="good">Хорошая</option><option value="medium">Средняя</option><option value="low">Низкая</option><option value="unclear">Трудно оценить</option>
+    </select>
+
+<label>Динамика</label>
+<select name="dynamics_status">
+  <option value="">Не указано</option>
+  <option value="improved">Улучшение</option>
+  <option value="stable">Без значимых изменений</option>
+  <option value="worse">Ухудшение</option>
+  <option value="unclear">Трудно оценить</option>
+</select>
+
+<label>Изменения функции</label>
+<textarea
+  name="function_changes"
+  placeholder="Например: стал отпускать опору на 3–4 секунды, появились самостоятельные шаги"
+></textarea>
+
+<div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form><div class="card"><h3>История занятий</h3>${state.sessions.map(s => `<div class="item"><div class="item-title">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</div><div class="item-sub">${esc(s.note || '')}</div><button class="link" style="color:#9b3333;margin-top:7px" data-del-session="${s.id}">Удалить</button></div>`).join('') || `<div class="empty">Занятий пока нет.</div>`}</div>`;
     const form = document.getElementById('sessionForm'), btn = document.getElementById('sessionSaveBtn'), status = document.getElementById('sessionStatus'); watchFormDirty(form, btn, 'Сохранить занятие');
-    form.onsubmit = async e => { e.preventDefault(); setButtonSaving(btn); const fd = new FormData(e.target), payload = { patient_id: p.id, session_date: fd.get('session_date'), note: fd.get('note').trim(), tolerance: fd.get('tolerance') }; const { error } = await sb.from('sessions').insert(payload); if (error) { setButtonError(btn, 'Сохранить занятие'); return flash('error', error.message) } setButtonSaved(btn, '✓ Занятие сохранено'); status.textContent = '✓ Данные сохранены в облаке'; await sleep(700); await loadPatientData(); renderPatient() };
-    document.querySelectorAll('[data-del-session]').forEach(b => b.onclick = async () => { const { error } = await sb.from('sessions').delete().eq('id', b.dataset.delSession); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
+    form.onsubmit = async e => { e.preventDefault(); setButtonSaving(btn); const fd = new FormData(e.target);
+
+    const payload = {
+     patient_id: p.id,
+     session_date: fd.get('session_date'),
+     note: fd.get('note').trim(),
+     tolerance: fd.get('tolerance'),
+     dynamics_status: fd.get('dynamics_status') || null,
+     function_changes: fd.get('function_changes').trim() || null
+    };
+   const { error } = await sb.from('sessions').insert(payload); if (error) { setButtonError(btn, 'Сохранить занятие'); return flash('error', error.message) } setButtonSaved(btn, '✓ Занятие сохранено'); status.textContent = '✓ Данные сохранены в облаке'; await sleep(700); await loadPatientData(); renderPatient() };
+     document.querySelectorAll('[data-del-session]').forEach(b => b.onclick = async () => { const { error } = await sb.from('sessions').delete().eq('id', b.dataset.delSession); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
   }
   if (state.tab === 'progress') {
     box.innerHTML = `<div class="card"><h3>Динамика по целям</h3>${state.goals.length ? state.goals.map(g => `<div class="goal"><div class="goal-top"><div class="item-title">${esc(g.title)}</div><div class="goal-pct">${g.progress}%</div></div><div class="progress"><span style="width:${Math.max(0, Math.min(100, g.progress))}%"></span></div><div class="item-sub">${esc(g.criterion || 'Критерий не указан')} · ${g.deadline ? fmtDate(g.deadline) : 'срок не указан'}</div></div>`).join('') : `<div class="empty">Нет целей для динамики.</div>`}</div><div class="card"><div class="metric-grid"><div class="metric"><b>${state.sessions.length}</b><span>занятий</span></div><div class="metric"><b>${state.goals.filter(g => g.progress >= 100).length}</b><span>целей 100%</span></div></div></div>`;
