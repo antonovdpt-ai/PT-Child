@@ -307,9 +307,11 @@ if (historyError) {
       aiBtn.textContent = "✓ Анализ готов";
 
       setTimeout(() => {
-        aiBtn.textContent = "✨ Анализ ИИ";
-        aiBtn.disabled = false;
-      }, 1200);
+  aiBtn.textContent = p.ai_analysis
+    ? "✨ Обновить анализ ИИ"
+    : "✨ Анализ ИИ";
+  aiBtn.disabled = false;
+}, 1200);
 
     } catch (error) {
       console.error(error);
