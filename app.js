@@ -61,12 +61,12 @@ function formatAIAnalysisDate(value) {
   });
 }
 
-function formatAIAnalysisBlock(text, updatedAt) {
+function formatAIAnalysisBlock(text, updatedAt, label = "Последний анализ ИИ") {
   const dateText = formatAIAnalysisDate(updatedAt);
 
   const dateHtml = dateText
     ? `<div class="muted tiny" style="margin-bottom:10px">
-        Последний анализ ИИ: ${dateText}
+        ${label}: ${dateText}
       </div>`
     : "";
 
@@ -267,8 +267,9 @@ historyBtn.onclick = async () => {
           aiResult.style.display = "block";
           aiResult.innerHTML = formatAIAnalysisBlock(
             item.analysis,
-            item.created_at
-          );
+            item.created_at,
+           "Архивный анализ ИИ"
+        );
         };
 
         historyPanel.appendChild(btn);
