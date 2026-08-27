@@ -152,6 +152,21 @@ async function countsForPatients() {
 
   return out;
 }
+
+async function loadAiAnalysisHistory(patientId) {
+  const { data, error } = await sb
+    .from("ai_analysis_history")
+    .select("id, analysis, patient_snapshot, created_at")
+    .eq("patient_id", patientId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}
+
 async function renderPatients() {
   const counts = await countsForPatients();
   app.innerHTML = `<div class="topline"><div><h2 style="margin-bottom:2px">Пациенты</h2><div class="muted tiny">Облачная база · ${state.patients.length} пациентов</div></div><button class="btn primary small" id="addPatient">＋ Ребёнок</button></div><div id="flash"></div><div class="patient-list">${state.patients.map(p => `<button class="patient-card" data-pid="${p.id}"><div class="patient-top"><div><div class="name">${esc(p.display_name)}</div><div class="meta">${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}</div></div><span class="badge">активное ведение</span></div><div class="item-sub" style="margin-top:9px">${esc(p.primary_complaint || 'Причина обращения пока не заполнена')}</div><div class="metric-grid"><div class="metric"><b>${counts[p.id]?.goals || 0}</b><span>целей</span></div><div class="metric"><b>${counts[p.id]?.sessions || 0}</b><span>занятий</span></div></div></button>`).join('') || `<div class="card empty">В облачной базе пока нет пациентов.</div>`}</div>`;
@@ -188,6 +203,13 @@ function renderPatient() {
   aiBtn.className = "primary";
   aiBtn.textContent = "✨ Анализ ИИ";
   actions.prepend(aiBtn);
+
+  const historyBtn = document.createElement("button");
+historyBtn.id = "aiHistoryBtn";
+historyBtn.className = "btn";
+historyBtn.textContent = "🕘 История анализов";
+
+aiBtn.insertAdjacentElement("afterend", historyBtn);
 
   const aiResult = document.createElement("div");
   aiResult.className = "card";
