@@ -653,6 +653,12 @@ function renderTab(p) {
     <div class="card">
       <h3>Динамика по занятиям</h3>
 
+      <button id="aiDynamicsBtn" class="btn primary full" type="button" style="margin-bottom:12px">
+       ✨ Анализ динамики ИИ
+      </button>
+
+      <div id="aiDynamicsStatus" class="muted tiny" style="margin-bottom:12px"></div>
+
       ${
         sessionsWithDynamics.length
           ? `
@@ -746,6 +752,17 @@ function renderTab(p) {
       }
     </div>
   `;
+
+  const aiDynamicsBtn = document.getElementById('aiDynamicsBtn');
+const aiDynamicsStatus = document.getElementById('aiDynamicsStatus');
+
+if (aiDynamicsBtn) {
+  aiDynamicsBtn.onclick = () => {
+    aiDynamicsStatus.textContent =
+      '✓ Кнопка работает. Подключение анализа ИИ — следующим шагом.';
+  };
+}
+
 }
 }
 
