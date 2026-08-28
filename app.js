@@ -658,6 +658,7 @@ function renderTab(p) {
       </button>
 
       <div id="aiDynamicsStatus" class="muted tiny" style="margin-bottom:12px"></div>
+      <div id="aiDynamicsResult" class="card" style="display:none; margin-bottom:12px"></div>
 
       ${
         sessionsWithDynamics.length
@@ -756,10 +757,98 @@ function renderTab(p) {
   const aiDynamicsBtn = document.getElementById('aiDynamicsBtn');
 const aiDynamicsStatus = document.getElementById('aiDynamicsStatus');
 
+const aiDynamicsResult = document.getElementById('aiDynamicsResult');
+
 if (aiDynamicsBtn) {
-  aiDynamicsBtn.onclick = () => {
+  aiDynamicsBtn.onclick = async () => {
+    aiDynamicsBtn.disabled = true;
+    aiDynamicsBtn.textContent = '⏳ Анализирую динамику...';
+
     aiDynamicsStatus.textContent =
-      '✓ Кнопка работает. Подключение анализа ИИ — следующим шагом.';
+      'ИИ сопоставляет занятия, функциональные изменения и цели.';
+
+    try {
+      const dynamicsData = {
+        age: ageFromDob(p.date_of_birth),
+        sex: sexLabel(p.sex),
+        primary_complaint: p.primary_complaint || null,
+
+        assessment: state.assessment || null,
+
+        goals: state.goals.map(g => ({
+          title: g.title,
+          baseline: g.baseline,
+          criterion: g.criterion,
+          deadline: g.deadline,
+          progress: g.progress,
+          status: g.status
+        })),
+
+        sessions: state.sessions.map(s => ({
+          date: s.session_date,
+          note: s.note,
+          tolerance: toleranceLabel(s.tolerance),
+          dynamics: s.dynamics_status
+            ? dynamicsLabel(s.dynamics_status)
+            : null,
+          function_changes: s.function_changes || null
+        }))
+      };
+
+      const prompt = `
+Ты — клинический ассистент специалиста по детской физической терапии.
+
+Проанализируй ДИНАМИКУ ребёнка только на основании предоставленных данных.
+Не придумывай навыки, диагнозы, улучшения или ухудшения, которых нет в данных.
+
+ДАННЫЕ:
+${JSON.stringify(dynamicsData, null, 2)}
+
+Сформируй ответ строго по структуре:
+
+## Общая тенденция
+Положительная / стабильная / отрицательная / недостаточно данных.
+Кратко объясни почему.
+
+## Подтверждённые функциональные изменения
+Перечисли только фактически описанные изменения.
+
+## Что остаётся без заметного прогресса
+Укажи только то, что можно обосновать данными.
+
+## Динамика целей
+Оцени прогресс по каждой цели и соответствие записей занятий поставленной цели.
+
+## Противоречия в данных
+Например: специалист отметил "без изменений", но одновременно описал появление новой функции.
+
+## Что стоит уточнить или измерить
+До 5 наиболее важных недостающих объективных данных.
+
+## Практические выводы
+До 5 конкретных выводов для дальнейшего ведения.
+
+В конце:
+**Уверенность анализа:** высокая / средняя / низкая — и коротко почему.
+`;
+
+      const answer = await callAI(prompt);
+
+      aiDynamicsResult.style.display = 'block';
+      aiDynamicsResult.innerHTML = formatAIResult(answer);
+
+      aiDynamicsStatus.textContent = '✓ Анализ динамики готов.';
+      aiDynamicsBtn.textContent = '✨ Обновить анализ динамики ИИ';
+    } catch (error) {
+      console.error(error);
+
+      aiDynamicsStatus.textContent =
+        'Не удалось выполнить анализ динамики ИИ. Попробуйте ещё раз.';
+
+      aiDynamicsBtn.textContent = '✨ Повторить анализ динамики ИИ';
+    } finally {
+      aiDynamicsBtn.disabled = false;
+    }
   };
 }
 
