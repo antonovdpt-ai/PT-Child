@@ -629,8 +629,124 @@ function renderTab(p) {
      document.querySelectorAll('[data-del-session]').forEach(b => b.onclick = async () => { const { error } = await sb.from('sessions').delete().eq('id', b.dataset.delSession); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
   }
   if (state.tab === 'progress') {
-    box.innerHTML = `<div class="card"><h3>Динамика по целям</h3>${state.goals.length ? state.goals.map(g => `<div class="goal"><div class="goal-top"><div class="item-title">${esc(g.title)}</div><div class="goal-pct">${g.progress}%</div></div><div class="progress"><span style="width:${Math.max(0, Math.min(100, g.progress))}%"></span></div><div class="item-sub">${esc(g.criterion || 'Критерий не указан')} · ${g.deadline ? fmtDate(g.deadline) : 'срок не указан'}</div></div>`).join('') : `<div class="empty">Нет целей для динамики.</div>`}</div><div class="card"><div class="metric-grid"><div class="metric"><b>${state.sessions.length}</b><span>занятий</span></div><div class="metric"><b>${state.goals.filter(g => g.progress >= 100).length}</b><span>целей 100%</span></div></div></div>`;
-  }
+  const sessionsWithDynamics = state.sessions.filter(
+    s => s.dynamics_status || s.function_changes
+  );
+
+  const improvedCount = sessionsWithDynamics.filter(
+    s => s.dynamics_status === 'improved'
+  ).length;
+
+  const stableCount = sessionsWithDynamics.filter(
+    s => s.dynamics_status === 'stable'
+  ).length;
+
+  const worseCount = sessionsWithDynamics.filter(
+    s => s.dynamics_status === 'worse'
+  ).length;
+
+  const recentChanges = sessionsWithDynamics
+    .filter(s => s.function_changes)
+    .slice(0, 5);
+
+  box.innerHTML = `
+    <div class="card">
+      <h3>Динамика по занятиям</h3>
+
+      ${
+        sessionsWithDynamics.length
+          ? `
+            <div class="metric-grid">
+              <div class="metric">
+                <b>${improvedCount}</b>
+                <span>улучшений</span>
+              </div>
+
+              <div class="metric">
+                <b>${stableCount}</b>
+                <span>без изменений</span>
+              </div>
+
+              <div class="metric">
+                <b>${worseCount}</b>
+                <span>ухудшений</span>
+              </div>
+
+              <div class="metric">
+                <b>${sessionsWithDynamics.length}</b>
+                <span>оценено занятий</span>
+              </div>
+            </div>
+          `
+          : `<div class="empty">Данных о динамике пока нет.</div>`
+      }
+    </div>
+
+    <div class="card">
+      <h3>Функциональные изменения</h3>
+
+      ${
+        recentChanges.length
+          ? recentChanges
+              .map(
+                s => `
+                  <div class="item">
+                    <div class="item-title">
+                      ${fmtDate(s.session_date)}
+                    </div>
+
+                    <div class="item-sub">
+                      ${esc(dynamicsLabel(s.dynamics_status))}
+                    </div>
+
+                    <div>
+                      ${esc(s.function_changes)}
+                    </div>
+                  </div>
+                `
+              )
+              .join('')
+          : `<div class="empty">Функциональные изменения пока не зафиксированы.</div>`
+      }
+    </div>
+
+    <div class="card">
+      <h3>Динамика по целям</h3>
+
+      ${
+        state.goals.length
+          ? state.goals
+              .map(
+                g => `
+                  <div class="goal">
+                    <div class="goal-top">
+                      <div class="item-title">${esc(g.title)}</div>
+                      <div class="goal-pct">${g.progress}%</div>
+                    </div>
+
+                    <div class="progress">
+                      <span
+                        style="width:${Math.max(
+                          0,
+                          Math.min(100, g.progress)
+                        )}%"
+                      ></span>
+                    </div>
+
+                    <div class="item-sub">
+                      ${esc(g.criterion || 'Критерий не указан')}
+                      ·
+                      ${g.deadline ? fmtDate(g.deadline) : 'срок не указан'}
+                    </div>
+                  </div>
+                `
+              )
+              .join('')
+          : `<div class="empty">Активных целей пока нет.</div>`
+      }
+    </div>
+  `;
+}
 }
 
 init().catch(err => { app.innerHTML = `<div class="error">Ошибка запуска приложения: ${esc(err.message)}</div>` });
