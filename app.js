@@ -236,6 +236,35 @@ function renderPatient() {
   aiResult.style.marginTop = "12px";
   aiResult.style.whiteSpace = "pre-wrap";
 
+  const aiToggleBtn = document.createElement("button");
+aiToggleBtn.className = "btn full";
+aiToggleBtn.type = "button";
+aiToggleBtn.style.display = "none";
+aiToggleBtn.style.marginTop = "12px";
+aiToggleBtn.textContent = "▲ Свернуть анализ";
+
+aiResult.parentNode.insertBefore(aiToggleBtn, aiResult);
+
+function showAiResult(html) {
+  aiResult.innerHTML = html;
+  aiResult.style.display = "block";
+
+  aiToggleBtn.style.display = "block";
+  aiToggleBtn.textContent = "▲ Свернуть анализ";
+}
+
+aiToggleBtn.onclick = () => {
+  const isOpen = aiResult.style.display !== "none";
+
+  if (isOpen) {
+    aiResult.style.display = "none";
+    aiToggleBtn.textContent = "▼ Развернуть анализ";
+  } else {
+    aiResult.style.display = "block";
+    aiToggleBtn.textContent = "▲ Свернуть анализ";
+  }
+};
+
   const tabContent = document.getElementById("tabContent");
   tabContent.parentNode.insertBefore(aiResult, tabContent);
 
@@ -283,13 +312,14 @@ function renderPatient() {
             `${index === 0 ? " — последний" : ""}`;
 
           btn.onclick = () => {
-            aiResult.style.display = "block";
-            aiResult.innerHTML = formatAIAnalysisBlock(
-              item.analysis,
-              item.created_at,
-              "Архивный анализ ИИ"
-            );
-          };
+           showAiResult(
+              formatAIAnalysisBlock(
+                item.analysis,
+                item.created_at,
+                "Архивный анализ ИИ"
+    )
+  );
+};
 
           historyPanel.appendChild(btn);
         });
@@ -308,12 +338,13 @@ function renderPatient() {
   };
 
   if (p.ai_analysis) {
-    aiResult.style.display = "block";
-    aiResult.innerHTML = formatAIAnalysisBlock(
-      p.ai_analysis,
-      p.ai_analysis_updated_at
-    );
-    aiBtn.textContent = "✨ Обновить анализ ИИ";
+    showAiResult(
+      formatAIAnalysisBlock(
+       p.ai_analysis,
+       p.ai_analysis_updated_at
+    ));
+
+  aiBtn.textContent = "✨ Обновить анализ ИИ";
   }
 
   aiBtn.onclick = async () => {
@@ -409,10 +440,12 @@ ${JSON.stringify(patientData, null, 2)}
       p.ai_analysis = answer;
       p.ai_analysis_updated_at = analysisUpdatedAt;
 
-      aiResult.innerHTML = formatAIAnalysisBlock(
+      showAiResult(
+       formatAIAnalysisBlock(
         answer,
         analysisUpdatedAt
-      );
+  )
+);
       aiBtn.textContent = "✓ Анализ готов";
 
       setTimeout(() => {
