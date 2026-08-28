@@ -658,7 +658,17 @@ function renderTab(p) {
       </button>
 
       <div id="aiDynamicsStatus" class="muted tiny" style="margin-bottom:12px"></div>
-      <div id="aiDynamicsResult" class="card" style="display:none; margin-bottom:12px"></div>
+
+      <button
+           id="aiDynamicsToggleBtn"
+           class="btn full"
+           type="button"
+           style="display:none; margin-bottom:12px"
+      >
+           ▲ Свернуть анализ
+      </button>
+
+       <div id="aiDynamicsResult" class="card" style="display:none; margin-bottom:12px"></div>
 
       ${
         sessionsWithDynamics.length
@@ -758,6 +768,23 @@ function renderTab(p) {
 const aiDynamicsStatus = document.getElementById('aiDynamicsStatus');
 
 const aiDynamicsResult = document.getElementById('aiDynamicsResult');
+
+const aiDynamicsToggleBtn =
+  document.getElementById('aiDynamicsToggleBtn');
+
+if (aiDynamicsToggleBtn && aiDynamicsResult) {
+  aiDynamicsToggleBtn.onclick = () => {
+    const isOpen = aiDynamicsResult.style.display !== 'none';
+
+    if (isOpen) {
+      aiDynamicsResult.style.display = 'none';
+      aiDynamicsToggleBtn.textContent = '▼ Развернуть анализ';
+    } else {
+      aiDynamicsResult.style.display = 'block';
+      aiDynamicsToggleBtn.textContent = '▲ Свернуть анализ';
+    }
+  };
+}
 
 if (aiDynamicsBtn) {
   aiDynamicsBtn.onclick = async () => {
@@ -935,6 +962,9 @@ ${JSON.stringify(dynamicsData, null, 2)}
 
       aiDynamicsResult.style.display = 'block';
       aiDynamicsResult.innerHTML = formatAIResult(answer);
+
+      aiDynamicsToggleBtn.style.display = 'block';
+      aiDynamicsToggleBtn.textContent = '▲ Свернуть анализ';
 
       aiDynamicsStatus.textContent = '✓ Анализ динамики готов.';
       aiDynamicsBtn.textContent = '✨ Обновить анализ динамики ИИ';
