@@ -243,7 +243,7 @@ aiToggleBtn.style.display = "none";
 aiToggleBtn.style.marginTop = "12px";
 aiToggleBtn.textContent = "▲ Свернуть анализ";
 
-aiResult.parentNode.insertBefore(aiToggleBtn, aiResult);
+
 
 function showAiResult(html) {
   aiResult.innerHTML = html;
@@ -267,6 +267,8 @@ aiToggleBtn.onclick = () => {
 
   const tabContent = document.getElementById("tabContent");
   tabContent.parentNode.insertBefore(aiResult, tabContent);
+
+  aiResult.parentNode.insertBefore(aiToggleBtn, aiResult);
 
   const historyPanel = document.createElement("div");
   historyPanel.className = "card";
