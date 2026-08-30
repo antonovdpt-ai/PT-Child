@@ -177,6 +177,22 @@ async function loadAiAnalysisHistory(patientId) {
     .from("ai_analysis_history")
     .select("id, analysis, patient_snapshot, created_at")
     .eq("patient_id", patientId)
+    .eq("analysis_type", "general")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}
+
+async function loadAiDynamicsHistory(patientId) {
+  const { data, error } = await sb
+    .from("ai_analysis_history")
+    .select("id, analysis, patient_snapshot, created_at")
+    .eq("patient_id", patientId)
+    .eq("analysis_type", "dynamics")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -693,6 +709,20 @@ function renderTab(p) {
       </button>
 
       <div id="aiDynamicsStatus" class="muted tiny" style="margin-bottom:12px"></div>
+      <button
+  id="aiDynamicsHistoryBtn"
+  class="btn full"
+  type="button"
+  style="margin-bottom:12px"
+>
+  🕘 История анализов динамики
+</button>
+
+<div
+  id="aiDynamicsHistoryPanel"
+  class="card"
+  style="display:none; margin-bottom:12px"
+></div>
 
       <button
            id="aiDynamicsToggleBtn"
@@ -799,11 +829,14 @@ function renderTab(p) {
     </div>
   `;
 
-  const aiDynamicsBtn = document.getElementById('aiDynamicsBtn');
+const aiDynamicsBtn = document.getElementById('aiDynamicsBtn');
 const aiDynamicsStatus = document.getElementById('aiDynamicsStatus');
-
 const aiDynamicsResult = document.getElementById('aiDynamicsResult');
+const aiDynamicsHistoryBtn =
+  document.getElementById('aiDynamicsHistoryBtn');
 
+const aiDynamicsHistoryPanel =
+  document.getElementById('aiDynamicsHistoryPanel');
 const aiDynamicsToggleBtn =
   document.getElementById('aiDynamicsToggleBtn');
 
@@ -817,6 +850,73 @@ if (aiDynamicsToggleBtn && aiDynamicsResult) {
     } else {
       aiDynamicsResult.style.display = 'block';
       aiDynamicsToggleBtn.textContent = '▲ Свернуть анализ';
+    }
+  };
+}
+if (aiDynamicsHistoryBtn && aiDynamicsHistoryPanel && aiDynamicsResult) {
+  aiDynamicsHistoryBtn.onclick = async () => {
+    if (aiDynamicsHistoryPanel.style.display === 'block') {
+      aiDynamicsHistoryPanel.style.display = 'none';
+      return;
+    }
+
+    aiDynamicsHistoryBtn.disabled = true;
+    aiDynamicsHistoryBtn.textContent = '⏳ Загружаю историю...';
+
+    try {
+      const history = await loadAiDynamicsHistory(p.id);
+
+      aiDynamicsHistoryPanel.innerHTML =
+        '<h3>🕘 История анализов динамики</h3>';
+
+      if (!history.length) {
+        aiDynamicsHistoryPanel.innerHTML +=
+          '<div class="muted">Анализов динамики пока нет.</div>';
+      } else {
+        history.forEach((item, index) => {
+          const btn = document.createElement('button');
+
+          btn.className = 'btn full';
+          btn.type = 'button';
+          btn.style.marginTop = '8px';
+
+          const dateText =
+            formatAIAnalysisDate(item.created_at) || 'Дата неизвестна';
+
+          btn.textContent =
+            `${index === 0 ? '● ' : ''}${dateText}` +
+            `${index === 0 ? ' — последний' : ''}`;
+
+          btn.onclick = () => {
+            aiDynamicsResult.innerHTML = formatAIAnalysisBlock(
+              item.analysis,
+              item.created_at,
+              'Архивный анализ динамики ИИ'
+            );
+
+            aiDynamicsResult.style.display = 'block';
+
+            if (aiDynamicsToggleBtn) {
+              aiDynamicsToggleBtn.style.display = 'block';
+              aiDynamicsToggleBtn.textContent = '▲ Свернуть анализ';
+            }
+          };
+
+          aiDynamicsHistoryPanel.appendChild(btn);
+        });
+      }
+
+      aiDynamicsHistoryPanel.style.display = 'block';
+    } catch (error) {
+      console.error(error);
+
+      aiDynamicsHistoryPanel.innerHTML =
+        `<div class="error">Не удалось загрузить историю динамики: ${esc(error.message)}</div>`;
+
+      aiDynamicsHistoryPanel.style.display = 'block';
+    } finally {
+      aiDynamicsHistoryBtn.disabled = false;
+      aiDynamicsHistoryBtn.textContent = '🕘 История анализов динамики';
     }
   };
 }
@@ -1030,6 +1130,23 @@ ${JSON.stringify(dynamicsData, null, 2)}
      throw new Error(
       "Анализ динамики создан, но сохранить его не удалось: " +
       saveDynamicsError.message
+  );
+}
+const { error: dynamicsHistoryError } = await sb
+  .from("ai_analysis_history")
+  .insert({
+    patient_id: p.id,
+    therapist_id: user.id,
+    analysis: answer,
+    patient_snapshot: dynamicsData,
+    analysis_type: "dynamics",
+    created_at: aiDynamicsUpdatedAt
+  });
+
+if (dynamicsHistoryError) {
+  throw new Error(
+    "Анализ динамики сохранён в карточке, но добавить его в историю не удалось: " +
+    dynamicsHistoryError.message
   );
 }
 
