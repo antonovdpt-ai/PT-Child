@@ -1450,6 +1450,7 @@ async function loadPatientMedia() {
         return `
           <div
             class="item"
+            data-media-card="${item.id}"
             style="
               margin:0;
               padding:8px;
@@ -1558,7 +1559,18 @@ async function loadPatientMedia() {
         );
       }
 
-      await loadPatientMedia();
+      const card = mediaList.querySelector(
+  `[data-media-card="${item.id}"]`
+);
+
+if (card) {
+  card.remove();
+}
+
+if (!mediaList.querySelector('[data-media-card]')) {
+  mediaList.innerHTML =
+    '<div class="muted">Загруженных фотографий пока нет.</div>';
+}
 
     } catch (error) {
       console.error(error);
