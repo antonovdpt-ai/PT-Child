@@ -122,6 +122,111 @@ function setButtonError(btn, text = 'Повторить сохранение') {
 function watchFormDirty(form, btn, dirtyText = 'Сохранить изменения') { form.addEventListener('input', () => setButtonDirty(btn, dirtyText)); form.addEventListener('change', () => setButtonDirty(btn, dirtyText)) }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+function enableVoiceInput(root) {
+  if (!root) return;
+
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    const note = document.createElement('div');
+    note.className = 'muted tiny';
+    note.style.marginBottom = '12px';
+    note.textContent =
+      '🎤 Голосовой ввод не поддерживается этим браузером.';
+    root.prepend(note);
+    return;
+  }
+
+  const fields = root.querySelectorAll(
+    'textarea, input[type="text"]'
+  );
+
+  fields.forEach(field => {
+    if (field.dataset.voiceReady === '1') return;
+    if (field.disabled || field.readOnly) return;
+
+    field.dataset.voiceReady = '1';
+
+    const voiceBtn = document.createElement('button');
+    voiceBtn.type = 'button';
+    voiceBtn.className = 'btn';
+    voiceBtn.style.marginTop = '6px';
+    voiceBtn.style.marginBottom = '10px';
+    voiceBtn.textContent = '🎤 Диктовать';
+
+    field.insertAdjacentElement('afterend', voiceBtn);
+
+    let recognition = null;
+    let listening = false;
+
+    voiceBtn.onclick = () => {
+      if (listening && recognition) {
+        recognition.stop();
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.lang = 'ru-RU';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        listening = true;
+        voiceBtn.textContent = '🔴 Слушаю… Нажмите для остановки';
+      };
+
+      recognition.onresult = event => {
+        const transcript =
+          event.results[event.results.length - 1][0].transcript.trim();
+
+        if (!transcript) return;
+
+        const oldText = field.value.trim();
+
+        field.value = oldText
+          ? `${oldText} ${transcript}`
+          : transcript;
+
+        field.dispatchEvent(
+          new Event('input', { bubbles: true })
+        );
+      };
+
+      recognition.onerror = event => {
+        console.error('Voice recognition error:', event.error);
+
+        if (event.error === 'not-allowed') {
+          voiceBtn.textContent = '🚫 Нет доступа к микрофону';
+        } else {
+          voiceBtn.textContent = '⚠️ Не удалось распознать';
+        }
+      };
+
+      recognition.onend = () => {
+        listening = false;
+
+        if (
+          voiceBtn.textContent !== '🚫 Нет доступа к микрофону' &&
+          voiceBtn.textContent !== '⚠️ Не удалось распознать'
+        ) {
+          voiceBtn.textContent = '✓ Текст добавлен';
+
+          setTimeout(() => {
+            voiceBtn.textContent = '🎤 Диктовать';
+          }, 1200);
+        }
+      };
+
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error(error);
+      }
+    };
+  });
+}
+
 async function init() {
   const { data } = await sb.auth.getSession(); session = data.session; user = session?.user || null; renderHeader();
   sb.auth.onAuthStateChange(async (_e, s) => { session = s; user = s?.user || null; renderHeader(); if (user) { await loadPatients(); await renderPatients() } else renderLogin() });
@@ -623,6 +728,7 @@ function renderTab(p) {
     box.innerHTML = assessmentHtml(state.assessment);
     const form = document.getElementById('assessmentForm'), btn = document.getElementById('assessmentSaveBtn'), status = document.getElementById('assessmentSaveStatus');
     watchFormDirty(form, btn, state.assessment?.id ? 'Сохранить изменения' : 'Сохранить оценку в облако');
+    enableVoiceInput(form);
     form.onsubmit = async e => {
       e.preventDefault(); setButtonSaving(btn); status.textContent = '';
       const fd = new FormData(form);
