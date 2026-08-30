@@ -1335,15 +1335,203 @@ if (state.tab === 'media') {
 
         <div id="mediaStatus" class="save-status"></div>
       </form>
-    </div>
+  </div>
 
-    <div class="card">
-      <h3>Материалы ребёнка</h3>
-      <div class="muted">
-        Загруженных фотографий пока нет.
-      </div>
-    </div>
+  <div class="card">
+  <h3>Материалы ребёнка</h3>
+  <div id="mediaList">
+  <div class="muted">Загружаю материалы...</div>
+  </div>
+  </div>
   `;
+const mediaForm = document.getElementById('mediaForm');
+const mediaFile = document.getElementById('mediaFile');
+const mediaUploadBtn = document.getElementById('mediaUploadBtn');
+const mediaStatus = document.getElementById('mediaStatus');
+const mediaList = document.getElementById('mediaList');
+
+async function loadPatientMedia() {
+  mediaList.innerHTML =
+    '<div class="muted">Загружаю материалы...</div>';
+
+  try {
+    const { data, error } = await sb
+      .from('patient_media')
+      .select('id, storage_path, media_type, note, captured_at, created_at')
+      .eq('patient_id', p.id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (!data || !data.length) {
+      mediaList.innerHTML =
+        '<div class="muted">Загруженных фотографий пока нет.</div>';
+      return;
+    }
+
+    const items = await Promise.all(
+      data.map(async item => {
+        const { data: signedData, error: signedError } =
+          await sb.storage
+            .from('patient-media')
+            .createSignedUrl(item.storage_path, 3600);
+
+        if (signedError) {
+          console.error(signedError);
+          return null;
+        }
+
+        return {
+          ...item,
+          url: signedData.signedUrl
+        };
+      })
+    );
+
+    const availableItems = items.filter(Boolean);
+
+    if (!availableItems.length) {
+      mediaList.innerHTML =
+        '<div class="muted">Не удалось открыть сохранённые фотографии.</div>';
+      return;
+    }
+
+    mediaList.innerHTML = availableItems
+      .map(item => {
+        const dateValue = item.captured_at || item.created_at;
+
+        const dateText = dateValue
+          ? new Date(dateValue).toLocaleDateString('ru-RU')
+          : 'Дата не указана';
+
+        return `
+          <div class="item" style="margin-top:12px">
+            <img
+              src="${item.url}"
+              alt="Фото пациента"
+              style="
+                width:100%;
+                max-height:420px;
+                object-fit:contain;
+                border-radius:12px;
+                display:block;
+                margin-bottom:10px;
+              "
+            >
+
+            <div class="item-title">
+              ${dateText}
+            </div>
+
+            ${
+              item.note
+                ? `<div class="item-sub">${esc(item.note)}</div>`
+                : '<div class="muted tiny">Без комментария</div>'
+            }
+          </div>
+        `;
+      })
+      .join('');
+
+  } catch (error) {
+    console.error(error);
+
+    mediaList.innerHTML =
+      `<div class="error">Не удалось загрузить материалы: ${esc(error.message)}</div>`;
+  }
+}
+
+loadPatientMedia();
+
+mediaForm.onsubmit = async e => {
+  e.preventDefault();
+
+  const file = mediaFile.files[0];
+
+  if (!file) {
+    mediaStatus.textContent = 'Выберите фотографию.';
+    return;
+  }
+
+  if (!file.type.startsWith('image/')) {
+    mediaStatus.textContent = 'Сейчас можно загружать только изображения.';
+    return;
+  }
+
+  if (file.size > 20 * 1024 * 1024) {
+    mediaStatus.textContent = 'Фотография слишком большая. Максимум 20 МБ.';
+    return;
+  }
+
+  mediaUploadBtn.disabled = true;
+  mediaUploadBtn.textContent = '⏳ Загружаю фото...';
+  mediaStatus.textContent = '';
+
+  let storagePath = null;
+
+  try {
+    const fd = new FormData(mediaForm);
+
+    const safeName = file.name
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .slice(-100);
+
+    storagePath =
+      `${user.id}/${p.id}/${crypto.randomUUID()}-${safeName}`;
+
+    const { error: uploadError } = await sb.storage
+      .from('patient-media')
+      .upload(storagePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type
+      });
+
+    if (uploadError) throw uploadError;
+
+    const capturedDate = fd.get('captured_at');
+
+    const { error: mediaError } = await sb
+      .from('patient_media')
+      .insert({
+        patient_id: p.id,
+        therapist_id: user.id,
+        storage_path: storagePath,
+        media_type: 'photo',
+        note: fd.get('note')?.trim() || null,
+        captured_at: capturedDate
+          ? `${capturedDate}T12:00:00`
+          : null
+      });
+
+    if (mediaError) {
+      await sb.storage
+        .from('patient-media')
+        .remove([storagePath]);
+
+      throw mediaError;
+    }
+
+    mediaStatus.textContent = '✓ Фото сохранено в карточке ребёнка';
+    mediaUploadBtn.textContent = '✓ Фото добавлено';
+
+    mediaForm.reset();
+
+    setTimeout(() => {
+      state.tab = 'media';
+      renderPatient();
+    }, 900);
+
+  } catch (error) {
+    console.error(error);
+
+    mediaStatus.textContent =
+      'Не удалось загрузить фото: ' + error.message;
+
+    mediaUploadBtn.textContent = '+ Добавить фото';
+    mediaUploadBtn.disabled = false;
+  }
+};
 }
 
 }
