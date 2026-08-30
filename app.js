@@ -356,11 +356,15 @@ aiToggleBtn.onclick = () => {
   };
 
   if (p.ai_analysis) {
-    showAiResult(
-      formatAIAnalysisBlock(
-       p.ai_analysis,
-       p.ai_analysis_updated_at
-    ));
+    aiResult.innerHTML = formatAIAnalysisBlock(
+  p.ai_analysis,
+  p.ai_analysis_updated_at
+);
+
+aiResult.style.display = "none";
+aiToggleBtn.style.display = "block";
+aiToggleBtn.textContent = "▼ Развернуть анализ";
+  
 
   aiBtn.textContent = "✨ Обновить анализ ИИ";
   }
@@ -930,7 +934,7 @@ if (
   aiDynamicsResult.innerHTML = formatAIResult(p.ai_dynamics_analysis);
   aiDynamicsResult.style.display = "none";
 
-  aiDynamicsToggleBtn.style.display = "block";
+  aiDynamicsToggleBtn.style.display = 'block';
   aiDynamicsToggleBtn.textContent = "▼ Развернуть анализ";
 
   aiDynamicsBtn.textContent = "✨ Обновить анализ динамики ИИ";
