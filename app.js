@@ -333,7 +333,7 @@ function goalsHtml(goals, deletable = false) {
 }
 function renderPatient() {
   const p = currentPatient(); if (!p) return renderPatients();
-  const tabs = [['overview', 'Обзор'], ['assessment', 'Оценка'], ['goals', 'Цели'], ['sessions', 'Занятия'], ['progress', 'Динамика']];
+  const tabs = [['overview', 'Обзор'], ['assessment', 'Оценка'], ['goals', 'Цели'], ['sessions', 'Занятия'], ['progress', 'Динамика'], ['media', 'Медиа']];
   app.innerHTML = `<div class="card"><div class="patient-top"><div><div class="muted tiny">Карточка ребёнка</div><h1>${esc(p.display_name)}</h1><div class="meta">${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}</div></div><span class="badge">облако</span></div><div class="sep"></div><div class="item-title">${esc(p.primary_complaint || 'Причина обращения пока не заполнена')}</div><div class="actions"><button class="btn full" id="backPatients">← К пациентам</button></div></div><div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('')}</div><div id="flash"></div><div id="tabContent"></div>`;
   document.getElementById('backPatients').onclick = renderPatients; document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderPatient() }); renderTab(p);
   const actions = app.querySelector(".actions");
@@ -1291,6 +1291,61 @@ if (dynamicsHistoryError) {
 }
 
 }
+if (state.tab === 'media') {
+  box.innerHTML = `
+    <div class="card">
+      <h3>Фото и материалы</h3>
+
+      <div class="muted" style="margin-bottom:16px">
+        Фото можно сохранять в карточке ребёнка и позже сравнивать между собой.
+      </div>
+
+      <form id="mediaForm">
+        <label>Фото</label>
+        <input
+          id="mediaFile"
+          name="media_file"
+          type="file"
+          accept="image/*"
+          required
+        />
+
+        <label style="margin-top:14px">Комментарий</label>
+        <textarea
+          name="note"
+          placeholder="Например: стойка у опоры, вид сбоку"
+        ></textarea>
+
+        <label>Дата съёмки</label>
+        <input
+          name="captured_at"
+          type="date"
+          value="${new Date().toISOString().slice(0, 10)}"
+        />
+
+        <div class="actions">
+          <button
+            id="mediaUploadBtn"
+            class="btn primary full"
+            type="submit"
+          >
+            + Добавить фото
+          </button>
+        </div>
+
+        <div id="mediaStatus" class="save-status"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Материалы ребёнка</h3>
+      <div class="muted">
+        Загруженных фотографий пока нет.
+      </div>
+    </div>
+  `;
+}
+
 }
 
 init().catch(err => { app.innerHTML = `<div class="error">Ошибка запуска приложения: ${esc(err.message)}</div>` });
