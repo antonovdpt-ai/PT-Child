@@ -1464,10 +1464,71 @@ async function loadPatientMedia() {
                 ? `<div class="item-sub">${esc(item.note)}</div>`
                 : '<div class="muted tiny">Без комментария</div>'
             }
+
+            <button
+  type="button"
+  class="link"
+  data-delete-media="${item.id}"
+  style="color:#b42318; margin-top:10px"
+>
+  Удалить фото
+</button>
           </div>
         `;
       })
       .join('');
+
+      mediaList.querySelectorAll('[data-delete-media]').forEach(btn => {
+  btn.onclick = async () => {
+    const mediaId = btn.dataset.deleteMedia;
+    const item = availableItems.find(x => x.id === mediaId);
+
+    if (!item) return;
+
+    const confirmed = confirm(
+      'Удалить это фото? Это действие нельзя отменить.'
+    );
+
+    if (!confirmed) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Удаляю...';
+
+    try {
+      // Сначала убираем запись из карточки ребёнка
+      const { error: deleteRowError } = await sb
+        .from('patient_media')
+        .delete()
+        .eq('id', item.id);
+
+      if (deleteRowError) throw deleteRowError;
+
+      // Затем удаляем сам файл из приватного Storage
+      const { error: deleteFileError } = await sb.storage
+        .from('patient-media')
+        .remove([item.storage_path]);
+
+      if (deleteFileError) {
+        console.error(
+          'Фото удалено из карточки, но файл не удалось удалить:',
+          deleteFileError
+        );
+      }
+
+      await loadPatientMedia();
+
+    } catch (error) {
+      console.error(error);
+
+      alert(
+        'Не удалось удалить фото: ' + error.message
+      );
+
+      btn.disabled = false;
+      btn.textContent = 'Удалить фото';
+    }
+  };
+});
 
   } catch (error) {
     console.error(error);
