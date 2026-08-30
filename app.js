@@ -1343,6 +1343,7 @@ if (state.tab === 'media') {
           name="media_file"
           type="file"
           accept="image/*"
+          multiple
           required
         />
 
@@ -1519,64 +1520,7 @@ async function loadPatientMedia() {
       .join('')}
   </div>
 `;
-mediaList.querySelectorAll('[data-media-preview]').forEach(img => {
-  img.onclick = () => {
-    const overlay = document.createElement('div');
 
-    overlay.style.cssText = `
-      position:fixed;
-      inset:0;
-      z-index:9999;
-      background:rgba(0,0,0,0.88);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:20px;
-    `;
-
-    overlay.innerHTML = `
-      <img
-        src="${img.dataset.mediaPreview}"
-        alt="Фото пациента"
-        style="
-          max-width:100%;
-          max-height:90vh;
-          object-fit:contain;
-          border-radius:12px;
-        "
-      >
-
-      <button
-        type="button"
-        aria-label="Закрыть"
-        style="
-          position:fixed;
-          top:18px;
-          right:18px;
-          width:46px;
-          height:46px;
-          border:0;
-          border-radius:50%;
-          background:white;
-          font-size:28px;
-          cursor:pointer;
-        "
-      >
-        ×
-      </button>
-    `;
-
-    const closePreview = () => overlay.remove();
-
-    overlay.querySelector('button').onclick = closePreview;
-
-    overlay.onclick = e => {
-      if (e.target === overlay) closePreview();
-    };
-
-    document.body.appendChild(overlay);
-  };
-});
       mediaList.querySelectorAll('[data-delete-media]').forEach(btn => {
   btn.onclick = async () => {
     const mediaId = btn.dataset.deleteMedia;
@@ -1642,74 +1586,95 @@ loadPatientMedia();
 mediaForm.onsubmit = async e => {
   e.preventDefault();
 
-  const file = mediaFile.files[0];
+  const files = Array.from(mediaFile.files);
 
-  if (!file) {
-    mediaStatus.textContent = 'Выберите фотографию.';
+  if (!files.length) {
+    mediaStatus.textContent = 'Выберите хотя бы одну фотографию.';
     return;
   }
 
-  if (!file.type.startsWith('image/')) {
-    mediaStatus.textContent = 'Сейчас можно загружать только изображения.';
+  const invalidFile = files.find(
+    file => !file.type.startsWith('image/')
+  );
+
+  if (invalidFile) {
+    mediaStatus.textContent =
+      'Сейчас можно загружать только изображения.';
     return;
   }
 
-  if (file.size > 20 * 1024 * 1024) {
-    mediaStatus.textContent = 'Фотография слишком большая. Максимум 20 МБ.';
+  const tooLargeFile = files.find(
+    file => file.size > 20 * 1024 * 1024
+  );
+
+  if (tooLargeFile) {
+    mediaStatus.textContent =
+      `Файл "${tooLargeFile.name}" больше 20 МБ.`;
     return;
   }
 
   mediaUploadBtn.disabled = true;
-  mediaUploadBtn.textContent = '⏳ Загружаю фото...';
   mediaStatus.textContent = '';
 
-  let storagePath = null;
+  const fd = new FormData(mediaForm);
+  const capturedDate = fd.get('captured_at');
+  const note = fd.get('note')?.trim() || null;
+
+  let uploadedCount = 0;
 
   try {
-    const fd = new FormData(mediaForm);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
 
-    const safeName = file.name
-      .replace(/[^a-zA-Z0-9._-]/g, '_')
-      .slice(-100);
+      mediaUploadBtn.textContent =
+        `⏳ Загружаю ${i + 1} из ${files.length}...`;
 
-    storagePath =
-      `${user.id}/${p.id}/${crypto.randomUUID()}-${safeName}`;
+      const safeName = file.name
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .slice(-100);
 
-    const { error: uploadError } = await sb.storage
-      .from('patient-media')
-      .upload(storagePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: file.type
-      });
+      const storagePath =
+        `${user.id}/${p.id}/${crypto.randomUUID()}-${safeName}`;
 
-    if (uploadError) throw uploadError;
-
-    const capturedDate = fd.get('captured_at');
-
-    const { error: mediaError } = await sb
-      .from('patient_media')
-      .insert({
-        patient_id: p.id,
-        therapist_id: user.id,
-        storage_path: storagePath,
-        media_type: 'photo',
-        note: fd.get('note')?.trim() || null,
-        captured_at: capturedDate
-          ? `${capturedDate}T12:00:00`
-          : null
-      });
-
-    if (mediaError) {
-      await sb.storage
+      const { error: uploadError } = await sb.storage
         .from('patient-media')
-        .remove([storagePath]);
+        .upload(storagePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type
+        });
 
-      throw mediaError;
+      if (uploadError) throw uploadError;
+
+      const { error: mediaError } = await sb
+        .from('patient_media')
+        .insert({
+          patient_id: p.id,
+          therapist_id: user.id,
+          storage_path: storagePath,
+          media_type: 'photo',
+          note: note,
+          captured_at: capturedDate
+            ? `${capturedDate}T12:00:00`
+            : null
+        });
+
+      if (mediaError) {
+        await sb.storage
+          .from('patient-media')
+          .remove([storagePath]);
+
+        throw mediaError;
+      }
+
+      uploadedCount++;
     }
 
-    mediaStatus.textContent = '✓ Фото сохранено в карточке ребёнка';
-    mediaUploadBtn.textContent = '✓ Фото добавлено';
+    mediaStatus.textContent =
+      `✓ Загружено фотографий: ${uploadedCount}`;
+
+    mediaUploadBtn.textContent =
+      '✓ Фотографии добавлены';
 
     mediaForm.reset();
 
@@ -1722,7 +1687,7 @@ mediaForm.onsubmit = async e => {
     console.error(error);
 
     mediaStatus.textContent =
-      'Не удалось загрузить фото: ' + error.message;
+      `Загружено ${uploadedCount} из ${files.length}. Ошибка: ${error.message}`;
 
     mediaUploadBtn.textContent = '+ Добавить фото';
     mediaUploadBtn.disabled = false;
