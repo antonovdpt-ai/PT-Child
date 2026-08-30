@@ -1432,7 +1432,13 @@ async function loadPatientMedia() {
       return;
     }
 
-    mediaList.innerHTML = availableItems
+    mediaList.innerHTML = `
+  <div style="
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px;
+  ">
+    ${availableItems
       .map(item => {
         const dateValue = item.captured_at || item.created_at;
 
@@ -1441,43 +1447,136 @@ async function loadPatientMedia() {
           : 'Дата не указана';
 
         return `
-          <div class="item" style="margin-top:12px">
+          <div
+            class="item"
+            style="
+              margin:0;
+              padding:8px;
+              min-width:0;
+            "
+          >
             <img
               src="${item.url}"
+              data-media-preview="${item.url}"
               alt="Фото пациента"
               style="
                 width:100%;
-                max-height:420px;
-                object-fit:contain;
-                border-radius:12px;
+                height:160px;
+                object-fit:cover;
+                border-radius:10px;
                 display:block;
-                margin-bottom:10px;
+                margin-bottom:8px;
+                cursor:pointer;
               "
             >
 
-            <div class="item-title">
+            <div
+              class="item-title"
+              style="font-size:14px"
+            >
               ${dateText}
             </div>
 
             ${
               item.note
-                ? `<div class="item-sub">${esc(item.note)}</div>`
-                : '<div class="muted tiny">Без комментария</div>'
+                ? `
+                  <div
+                    class="item-sub"
+                    style="
+                      font-size:13px;
+                      margin-top:4px;
+                      overflow:hidden;
+                      display:-webkit-box;
+                      -webkit-line-clamp:2;
+                      -webkit-box-orient:vertical;
+                    "
+                  >
+                    ${esc(item.note)}
+                  </div>
+                `
+                : `
+                  <div class="muted tiny">
+                    Без комментария
+                  </div>
+                `
             }
 
             <button
-  type="button"
-  class="link"
-  data-delete-media="${item.id}"
-  style="color:#b42318; margin-top:10px"
->
-  Удалить фото
-</button>
+              type="button"
+              class="link"
+              data-delete-media="${item.id}"
+              style="
+                color:#b42318;
+                margin-top:8px;
+                font-size:13px;
+              "
+            >
+              Удалить
+            </button>
           </div>
         `;
       })
-      .join('');
+      .join('')}
+  </div>
+`;
+mediaList.querySelectorAll('[data-media-preview]').forEach(img => {
+  img.onclick = () => {
+    const overlay = document.createElement('div');
 
+    overlay.style.cssText = `
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      background:rgba(0,0,0,0.88);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    `;
+
+    overlay.innerHTML = `
+      <img
+        src="${img.dataset.mediaPreview}"
+        alt="Фото пациента"
+        style="
+          max-width:100%;
+          max-height:90vh;
+          object-fit:contain;
+          border-radius:12px;
+        "
+      >
+
+      <button
+        type="button"
+        aria-label="Закрыть"
+        style="
+          position:fixed;
+          top:18px;
+          right:18px;
+          width:46px;
+          height:46px;
+          border:0;
+          border-radius:50%;
+          background:white;
+          font-size:28px;
+          cursor:pointer;
+        "
+      >
+        ×
+      </button>
+    `;
+
+    const closePreview = () => overlay.remove();
+
+    overlay.querySelector('button').onclick = closePreview;
+
+    overlay.onclick = e => {
+      if (e.target === overlay) closePreview();
+    };
+
+    document.body.appendChild(overlay);
+  };
+});
       mediaList.querySelectorAll('[data-delete-media]').forEach(btn => {
   btn.onclick = async () => {
     const mediaId = btn.dataset.deleteMedia;
