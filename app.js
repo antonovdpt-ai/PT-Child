@@ -820,6 +820,28 @@ if (aiDynamicsToggleBtn && aiDynamicsResult) {
     }
   };
 }
+if (
+  p.ai_dynamics_analysis &&
+  aiDynamicsResult &&
+  aiDynamicsToggleBtn &&
+  aiDynamicsBtn &&
+  aiDynamicsStatus
+) {
+  aiDynamicsResult.innerHTML = formatAIResult(p.ai_dynamics_analysis);
+  aiDynamicsResult.style.display = "none";
+
+  aiDynamicsToggleBtn.style.display = "block";
+  aiDynamicsToggleBtn.textContent = "▼ Развернуть анализ";
+
+  aiDynamicsBtn.textContent = "✨ Обновить анализ динамики ИИ";
+
+  const savedDynamicsDate =
+    formatAIAnalysisDate(p.ai_dynamics_updated_at);
+
+  aiDynamicsStatus.textContent = savedDynamicsDate
+    ? `✓ Сохранённый анализ динамики: ${savedDynamicsDate}`
+    : "✓ Сохранённый анализ динамики";
+}
 
 if (aiDynamicsBtn) {
   aiDynamicsBtn.onclick = async () => {
@@ -994,15 +1016,34 @@ ${JSON.stringify(dynamicsData, null, 2)}
 `;
 
       const answer = await callAI(prompt);
+      const aiDynamicsUpdatedAt = new Date().toISOString();
 
-      aiDynamicsResult.style.display = 'block';
-      aiDynamicsResult.innerHTML = formatAIResult(answer);
+      const { error: saveDynamicsError } = await sb
+       .from("patients")
+       .update({
+         ai_dynamics_analysis: answer,
+         ai_dynamics_updated_at: aiDynamicsUpdatedAt
+       })
+     .eq("id", p.id);
 
-      aiDynamicsToggleBtn.style.display = 'block';
-      aiDynamicsToggleBtn.textContent = '▲ Свернуть анализ';
+    if (saveDynamicsError) {
+     throw new Error(
+      "Анализ динамики создан, но сохранить его не удалось: " +
+      saveDynamicsError.message
+  );
+}
 
-      aiDynamicsStatus.textContent = '✓ Анализ динамики готов.';
-      aiDynamicsBtn.textContent = '✨ Обновить анализ динамики ИИ';
+    p.ai_dynamics_analysis = answer;
+    p.ai_dynamics_updated_at = aiDynamicsUpdatedAt;
+
+    aiDynamicsResult.style.display = "block";
+    aiDynamicsResult.innerHTML = formatAIResult(answer);
+
+    aiDynamicsToggleBtn.style.display = "block";
+    aiDynamicsToggleBtn.textContent = "▲ Свернуть анализ";
+
+    aiDynamicsStatus.textContent = "✓ Анализ динамики готов и сохранён.";
+    aiDynamicsBtn.textContent = "✨ Обновить анализ динамики ИИ";
     } catch (error) {
       console.error(error);
 
