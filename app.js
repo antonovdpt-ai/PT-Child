@@ -160,33 +160,57 @@ function enableVoiceInput(root) {
     let recognition = null;
     let listening = false;
 
+    let baseText = '';
+    let recognizedText = '';
+    let recognitionError = false;
+
     voiceBtn.onclick = () => {
       if (listening && recognition) {
+        voiceBtn.textContent = '⏳ Завершаю...';
         recognition.stop();
         return;
       }
 
       recognition = new SpeechRecognition();
+
       recognition.lang = 'ru-RU';
-      recognition.continuous = false;
-      recognition.interimResults = false;
+
+      // Главное изменение:
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      // Запоминаем текст, который уже был в поле
+      baseText = field.value.trim();
+      recognizedText = '';
+      recognitionError = false;
 
       recognition.onstart = () => {
         listening = true;
-        voiceBtn.textContent = '🔴 Слушаю… Нажмите для остановки';
+        voiceBtn.textContent =
+          '🔴 Слушаю... Нажмите для остановки';
       };
 
       recognition.onresult = event => {
-        const transcript =
-          event.results[event.results.length - 1][0].transcript.trim();
+        const parts = [];
 
-        if (!transcript) return;
+        // Берём и финальный, и промежуточный распознанный текст
+        for (let i = 0; i < event.results.length; i++) {
+          const text =
+            event.results[i]?.[0]?.transcript?.trim();
 
-        const oldText = field.value.trim();
+          if (text) {
+            parts.push(text);
+          }
+        }
 
-        field.value = oldText
-          ? `${oldText} ${transcript}`
-          : transcript;
+        recognizedText = parts.join(' ').trim();
+
+        if (!recognizedText) return;
+
+        field.value = baseText
+          ? `${baseText} ${recognizedText}`
+          : recognizedText;
 
         field.dispatchEvent(
           new Event('input', { bubbles: true })
@@ -194,23 +218,32 @@ function enableVoiceInput(root) {
       };
 
       recognition.onerror = event => {
-        console.error('Voice recognition error:', event.error);
+        console.error(
+          'Voice recognition error:',
+          event.error
+        );
+
+        recognitionError = true;
 
         if (event.error === 'not-allowed') {
-          voiceBtn.textContent = '🚫 Нет доступа к микрофону';
+          voiceBtn.textContent =
+            '🚫 Нет доступа к микрофону';
+        } else if (event.error === 'no-speech') {
+          voiceBtn.textContent =
+            '⚠️ Речь не распознана';
         } else {
-          voiceBtn.textContent = '⚠️ Не удалось распознать';
+          voiceBtn.textContent =
+            '⚠️ Не удалось распознать';
         }
       };
 
       recognition.onend = () => {
         listening = false;
 
-        if (
-          voiceBtn.textContent !== '🚫 Нет доступа к микрофону' &&
-          voiceBtn.textContent !== '⚠️ Не удалось распознать'
-        ) {
-          voiceBtn.textContent = '✓ Текст добавлен';
+        if (!recognitionError) {
+          voiceBtn.textContent = recognizedText
+            ? '✓ Текст добавлен'
+            : '⚠️ Речь не распознана';
 
           setTimeout(() => {
             voiceBtn.textContent = '🎤 Диктовать';
@@ -222,6 +255,9 @@ function enableVoiceInput(root) {
         recognition.start();
       } catch (error) {
         console.error(error);
+        listening = false;
+        voiceBtn.textContent =
+          '⚠️ Не удалось запустить микрофон';
       }
     };
   });
