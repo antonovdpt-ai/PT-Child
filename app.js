@@ -751,8 +751,12 @@ function renderTab(p) {
   }
   if (state.tab === 'goals') {
     box.innerHTML = `<div class="card"><h3>Активные цели</h3>${goalsHtml(state.goals, true)}</div><form class="card" id="goalForm"><h3>＋ Новая цель</h3><label>Функциональная цель</label><textarea name="title" required></textarea><label>Исходное состояние</label><textarea name="baseline"></textarea><label>Критерий достижения</label><input name="criterion"><label>Срок</label><input type="date" name="deadline"><label>Прогресс</label><select name="progress"><option value="0">0%</option><option value="20">20%</option><option value="40">40%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option></select><div class="actions"><button id="goalSaveBtn" class="btn primary full" type="submit">Добавить цель</button></div><div id="goalStatus" class="save-status"></div></form>`;
-    const form = document.getElementById('goalForm'), btn = document.getElementById('goalSaveBtn'), status = document.getElementById('goalStatus'); watchFormDirty(form, btn, 'Добавить цель');
-    form.onsubmit = async e => { e.preventDefault(); setButtonSaving(btn); const fd = new FormData(e.target), payload = { patient_id: p.id, title: fd.get('title').trim(), baseline: fd.get('baseline').trim() || null, criterion: fd.get('criterion').trim() || null, deadline: fd.get('deadline') || null, progress: Number(fd.get('progress')), status: 'active' }; const { error } = await sb.from('goals').insert(payload); if (error) { setButtonError(btn, 'Добавить цель'); return flash('error', error.message) } setButtonSaved(btn, '✓ Цель сохранена'); status.textContent = '✓ Данные сохранены в облаке'; await sleep(700); await loadPatientData(); renderPatient() };
+    const form = document.getElementById('goalForm'), btn = document.getElementById('goalSaveBtn'), status = document.getElementById('goalStatus');
+    watchFormDirty(form, btn, 'Добавить цель');
+    enableVoiceInput(form);
+    form.onsubmit = async e => { e.preventDefault(); 
+    setButtonSaving(btn);
+       const fd = new FormData(e.target), payload = { patient_id: p.id, title: fd.get('title').trim(), baseline: fd.get('baseline').trim() || null, criterion: fd.get('criterion').trim() || null, deadline: fd.get('deadline') || null, progress: Number(fd.get('progress')), status: 'active' }; const { error } = await sb.from('goals').insert(payload); if (error) { setButtonError(btn, 'Добавить цель'); return flash('error', error.message) } setButtonSaved(btn, '✓ Цель сохранена'); status.textContent = '✓ Данные сохранены в облаке'; await sleep(700); await loadPatientData(); renderPatient() };
     document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () => { const { error } = await sb.from('goals').delete().eq('id', b.dataset.delGoal); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
   }
   if (state.tab === 'sessions') {
