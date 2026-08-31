@@ -762,9 +762,406 @@ function renderTab(p) {
   }
   if (state.tab === 'assessment') {
     box.innerHTML = assessmentHtml(state.assessment);
+
+box.insertAdjacentHTML('beforeend', `
+  <div class="card" style="margin-top:12px">
+    <h3>Документы и исследования</h3>
+
+    <div class="muted" style="margin-bottom:14px">
+      Здесь можно хранить обследования, заключения, выписки и другие медицинские документы ребёнка.
+    </div>
+
+    <form id="documentForm">
+
+      <label>Тип документа</label>
+      <select name="document_type" required>
+        <option value="">Выберите тип</option>
+        <option value="mri_ct">МРТ / КТ</option>
+        <option value="xray">Рентген</option>
+        <option value="nsg">НСГ</option>
+        <option value="eeg">ЭЭГ</option>
+        <option value="enmg">ЭНМГ</option>
+        <option value="ultrasound">УЗИ</option>
+        <option value="doctor_report">Заключение врача</option>
+        <option value="discharge">Выписка</option>
+        <option value="labs">Анализы</option>
+        <option value="genetic">Генетические исследования</option>
+        <option value="other">Другое</option>
+      </select>
+
+      <label style="margin-top:14px">Файл</label>
+      <input
+        id="documentFile"
+        type="file"
+        accept="image/*,application/pdf"
+        multiple
+        required
+      >
+
+      <label style="margin-top:14px">Дата исследования</label>
+      <input
+        type="date"
+        name="document_date"
+      >
+
+      <label style="margin-top:14px">Комментарий</label>
+      <textarea
+        name="document_note"
+        placeholder="Например: заключение невролога, контроль после лечения"
+      ></textarea>
+
+      <button
+        id="documentUploadBtn"
+        class="btn primary full"
+        type="submit"
+        style="margin-top:14px"
+      >
+        + Добавить документ
+      </button>
+
+      <div
+        id="documentStatus"
+        class="save-status"
+      ></div>
+    </form>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h3>Сохранённые документы</h3>
+
+    <div id="documentList">
+      <div class="muted">
+        Документы пока не загружены.
+      </div>
+    </div>
+  </div>
+`);
+
     const form = document.getElementById('assessmentForm'), btn = document.getElementById('assessmentSaveBtn'), status = document.getElementById('assessmentSaveStatus');
     watchFormDirty(form, btn, state.assessment?.id ? 'Сохранить изменения' : 'Сохранить оценку в облако');
     enableVoiceInput(form);
+
+const documentForm = document.getElementById('documentForm');
+const documentFile = document.getElementById('documentFile');
+const documentUploadBtn = document.getElementById('documentUploadBtn');
+const documentStatus = document.getElementById('documentStatus');
+const documentList = document.getElementById('documentList');
+
+const documentTypeLabels = {
+  mri_ct: 'МРТ / КТ',
+  xray: 'Рентген',
+  nsg: 'НСГ',
+  eeg: 'ЭЭГ',
+  enmg: 'ЭНМГ',
+  ultrasound: 'УЗИ',
+  doctor_report: 'Заключение врача',
+  discharge: 'Выписка',
+  labs: 'Анализы',
+  genetic: 'Генетические исследования',
+  other: 'Другое'
+};
+
+async function loadPatientDocuments() {
+  documentList.innerHTML =
+    '<div class="muted">Загружаю документы...</div>';
+
+  try {
+    const { data, error } = await sb
+      .from('patient_media')
+      .select(
+        'id, storage_path, media_type, document_type, note, captured_at, created_at'
+      )
+      .eq('patient_id', p.id)
+      .eq('media_type', 'document')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (!data || !data.length) {
+      documentList.innerHTML =
+        '<div class="muted">Документы пока не загружены.</div>';
+      return;
+    }
+
+    const items = await Promise.all(
+      data.map(async item => {
+        const { data: signedData, error: signedError } =
+          await sb.storage
+            .from('patient-media')
+            .createSignedUrl(item.storage_path, 3600);
+
+        if (signedError) {
+          console.error(signedError);
+          return null;
+        }
+
+        return {
+          ...item,
+          url: signedData.signedUrl
+        };
+      })
+    );
+
+    const availableItems = items.filter(Boolean);
+
+    documentList.innerHTML = availableItems
+      .map(item => {
+        const dateValue = item.captured_at || item.created_at;
+
+        const dateText = dateValue
+          ? new Date(dateValue).toLocaleDateString('ru-RU')
+          : 'Дата не указана';
+
+        const fileName =
+          item.storage_path.split('/').pop() || 'Документ';
+
+        return `
+          <div
+            class="item"
+            data-document-card="${item.id}"
+            style="margin-top:12px"
+          >
+            <div class="item-title">
+              ${documentTypeLabels[item.document_type] || 'Документ'}
+            </div>
+
+            <div class="item-sub">
+              ${dateText}
+            </div>
+
+            ${
+              item.note
+                ? `<div style="margin-top:6px">${esc(item.note)}</div>`
+                : ''
+            }
+
+            <div class="actions" style="margin-top:10px">
+              <a
+                class="btn"
+                href="${item.url}"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Открыть документ
+              </a>
+
+              <button
+                type="button"
+                class="link"
+                data-delete-document="${item.id}"
+                style="color:#b42318"
+              >
+                Удалить
+              </button>
+            </div>
+
+            <div class="muted tiny" style="margin-top:5px">
+              ${esc(fileName)}
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+
+    documentList
+      .querySelectorAll('[data-delete-document]')
+      .forEach(btn => {
+        btn.onclick = async () => {
+          const documentId = btn.dataset.deleteDocument;
+
+          const item = availableItems.find(
+            x => x.id === documentId
+          );
+
+          if (!item) return;
+
+          const confirmed = confirm(
+            'Удалить этот документ? Это действие нельзя отменить.'
+          );
+
+          if (!confirmed) return;
+
+          btn.disabled = true;
+          btn.textContent = 'Удаляю...';
+
+          try {
+            const { error: deleteFileError } = await sb.storage
+              .from('patient-media')
+              .remove([item.storage_path]);
+
+            if (deleteFileError) throw deleteFileError;
+
+            const { error: deleteRowError } = await sb
+              .from('patient_media')
+              .delete()
+              .eq('id', item.id);
+
+            if (deleteRowError) throw deleteRowError;
+
+            const card = documentList.querySelector(
+              `[data-document-card="${item.id}"]`
+            );
+
+            if (card) card.remove();
+
+            if (
+              !documentList.querySelector('[data-document-card]')
+            ) {
+              documentList.innerHTML =
+                '<div class="muted">Документы пока не загружены.</div>';
+            }
+          } catch (error) {
+            console.error(error);
+
+            alert(
+              'Не удалось удалить документ: ' + error.message
+            );
+
+            btn.disabled = false;
+            btn.textContent = 'Удалить';
+          }
+        };
+      });
+
+  } catch (error) {
+    console.error(error);
+
+    documentList.innerHTML =
+      `<div class="error">Не удалось загрузить документы: ${esc(error.message)}</div>`;
+  }
+}
+
+loadPatientDocuments();
+
+documentForm.onsubmit = async e => {
+  e.preventDefault();
+
+  const files = Array.from(documentFile.files);
+
+  if (!files.length) {
+    documentStatus.textContent =
+      'Выберите хотя бы один файл.';
+    return;
+  }
+
+  const allowedTypes = [
+    'application/pdf'
+  ];
+
+  const invalidFile = files.find(
+    file =>
+      !file.type.startsWith('image/') &&
+      !allowedTypes.includes(file.type)
+  );
+
+  if (invalidFile) {
+    documentStatus.textContent =
+      'Можно загружать изображения или PDF.';
+    return;
+  }
+
+  const tooLargeFile = files.find(
+    file => file.size > 20 * 1024 * 1024
+  );
+
+  if (tooLargeFile) {
+    documentStatus.textContent =
+      `Файл "${tooLargeFile.name}" больше 20 МБ.`;
+    return;
+  }
+
+  const fd = new FormData(documentForm);
+
+  const documentType = fd.get('document_type');
+  const documentDate = fd.get('document_date');
+  const note =
+    fd.get('document_note')?.trim() || null;
+
+  documentUploadBtn.disabled = true;
+  documentStatus.textContent = '';
+
+  let uploadedCount = 0;
+
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      documentUploadBtn.textContent =
+        `⏳ Загружаю ${i + 1} из ${files.length}...`;
+
+      const safeName = file.name
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .slice(-100);
+
+      const storagePath =
+        `${user.id}/${p.id}/documents/` +
+        `${crypto.randomUUID()}-${safeName}`;
+
+      const { error: uploadError } = await sb.storage
+        .from('patient-media')
+        .upload(storagePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { error: documentError } = await sb
+        .from('patient_media')
+        .insert({
+          patient_id: p.id,
+          therapist_id: user.id,
+          storage_path: storagePath,
+          media_type: 'document',
+          document_type: documentType,
+          note: note,
+          captured_at: documentDate
+            ? `${documentDate}T12:00:00`
+            : null
+        });
+
+      if (documentError) {
+        await sb.storage
+          .from('patient-media')
+          .remove([storagePath]);
+
+        throw documentError;
+      }
+
+      uploadedCount++;
+    }
+
+    documentStatus.textContent =
+      `✓ Загружено документов: ${uploadedCount}`;
+
+    documentUploadBtn.textContent =
+      '✓ Документы добавлены';
+
+    documentForm.reset();
+
+    await loadPatientDocuments();
+
+    setTimeout(() => {
+      documentUploadBtn.textContent =
+        '+ Добавить документ';
+
+      documentUploadBtn.disabled = false;
+    }, 1200);
+
+  } catch (error) {
+    console.error(error);
+
+    documentStatus.textContent =
+      `Загружено ${uploadedCount} из ${files.length}. Ошибка: ${error.message}`;
+
+    documentUploadBtn.textContent =
+      '+ Добавить документ';
+
+    documentUploadBtn.disabled = false;
+  }
+};
+
     form.onsubmit = async e => {
       e.preventDefault(); setButtonSaving(btn); status.textContent = '';
       const fd = new FormData(form);
