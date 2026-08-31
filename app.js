@@ -1625,6 +1625,67 @@ mediaList.querySelectorAll('[data-media-filter]').forEach(filterBtn => {
   };
 });
 
+mediaList.querySelectorAll('[data-media-preview]').forEach(img => {
+  img.onclick = () => {
+    const overlay = document.createElement('div');
+
+    overlay.style.cssText = `
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      background:rgba(0,0,0,0.88);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    `;
+
+    overlay.innerHTML = `
+      <img
+        src="${img.dataset.mediaPreview}"
+        alt="Фото пациента"
+        style="
+          max-width:100%;
+          max-height:90vh;
+          object-fit:contain;
+          border-radius:12px;
+        "
+      >
+
+      <button
+        type="button"
+        aria-label="Закрыть"
+        style="
+          position:fixed;
+          top:18px;
+          right:18px;
+          width:46px;
+          height:46px;
+          border:0;
+          border-radius:50%;
+          background:white;
+          font-size:28px;
+          cursor:pointer;
+        "
+      >
+        ×
+      </button>
+    `;
+
+    const closePreview = () => overlay.remove();
+
+    overlay.querySelector('button').onclick = closePreview;
+
+    overlay.onclick = e => {
+      if (e.target === overlay) {
+        closePreview();
+      }
+    };
+
+    document.body.appendChild(overlay);
+  };
+});
+
       mediaList.querySelectorAll('[data-delete-media]').forEach(btn => {
   btn.onclick = async () => {
     const mediaId = btn.dataset.deleteMedia;
