@@ -1347,6 +1347,20 @@ if (state.tab === 'media') {
           required
         />
 
+        <label style="margin-top:14px">Категория</label>
+<select name="category">
+  <option value="posture">Поза / осанка</option>
+  <option value="sitting">Сидение</option>
+  <option value="crawling">Ползание</option>
+  <option value="standing">Стояние</option>
+  <option value="walking">Ходьба</option>
+  <option value="transitions">Переходы</option>
+  <option value="lower_limb">Стопы / ноги</option>
+  <option value="upper_limb">Руки</option>
+  <option value="equipment">ТСР / ортезы</option>
+  <option value="other">Другое</option>
+</select>
+
         <label style="margin-top:14px">Комментарий</label>
         <textarea
           name="note"
@@ -1394,7 +1408,7 @@ async function loadPatientMedia() {
   try {
     const { data, error } = await sb
       .from('patient_media')
-      .select('id, storage_path, media_type, note, captured_at, created_at')
+      .select('id, storage_path, media_type, category, note, captured_at, created_at')
       .eq('patient_id', p.id)
       .order('created_at', { ascending: false });
 
@@ -1406,34 +1420,85 @@ async function loadPatientMedia() {
       return;
     }
 
-    const items = await Promise.all(
-      data.map(async item => {
-        const { data: signedData, error: signedError } =
-          await sb.storage
-            .from('patient-media')
-            .createSignedUrl(item.storage_path, 3600);
+   const items = await Promise.all(
+  data.map(async item => {
+    const { data: signedData, error: signedError } =
+      await sb.storage
+        .from('patient-media')
+        .createSignedUrl(item.storage_path, 3600);
 
-        if (signedError) {
-          console.error(signedError);
-          return null;
-        }
-
-        return {
-          ...item,
-          url: signedData.signedUrl
-        };
-      })
-    );
-
-    const availableItems = items.filter(Boolean);
-
-    if (!availableItems.length) {
-      mediaList.innerHTML =
-        '<div class="muted">Не удалось открыть сохранённые фотографии.</div>';
-      return;
+    if (signedError) {
+      console.error(signedError);
+      return null;
     }
 
-    mediaList.innerHTML = `
+    return {
+      ...item,
+      url: signedData.signedUrl
+    };
+  })
+);
+
+const availableItems = items.filter(Boolean);
+
+if (!availableItems.length) {
+  mediaList.innerHTML =
+    '<div class="muted">Не удалось открыть сохранённые фотографии.</div>';
+  return;
+}
+
+const categoryLabels = {
+  posture: 'Поза / осанка',
+  sitting: 'Сидение',
+  crawling: 'Ползание',
+  standing: 'Стояние',
+  walking: 'Ходьба',
+  transitions: 'Переходы',
+  lower_limb: 'Стопы / ноги',
+  upper_limb: 'Руки',
+  equipment: 'ТСР / ортезы',
+  other: 'Другое'
+};
+
+const usedCategories = [
+  ...new Set(
+    availableItems.map(item => item.category || 'other')
+  )
+];
+
+mediaList.innerHTML = `
+  <div
+    style="
+      display:flex;
+      gap:8px;
+      overflow-x:auto;
+      margin-bottom:14px;
+      padding-bottom:4px;
+    "
+  >
+    <button
+      type="button"
+      class="btn primary"
+      data-media-filter="all"
+      style="white-space:nowrap"
+    >
+      Все
+    </button>
+
+    ${usedCategories
+      .map(category => `
+        <button
+          type="button"
+          class="btn"
+          data-media-filter="${category}"
+          style="white-space:nowrap"
+        >
+          ${categoryLabels[category] || 'Другое'}
+        </button>
+      `)
+      .join('')}
+  </div>
+
   <div style="
     display:grid;
     grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -1451,6 +1516,7 @@ async function loadPatientMedia() {
           <div
             class="item"
             data-media-card="${item.id}"
+            data-media-category="${item.category || 'other'}"
             style="
               margin:0;
               padding:8px;
@@ -1478,6 +1544,21 @@ async function loadPatientMedia() {
             >
               ${dateText}
             </div>
+
+            <div
+  style="
+    display:inline-block;
+    margin-top:5px;
+    margin-bottom:4px;
+    padding:3px 7px;
+    border-radius:999px;
+    background:#eef4ff;
+    font-size:12px;
+    font-weight:600;
+  "
+>
+  ${categoryLabels[item.category] || 'Другое'}
+</div>
 
             ${
               item.note
@@ -1521,6 +1602,28 @@ async function loadPatientMedia() {
       .join('')}
   </div>
 `;
+
+mediaList.querySelectorAll('[data-media-filter]').forEach(filterBtn => {
+  filterBtn.onclick = () => {
+    const selectedCategory = filterBtn.dataset.mediaFilter;
+
+    mediaList
+      .querySelectorAll('[data-media-filter]')
+      .forEach(btn => btn.classList.remove('primary'));
+
+    filterBtn.classList.add('primary');
+
+    mediaList
+      .querySelectorAll('[data-media-card]')
+      .forEach(card => {
+        const show =
+          selectedCategory === 'all' ||
+          card.dataset.mediaCategory === selectedCategory;
+
+        card.style.display = show ? '' : 'none';
+      });
+  };
+});
 
       mediaList.querySelectorAll('[data-delete-media]').forEach(btn => {
   btn.onclick = async () => {
@@ -1631,6 +1734,7 @@ mediaForm.onsubmit = async e => {
   const fd = new FormData(mediaForm);
   const capturedDate = fd.get('captured_at');
   const note = fd.get('note')?.trim() || null;
+  const category = fd.get('category') || 'other';
 
   let uploadedCount = 0;
 
@@ -1665,6 +1769,7 @@ mediaForm.onsubmit = async e => {
           therapist_id: user.id,
           storage_path: storagePath,
           media_type: 'photo',
+          category: category,
           note: note,
           captured_at: capturedDate
             ? `${capturedDate}T12:00:00`
