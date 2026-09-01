@@ -512,37 +512,65 @@ async function loadAiDocumentChoices() {
               : '';
 
           return `
-            <label
-              style="
-                display:flex;
-                align-items:flex-start;
-                gap:9px;
-                padding:7px 0;
-                cursor:pointer;
-              "
-            >
-              <input
-                type="checkbox"
-                data-ai-document-id="${item.id}"
-                ${checked}
-                style="margin-top:3px"
-              >
+  <label
+    style="
+      display:grid;
+      grid-template-columns:20px minmax(0, 1fr);
+      align-items:center;
+      gap:10px;
+      padding:10px 0;
+      margin:0;
+      cursor:pointer;
+      border-bottom:1px solid #e5e7eb;
+    "
+  >
+    <input
+      type="checkbox"
+      data-ai-document-id="${item.id}"
+      ${checked}
+      style="
+        width:18px;
+        height:18px;
+        min-width:18px;
+        margin:0;
+        padding:0;
+      "
+    >
 
-              <span>
-                <strong>
-                  ${
-                    aiDocumentTypeLabels[
-                      item.document_type
-                    ] || 'Документ'
-                  }
-                </strong>
+    <span
+      style="
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        min-width:0;
+      "
+    >
+      <strong
+        style="
+          font-size:14px;
+          text-align:left;
+        "
+      >
+        ${
+          aiDocumentTypeLabels[
+            item.document_type
+          ] || 'Документ'
+        }
+      </strong>
 
-                <span class="muted tiny">
-                  · ${dateText}
-                </span>
-              </span>
-            </label>
-          `;
+      <span
+        class="muted tiny"
+        style="
+          white-space:nowrap;
+          text-align:right;
+        "
+      >
+        ${dateText}
+      </span>
+    </span>
+  </label>
+`;
         })
         .join('')}
     `;
