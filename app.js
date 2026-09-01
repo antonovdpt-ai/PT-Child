@@ -10,7 +10,15 @@ const sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 const app = document.getElementById('app');
 const headerActions = document.getElementById('headerActions');
 let session = null, user = null;
-let state = { patientId: null, tab: 'overview', patients: [], goals: [], sessions: [], assessment: null };
+let state = {
+  patientId: null,
+  tab: 'overview',
+  patients: [],
+  goals: [],
+  sessions: [],
+  assessment: null,
+  aiDocumentIdsByPatient: {}
+};
 
 const esc = (v = '') => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
 const fmtDate = v => { if (!v) return 'дата не указана'; const d = new Date(v + 'T12:00:00'); return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) };
@@ -383,6 +391,215 @@ function renderPatient() {
   aiBtn.textContent = "✨ Анализ ИИ";
   actions.prepend(aiBtn);
 
+  const aiDocumentsPanel = document.createElement("div");
+
+aiDocumentsPanel.id = "aiDocumentsPanel";
+
+aiDocumentsPanel.style.cssText = `
+  width:100%;
+  margin-top:10px;
+  padding:12px;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  background:#f8fafc;
+`;
+
+aiDocumentsPanel.innerHTML = `
+  <div style="
+    font-weight:700;
+    margin-bottom:6px;
+  ">
+    📎 Документы для ИИ
+  </div>
+
+  <div
+    id="aiDocumentsList"
+    class="muted"
+  >
+    Загружаю документы...
+  </div>
+`;
+
+actions.insertAdjacentElement(
+  "afterend",
+  aiDocumentsPanel
+);
+
+const aiDocumentTypeLabels = {
+  mri_ct: 'МРТ / КТ',
+  xray: 'Рентген',
+  nsg: 'НСГ',
+  eeg: 'ЭЭГ',
+  enmg: 'ЭНМГ',
+  ultrasound: 'УЗИ',
+  doctor_report: 'Заключение врача',
+  discharge: 'Выписка',
+  labs: 'Анализы',
+  genetic: 'Генетические исследования',
+  other: 'Другое'
+};
+
+async function loadAiDocumentChoices() {
+  const aiDocumentsList =
+    document.getElementById('aiDocumentsList');
+
+  if (!aiDocumentsList) return;
+
+  try {
+    const { data, error } = await sb
+      .from('patient_media')
+      .select(
+        'id, document_type, captured_at, created_at'
+      )
+      .eq('patient_id', p.id)
+      .eq('media_type', 'document')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const documents = data || [];
+
+    if (!documents.length) {
+      aiDocumentsList.innerHTML =
+        '<div class="muted">Документов для анализа пока нет.</div>';
+      return;
+    }
+
+    if (
+      !Array.isArray(
+        state.aiDocumentIdsByPatient[p.id]
+      )
+    ) {
+      state.aiDocumentIdsByPatient[p.id] =
+        documents
+          .slice(0, 3)
+          .map(item => item.id);
+    }
+
+    const validIds = new Set(
+      documents.map(item => item.id)
+    );
+
+    state.aiDocumentIdsByPatient[p.id] =
+      state.aiDocumentIdsByPatient[p.id]
+        .filter(id => validIds.has(id));
+
+    const selectedIds =
+      state.aiDocumentIdsByPatient[p.id];
+
+    aiDocumentsList.innerHTML = `
+      <div
+        id="aiDocumentsCount"
+        class="muted tiny"
+        style="margin-bottom:8px"
+      >
+        Выбрано: ${selectedIds.length} из 3
+      </div>
+
+      ${documents
+        .map(item => {
+          const dateValue =
+            item.captured_at || item.created_at;
+
+          const dateText = dateValue
+            ? new Date(dateValue)
+                .toLocaleDateString('ru-RU')
+            : 'Дата не указана';
+
+          const checked =
+            selectedIds.includes(item.id)
+              ? 'checked'
+              : '';
+
+          return `
+            <label
+              style="
+                display:flex;
+                align-items:flex-start;
+                gap:9px;
+                padding:7px 0;
+                cursor:pointer;
+              "
+            >
+              <input
+                type="checkbox"
+                data-ai-document-id="${item.id}"
+                ${checked}
+                style="margin-top:3px"
+              >
+
+              <span>
+                <strong>
+                  ${
+                    aiDocumentTypeLabels[
+                      item.document_type
+                    ] || 'Документ'
+                  }
+                </strong>
+
+                <span class="muted tiny">
+                  · ${dateText}
+                </span>
+              </span>
+            </label>
+          `;
+        })
+        .join('')}
+    `;
+
+    aiDocumentsList
+      .querySelectorAll('[data-ai-document-id]')
+      .forEach(checkbox => {
+        checkbox.onchange = () => {
+          const documentId =
+            checkbox.dataset.aiDocumentId;
+
+          let ids =
+            state.aiDocumentIdsByPatient[p.id];
+
+          if (checkbox.checked) {
+            if (ids.length >= 3) {
+              checkbox.checked = false;
+
+              alert(
+                'Для одного ИИ-анализа можно выбрать максимум 3 документа.'
+              );
+
+              return;
+            }
+
+            ids = [...ids, documentId];
+          } else {
+            ids = ids.filter(
+              id => id !== documentId
+            );
+          }
+
+          state.aiDocumentIdsByPatient[p.id] =
+            ids;
+
+          const count =
+            document.getElementById(
+              'aiDocumentsCount'
+            );
+
+          if (count) {
+            count.textContent =
+              `Выбрано: ${ids.length} из 3`;
+          }
+        };
+      });
+
+  } catch (error) {
+    console.error(error);
+
+    aiDocumentsList.innerHTML =
+      '<div class="error">Не удалось загрузить список документов.</div>';
+  }
+}
+
+loadAiDocumentChoices();
+
   const historyBtn = document.createElement("button");
   historyBtn.id = "aiHistoryBtn";
   historyBtn.className = "btn";
@@ -522,49 +739,74 @@ aiToggleBtn.textContent = "▼ Развернуть анализ";
     try {
   const { data: documentRows, error: documentsError } = await sb
     .from('patient_media')
-    .select('document_type, note, captured_at, created_at, storage_path')
+    .select('id, document_type, note, captured_at, created_at, storage_path')
     .eq('patient_id', p.id)
     .eq('media_type', 'document')
     .order('created_at', { ascending: false });
 
   if (documentsError) throw documentsError;
 
-  const documentsForAI = (documentRows || []).map(item => ({
+  const allDocumentRows = documentRows || [];
+
+let selectedIds =
+  state.aiDocumentIdsByPatient[p.id];
+
+if (!Array.isArray(selectedIds)) {
+  selectedIds = allDocumentRows
+    .slice(0, 3)
+    .map(item => item.id);
+
+  state.aiDocumentIdsByPatient[p.id] =
+    selectedIds;
+}
+
+const selectedDocumentRows =
+  allDocumentRows.filter(item =>
+    selectedIds.includes(item.id)
+  );
+
+const documentsForAI =
+  selectedDocumentRows.map(item => ({
     type: item.document_type || 'other',
     date: item.captured_at || item.created_at || null,
     note: item.note || null
   }));
 
-  const aiFiles = (
+const aiFiles = (
   await Promise.all(
-    (documentRows || [])
-      .slice(0, 3)
-      .map(async item => {
-        if (!item.storage_path) return null;
+    selectedDocumentRows.map(async item => {
+      if (!item.storage_path) return null;
 
-        const { data: signedData, error: signedError } =
-          await sb.storage
-            .from('patient-media')
-            .createSignedUrl(item.storage_path, 600);
-
-        if (signedError || !signedData?.signedUrl) {
-          console.error(
-            'Не удалось подготовить документ для ИИ:',
-            signedError
+      const { data: signedData, error: signedError } =
+        await sb.storage
+          .from('patient-media')
+          .createSignedUrl(
+            item.storage_path,
+            600
           );
-          return null;
-        }
 
-        const lowerPath =
-          item.storage_path.toLowerCase();
+      if (
+        signedError ||
+        !signedData?.signedUrl
+      ) {
+        console.error(
+          'Не удалось подготовить документ для ИИ:',
+          signedError
+        );
 
-        return {
-          kind: lowerPath.endsWith('.pdf')
-            ? 'pdf'
-            : 'image',
-          url: signedData.signedUrl
-        };
-      })
+        return null;
+      }
+
+      const lowerPath =
+        item.storage_path.toLowerCase();
+
+      return {
+        kind: lowerPath.endsWith('.pdf')
+          ? 'pdf'
+          : 'image',
+        url: signedData.signedUrl
+      };
+    })
   )
 ).filter(Boolean);
 
@@ -618,7 +860,10 @@ ${JSON.stringify(patientData, null, 2)}
 **Уверенность анализа:** высокая / средняя / низкая — и коротко почему.
 `;
 
-      const answer = await callAI(prompt, aiFiles);
+     const aiAnswer = await callAI(prompt, aiFiles);
+
+const answer =
+  `📎 Документов в анализе: ${selectedDocumentRows.length}\n\n${aiAnswer}`; 
 
       const analysisUpdatedAt = new Date().toISOString();
 
