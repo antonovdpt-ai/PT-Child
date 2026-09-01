@@ -921,11 +921,21 @@ const aiFiles = (
         item.storage_path.toLowerCase();
 
       return {
-        kind: lowerPath.endsWith('.pdf')
-          ? 'pdf'
-          : 'image',
-        url: signedData.signedUrl
-      };
+  kind: lowerPath.endsWith('.pdf')
+    ? 'pdf'
+    : 'image',
+
+  url: signedData.signedUrl,
+
+  label:
+    aiDocumentTypeLabels[item.document_type] ||
+    'Документ',
+
+  date:
+    item.captured_at ||
+    item.created_at ||
+    null
+};
     })
   )
 ).filter(Boolean);
@@ -961,6 +971,18 @@ ${JSON.stringify(patientData, null, 2)}
 ## Краткое резюме
 Максимум 3 коротких предложения.
 
+## 📎 Данные из выбранных документов
+Если к запросу приложены медицинские документы, обязательно разберись с каждым из них отдельно.
+
+Для каждого приложенного документа:
+- укажи тип документа;
+- перечисли 1–5 ключевых фактов, которые действительно удалось прочитать непосредственно из файла;
+- не смешивай факты документа с предположениями;
+- если документ не удалось прочитать или изображение недостаточно разборчиво — прямо напиши об этом.
+
+Не пропускай приложенный документ молча.
+Если документов нет — напиши: "Документы не выбраны".
+
 ## 🔴 Что требует внимания
 Только значимые красные флаги, противоречия или важные клинические моменты.
 Максимум 4 пункта.
@@ -983,7 +1005,7 @@ ${JSON.stringify(patientData, null, 2)}
      const aiAnswer = await callAI(prompt, aiFiles);
 
 const answer =
-  `📎 Документов в анализе: ${selectedDocumentRows.length}\n\n${aiAnswer}`; 
+  `📎 Файлов передано ИИ: ${aiFiles.length} из ${selectedDocumentRows.length} выбранных\n\n${aiAnswer}`;
 
       const analysisUpdatedAt = new Date().toISOString();
 
