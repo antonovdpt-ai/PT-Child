@@ -904,7 +904,47 @@ async function loadPatientDocuments() {
 
     const availableItems = items.filter(Boolean);
 
-    documentList.innerHTML = availableItems
+    const usedDocumentTypes = [
+  ...new Set(
+    availableItems.map(item => item.document_type || 'other')
+  )
+];
+
+documentList.innerHTML = `
+  <div
+    style="
+      display:flex;
+      gap:8px;
+      overflow-x:auto;
+      margin-bottom:14px;
+      padding-bottom:4px;
+    "
+  >
+    <button
+      type="button"
+      class="btn primary"
+      data-document-filter="all"
+      style="white-space:nowrap"
+    >
+      Все
+    </button>
+
+    ${usedDocumentTypes
+      .map(type => `
+        <button
+          type="button"
+          class="btn"
+          data-document-filter="${type}"
+          style="white-space:nowrap"
+        >
+          ${documentTypeLabels[type] || 'Другое'}
+        </button>
+      `)
+      .join('')}
+  </div>
+
+  <div>
+    ${availableItems
       .map(item => {
         const dateValue = item.captured_at || item.created_at;
 
@@ -919,6 +959,7 @@ async function loadPatientDocuments() {
           <div
             class="item"
             data-document-card="${item.id}"
+            data-document-type="${item.document_type || 'other'}"
             style="margin-top:12px"
           >
             <div class="item-title">
@@ -961,8 +1002,33 @@ async function loadPatientDocuments() {
           </div>
         `;
       })
-      .join('');
+      .join('')}
+  </div>
+`;
+documentList
+  .querySelectorAll('[data-document-filter]')
+  .forEach(filterBtn => {
+    filterBtn.onclick = () => {
+      const selectedType =
+        filterBtn.dataset.documentFilter;
 
+      documentList
+        .querySelectorAll('[data-document-filter]')
+        .forEach(btn => btn.classList.remove('primary'));
+
+      filterBtn.classList.add('primary');
+
+      documentList
+        .querySelectorAll('[data-document-card]')
+        .forEach(card => {
+          const show =
+            selectedType === 'all' ||
+            card.dataset.documentType === selectedType;
+
+          card.style.display = show ? '' : 'none';
+        });
+    };
+  });
     documentList
       .querySelectorAll('[data-delete-document]')
       .forEach(btn => {
@@ -999,17 +1065,52 @@ async function loadPatientDocuments() {
             if (deleteRowError) throw deleteRowError;
 
             const card = documentList.querySelector(
-              `[data-document-card="${item.id}"]`
-            );
+  `[data-document-card="${item.id}"]`
+);
 
-            if (card) card.remove();
+if (card) card.remove();
 
-            if (
-              !documentList.querySelector('[data-document-card]')
-            ) {
-              documentList.innerHTML =
-                '<div class="muted">Документы пока не загружены.</div>';
-            }
+const remainingCards =
+  documentList.querySelectorAll('[data-document-card]');
+
+if (!remainingCards.length) {
+  documentList.innerHTML =
+    '<div class="muted">Документы пока не загружены.</div>';
+  return;
+}
+
+const documentType =
+  item.document_type || 'other';
+
+const remainingSameType =
+  documentList.querySelector(
+    `[data-document-card][data-document-type="${documentType}"]`
+  );
+
+if (!remainingSameType) {
+  const typeButton =
+    documentList.querySelector(
+      `[data-document-filter="${documentType}"]`
+    );
+
+  const wasActive =
+    typeButton?.classList.contains('primary');
+
+  if (typeButton) {
+    typeButton.remove();
+  }
+
+  if (wasActive) {
+    const allButton =
+      documentList.querySelector(
+        '[data-document-filter="all"]'
+      );
+
+    if (allButton) {
+      allButton.click();
+    }
+  }
+}
           } catch (error) {
             console.error(error);
 
