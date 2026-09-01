@@ -39,7 +39,7 @@ function sessionDynamicsHtml(s) {
 
 function flash(type, msg) { const el = document.getElementById('flash'); if (el) el.innerHTML = `<div class="${type}">${esc(msg)}</div>` }
 
-async function callAI(prompt) {
+async function callAI(prompt, files = []) {
   const cleanPrompt = String(prompt || "").trim();
 
   if (!cleanPrompt) {
@@ -47,8 +47,11 @@ async function callAI(prompt) {
   }
 
   const { data, error } = await sb.functions.invoke("ptchild-ai", {
-    body: { prompt: cleanPrompt }
-  });
+  body: {
+    prompt: cleanPrompt,
+    files: files
+  }
+});
 
   if (error) {
     throw error;
@@ -517,14 +520,63 @@ aiToggleBtn.textContent = "▼ Развернуть анализ";
     aiResult.textContent = "ИИ анализирует данные ребёнка...";
 
     try {
-      const patientData = {
-        age: ageFromDob(p.date_of_birth),
-        sex: sexLabel(p.sex),
-        complaint: p.primary_complaint || "",
-        assessment: state.assessment || null,
-        goals: state.goals || [],
-        sessions: state.sessions || []
-      };
+  const { data: documentRows, error: documentsError } = await sb
+    .from('patient_media')
+    .select('document_type, note, captured_at, created_at, storage_path')
+    .eq('patient_id', p.id)
+    .eq('media_type', 'document')
+    .order('created_at', { ascending: false });
+
+  if (documentsError) throw documentsError;
+
+  const documentsForAI = (documentRows || []).map(item => ({
+    type: item.document_type || 'other',
+    date: item.captured_at || item.created_at || null,
+    note: item.note || null
+  }));
+
+  const aiFiles = (
+  await Promise.all(
+    (documentRows || [])
+      .slice(0, 3)
+      .map(async item => {
+        if (!item.storage_path) return null;
+
+        const { data: signedData, error: signedError } =
+          await sb.storage
+            .from('patient-media')
+            .createSignedUrl(item.storage_path, 600);
+
+        if (signedError || !signedData?.signedUrl) {
+          console.error(
+            'Не удалось подготовить документ для ИИ:',
+            signedError
+          );
+          return null;
+        }
+
+        const lowerPath =
+          item.storage_path.toLowerCase();
+
+        return {
+          kind: lowerPath.endsWith('.pdf')
+            ? 'pdf'
+            : 'image',
+          url: signedData.signedUrl
+        };
+      })
+  )
+).filter(Boolean);
+
+  const patientData = {
+    age: ageFromDob(p.date_of_birth),
+    sex: sexLabel(p.sex),
+    complaint: p.primary_complaint || "",
+    assessment: state.assessment || null,
+    goals: state.goals || [],
+    sessions: state.sessions || [],
+    documents: documentsForAI
+  };
 
       const prompt = `
 Ты — клинический помощник детского физического терапевта.
@@ -566,7 +618,7 @@ ${JSON.stringify(patientData, null, 2)}
 **Уверенность анализа:** высокая / средняя / низкая — и коротко почему.
 `;
 
-      const answer = await callAI(prompt);
+      const answer = await callAI(prompt, aiFiles);
 
       const analysisUpdatedAt = new Date().toISOString();
 
@@ -952,8 +1004,7 @@ documentList.innerHTML = `
           ? new Date(dateValue).toLocaleDateString('ru-RU')
           : 'Дата не указана';
 
-        const fileName =
-          item.storage_path.split('/').pop() || 'Документ';
+        
 
         return `
           <div
@@ -996,10 +1047,7 @@ documentList.innerHTML = `
               </button>
             </div>
 
-            <div class="muted tiny" style="margin-top:5px">
-              ${esc(fileName)}
-            </div>
-          </div>
+            
         `;
       })
       .join('')}
