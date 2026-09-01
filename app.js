@@ -405,18 +405,51 @@ aiDocumentsPanel.style.cssText = `
 `;
 
 aiDocumentsPanel.innerHTML = `
-  <div style="
-    font-weight:700;
-    margin-bottom:6px;
-  ">
-    📎 Документы для ИИ
+  <div
+    style="
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    "
+  >
+    <div>
+      <div style="font-weight:700">
+        📎 Документы для ИИ
+      </div>
+
+      <div
+        id="aiDocumentsSummary"
+        class="muted tiny"
+        style="margin-top:3px"
+      >
+        Загружаю...
+      </div>
+    </div>
+
+    <button
+      type="button"
+      id="aiDocumentsToggleBtn"
+      class="link"
+      style="
+        white-space:nowrap;
+        margin:0;
+      "
+    >
+      Изменить
+    </button>
   </div>
 
   <div
     id="aiDocumentsList"
-    class="muted"
+    style="
+      display:none;
+      margin-top:10px;
+    "
   >
-    Загружаю документы...
+    <div class="muted">
+      Загружаю документы...
+    </div>
   </div>
 `;
 
@@ -424,6 +457,23 @@ actions.insertAdjacentElement(
   "afterend",
   aiDocumentsPanel
 );
+
+const aiDocumentsToggleBtn =
+  document.getElementById('aiDocumentsToggleBtn');
+
+const aiDocumentsList =
+  document.getElementById('aiDocumentsList');
+
+aiDocumentsToggleBtn.onclick = () => {
+  const isOpen =
+    aiDocumentsList.style.display !== 'none';
+
+  aiDocumentsList.style.display =
+    isOpen ? 'none' : 'block';
+
+  aiDocumentsToggleBtn.textContent =
+    isOpen ? 'Изменить' : 'Скрыть';
+};
 
 const aiDocumentTypeLabels = {
   mri_ct: 'МРТ / КТ',
@@ -460,10 +510,32 @@ async function loadAiDocumentChoices() {
     const documents = data || [];
 
     if (!documents.length) {
-      aiDocumentsList.innerHTML =
-        '<div class="muted">Документов для анализа пока нет.</div>';
-      return;
-    }
+  const summary =
+    document.getElementById('aiDocumentsSummary');
+
+  const toggleBtn =
+    document.getElementById('aiDocumentsToggleBtn');
+
+  if (summary) {
+    summary.textContent = 'Документов пока нет';
+  }
+
+  if (toggleBtn) {
+    toggleBtn.style.display = 'none';
+  }
+
+  aiDocumentsList.innerHTML =
+    '<div class="muted">Документов для анализа пока нет.</div>';
+
+  return;
+}
+
+const toggleBtn =
+  document.getElementById('aiDocumentsToggleBtn');
+
+if (toggleBtn) {
+  toggleBtn.style.display = '';
+}
 
     if (
       !Array.isArray(
@@ -486,6 +558,16 @@ async function loadAiDocumentChoices() {
 
     const selectedIds =
       state.aiDocumentIdsByPatient[p.id];
+
+      const aiDocumentsSummary =
+  document.getElementById(
+    'aiDocumentsSummary'
+  );
+
+if (aiDocumentsSummary) {
+  aiDocumentsSummary.textContent =
+    `Выбрано: ${selectedIds.length} из 3`;
+}
 
     aiDocumentsList.innerHTML = `
       <div
@@ -615,6 +697,16 @@ async function loadAiDocumentChoices() {
             count.textContent =
               `Выбрано: ${ids.length} из 3`;
           }
+
+          const summary =
+  document.getElementById(
+    'aiDocumentsSummary'
+  );
+
+if (summary) {
+  summary.textContent =
+    `Выбрано: ${ids.length} из 3`;
+}
         };
       });
 
