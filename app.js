@@ -1381,11 +1381,59 @@ function assessmentHtml(a) {
 
   <label>Результат / комментарий</label>
   <textarea name="test_result">${esc(tests.result || '')}</textarea>
+  <div
+  style="
+    margin-top:18px;
+    padding-top:16px;
+    border-top:1px solid #e5e7eb;
+  "
+>
+  <div
+    style="
+      font-weight:700;
+      margin-bottom:10px;
+    "
+  >
+    📈 История оценок
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Дата записи</label>
+      <input
+        type="date"
+        id="standardizedHistoryDate"
+      >
+    </div>
+
+    <div style="display:flex;align-items:flex-end">
+      <button
+        type="button"
+        id="saveStandardizedHistoryBtn"
+        class="btn"
+        style="width:100%"
+      >
+        + Добавить текущие результаты
+      </button>
+    </div>
+  </div>
+
+  <div
+    id="standardizedHistoryStatus"
+    class="save-status"
+  ></div>
+
+  <div
+    id="standardizedHistoryList"
+    style="margin-top:12px"
+  >
+    <div class="muted">
+      Загружаю историю оценок...
+    </div>
+  </div>
 </div>
-        <label>Инструмент / шкала</label><input name="test_name" value="${esc(tests.name || '')}" placeholder="например, HINE">
-        <label>Результат / комментарий</label><textarea name="test_result">${esc(tests.result || '')}</textarea>
-        <div class="help">На следующих этапах отдельные шкалы будут встроены структурированно и только при разрешённом использовании.</div>
-      </div>
+</div>
+        
 
       <div class="section-card">
         <div class="section-head"><div class="section-num">9</div><div class="section-title">Физиотерапевтическое заключение</div></div>
@@ -1947,7 +1995,335 @@ documentForm.onsubmit = async e => {
     documentUploadBtn.disabled = false;
   }
 };
+const standardizedHistoryDate =
+  document.getElementById('standardizedHistoryDate');
 
+const saveStandardizedHistoryBtn =
+  document.getElementById('saveStandardizedHistoryBtn');
+
+const standardizedHistoryStatus =
+  document.getElementById('standardizedHistoryStatus');
+
+const standardizedHistoryList =
+  document.getElementById('standardizedHistoryList');
+
+const standardizedScaleLabels = {
+  gmfcs: 'GMFCS',
+  macs: 'MACS',
+  cfcs: 'CFCS',
+  edacs: 'EDACS',
+  hine: 'HINE',
+  gmfm66: 'GMFM-66',
+  other: 'Другая шкала'
+};
+
+if (standardizedHistoryDate && !standardizedHistoryDate.value) {
+  const now = new Date();
+  const localDate = new Date(
+    now.getTime() - now.getTimezoneOffset() * 60000
+  )
+    .toISOString()
+    .slice(0, 10);
+
+  standardizedHistoryDate.value = localDate;
+}
+
+async function loadStandardizedHistory() {
+  if (!standardizedHistoryList) return;
+
+  standardizedHistoryList.innerHTML =
+    '<div class="muted">Загружаю историю оценок...</div>';
+
+  try {
+    const { data, error } = await sb
+      .from('standardized_assessments')
+      .select(
+        'id, scale, value_text, value_numeric, assessed_at, note, created_at'
+      )
+      .eq('patient_id', p.id)
+      .order('assessed_at', {
+        ascending: false,
+        nullsFirst: false
+      })
+      .order('created_at', {
+        ascending: false
+      });
+
+    if (error) throw error;
+
+    const items = data || [];
+
+    if (!items.length) {
+      standardizedHistoryList.innerHTML =
+        '<div class="muted">Истории оценок пока нет.</div>';
+      return;
+    }
+
+    standardizedHistoryList.innerHTML = items
+      .map(item => {
+        const dateText = item.assessed_at
+          ? new Date(
+              `${item.assessed_at}T12:00:00`
+            ).toLocaleDateString('ru-RU')
+          : 'Дата не указана';
+
+        const value =
+          item.value_numeric !== null &&
+          item.value_numeric !== undefined
+            ? item.value_numeric
+            : item.value_text || '—';
+
+        const title =
+          item.scale === 'other' && item.note
+            ? item.note
+            : standardizedScaleLabels[item.scale] ||
+              item.scale;
+
+        return `
+          <div
+            class="item"
+            data-standardized-history-card="${item.id}"
+            style="margin-top:8px"
+          >
+            <div
+              style="
+                display:flex;
+                justify-content:space-between;
+                gap:12px;
+                align-items:center;
+              "
+            >
+              <strong>${esc(title)}</strong>
+
+              <span class="muted tiny">
+                ${dateText}
+              </span>
+            </div>
+
+            <div style="margin-top:4px">
+              ${esc(value)}
+            </div>
+
+            <button
+              type="button"
+              class="link"
+              data-delete-standardized-history="${item.id}"
+              style="
+                color:#b42318;
+                margin-top:6px;
+              "
+            >
+              Удалить
+            </button>
+          </div>
+        `;
+      })
+      .join('');
+
+    standardizedHistoryList
+      .querySelectorAll(
+        '[data-delete-standardized-history]'
+      )
+      .forEach(btn => {
+        btn.onclick = async () => {
+          const id =
+            btn.dataset.deleteStandardizedHistory;
+
+          const confirmed = confirm(
+            'Удалить эту запись из истории оценок?'
+          );
+
+          if (!confirmed) return;
+
+          btn.disabled = true;
+          btn.textContent = 'Удаляю...';
+
+          try {
+            const { error } = await sb
+              .from('standardized_assessments')
+              .delete()
+              .eq('id', id);
+
+            if (error) throw error;
+
+            await loadStandardizedHistory();
+          } catch (error) {
+            console.error(error);
+
+            alert(
+              'Не удалось удалить результат: ' +
+                error.message
+            );
+
+            btn.disabled = false;
+            btn.textContent = 'Удалить';
+          }
+        };
+      });
+
+  } catch (error) {
+    console.error(error);
+
+    standardizedHistoryList.innerHTML =
+      `<div class="error">Не удалось загрузить историю: ${esc(error.message)}</div>`;
+  }
+}
+
+loadStandardizedHistory();
+
+if (saveStandardizedHistoryBtn) {
+  saveStandardizedHistoryBtn.onclick = async () => {
+    const fd = new FormData(form);
+
+    const historyDate =
+      standardizedHistoryDate?.value || '';
+
+    if (!historyDate) {
+      standardizedHistoryStatus.textContent =
+        'Укажите дату оценки.';
+      return;
+    }
+
+    const rows = [];
+
+    const addLevel = (scale, fieldName) => {
+      const value = formValue(fd, fieldName);
+
+      if (!value) return;
+
+      rows.push({
+        patient_id: p.id,
+        therapist_id: user.id,
+        scale,
+        value_text: value,
+        value_numeric: null,
+        assessed_at: historyDate,
+        note: null
+      });
+    };
+
+    addLevel('gmfcs', 'gmfcs');
+    addLevel('macs', 'macs');
+    addLevel('cfcs', 'cfcs');
+    addLevel('edacs', 'edacs');
+
+    const hineText =
+      formValue(fd, 'hine_score');
+
+    if (hineText) {
+      const hineValue = Number(
+        hineText.replace(',', '.')
+      );
+
+      if (Number.isNaN(hineValue)) {
+        standardizedHistoryStatus.textContent =
+          'Проверьте значение HINE.';
+        return;
+      }
+
+      rows.push({
+        patient_id: p.id,
+        therapist_id: user.id,
+        scale: 'hine',
+        value_text: null,
+        value_numeric: hineValue,
+        assessed_at:
+          formValue(fd, 'hine_date') ||
+          historyDate,
+        note: null
+      });
+    }
+
+    const gmfmText =
+      formValue(fd, 'gmfm66_score');
+
+    if (gmfmText) {
+      const gmfmValue = Number(
+        gmfmText.replace(',', '.')
+      );
+
+      if (Number.isNaN(gmfmValue)) {
+        standardizedHistoryStatus.textContent =
+          'Проверьте значение GMFM-66.';
+        return;
+      }
+
+      rows.push({
+        patient_id: p.id,
+        therapist_id: user.id,
+        scale: 'gmfm66',
+        value_text: null,
+        value_numeric: gmfmValue,
+        assessed_at:
+          formValue(fd, 'gmfm66_date') ||
+          historyDate,
+        note: null
+      });
+    }
+
+    const otherName =
+      formValue(fd, 'test_name');
+
+    const otherResult =
+      formValue(fd, 'test_result');
+
+    if (otherName || otherResult) {
+      rows.push({
+        patient_id: p.id,
+        therapist_id: user.id,
+        scale: 'other',
+        value_text: otherResult || 'Результат не указан',
+        value_numeric: null,
+        assessed_at: historyDate,
+        note: otherName || 'Другая шкала'
+      });
+    }
+
+    if (!rows.length) {
+      standardizedHistoryStatus.textContent =
+        'Сначала заполните хотя бы одну шкалу или классификацию.';
+      return;
+    }
+
+    saveStandardizedHistoryBtn.disabled = true;
+    saveStandardizedHistoryBtn.textContent =
+      '⏳ Сохраняю...';
+
+    standardizedHistoryStatus.textContent = '';
+
+    try {
+      const { error } = await sb
+        .from('standardized_assessments')
+        .insert(rows);
+
+      if (error) throw error;
+
+      standardizedHistoryStatus.textContent =
+        `✓ Добавлено результатов: ${rows.length}`;
+
+      saveStandardizedHistoryBtn.textContent =
+        '✓ Результаты добавлены';
+
+      await loadStandardizedHistory();
+
+      setTimeout(() => {
+        saveStandardizedHistoryBtn.disabled = false;
+        saveStandardizedHistoryBtn.textContent =
+          '+ Добавить текущие результаты';
+      }, 1200);
+
+    } catch (error) {
+      console.error(error);
+
+      standardizedHistoryStatus.textContent =
+        'Ошибка: ' + error.message;
+
+      saveStandardizedHistoryBtn.disabled = false;
+      saveStandardizedHistoryBtn.textContent =
+        '+ Добавить текущие результаты';
+    }
+  };
+}
     form.onsubmit = async e => {
       e.preventDefault(); setButtonSaving(btn); status.textContent = '';
       const fd = new FormData(form);
