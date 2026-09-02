@@ -2059,66 +2059,102 @@ async function loadStandardizedHistory() {
       return;
     }
 
-    standardizedHistoryList.innerHTML = items
-      .map(item => {
-        const dateText = item.assessed_at
+    const groups = {};
+
+items.forEach(item => {
+  const dateKey =
+    item.assessed_at || 'no-date';
+
+  if (!groups[dateKey]) {
+    groups[dateKey] = [];
+  }
+
+  groups[dateKey].push(item);
+});
+
+standardizedHistoryList.innerHTML =
+  Object.entries(groups)
+    .map(([dateKey, groupItems]) => {
+      const dateText =
+        dateKey !== 'no-date'
           ? new Date(
-              `${item.assessed_at}T12:00:00`
+              `${dateKey}T12:00:00`
             ).toLocaleDateString('ru-RU')
           : 'Дата не указана';
 
-        const value =
-          item.value_numeric !== null &&
-          item.value_numeric !== undefined
-            ? item.value_numeric
-            : item.value_text || '—';
-
-        const title =
-          item.scale === 'other' && item.note
-            ? item.note
-            : standardizedScaleLabels[item.scale] ||
-              item.scale;
-
-        return `
+      return `
+        <div
+          style="
+            margin-top:14px;
+            padding-top:12px;
+            border-top:1px solid #e5e7eb;
+          "
+        >
           <div
-            class="item"
-            data-standardized-history-card="${item.id}"
-            style="margin-top:8px"
+            style="
+              font-weight:700;
+              font-size:15px;
+              margin-bottom:8px;
+            "
           >
-            <div
-              style="
-                display:flex;
-                justify-content:space-between;
-                gap:12px;
-                align-items:center;
-              "
-            >
-              <strong>${esc(title)}</strong>
-
-              <span class="muted tiny">
-                ${dateText}
-              </span>
-            </div>
-
-            <div style="margin-top:4px">
-              ${esc(value)}
-            </div>
-
-            <button
-              type="button"
-              class="link"
-              data-delete-standardized-history="${item.id}"
-              style="
-                color:#b42318;
-                margin-top:6px;
-              "
-            >
-              Удалить
-            </button>
+            ${dateText}
           </div>
-        `;
-      })
-      .join('');
+
+          ${groupItems
+            .map(item => {
+              const value =
+                item.value_numeric !== null &&
+                item.value_numeric !== undefined
+                  ? item.value_numeric
+                  : item.value_text || '—';
+
+              const title =
+                item.scale === 'other' && item.note
+                  ? item.note
+                  : standardizedScaleLabels[item.scale] ||
+                    item.scale;
+
+              return `
+                <div
+                  data-standardized-history-card="${item.id}"
+                  style="
+                    display:grid;
+                    grid-template-columns:minmax(0,1fr) auto;
+                    gap:8px;
+                    align-items:center;
+                    padding:8px 0;
+                    border-bottom:1px solid #eef0f2;
+                  "
+                >
+                  <div>
+                    <strong>
+                      ${esc(title)}
+                    </strong>
+
+                    <span style="margin-left:8px">
+                      ${esc(value)}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="link"
+                    data-delete-standardized-history="${item.id}"
+                    style="
+                      color:#b42318;
+                      margin:0;
+                    "
+                  >
+                    Удалить
+                  </button>
+                </div>
+              `;
+            })
+            .join('')}
+        </div>
+      `;
+    })
+    .join('');
 
     standardizedHistoryList
       .querySelectorAll(
@@ -2294,7 +2330,9 @@ if (saveStandardizedHistoryBtn) {
     try {
       const { error } = await sb
         .from('standardized_assessments')
-        .insert(rows);
+.upsert(rows, {
+  onConflict: 'patient_id,scale,assessed_at'
+});
 
       if (error) throw error;
 
