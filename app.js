@@ -1111,7 +1111,102 @@ function assessmentHtml(a) {
       </div>
 
       <div class="section-card">
-        <div class="section-head"><div class="section-num">2</div><div class="section-title">Беременность, роды, анамнез</div></div>
+  <div class="section-head">
+    <div class="section-num">2</div>
+    <div class="section-title">Беременность, роды, анамнез</div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Беременность по счёту</label>
+      <input
+        inputmode="numeric"
+        name="pregnancy_number"
+        value="${esc(hx.pregnancy_number || '')}"
+      >
+    </div>
+
+    <div>
+      <label>Срок рождения, нед.</label>
+      <input
+        inputmode="numeric"
+        name="gestational_age"
+        value="${esc(hx.gestational_age || '')}"
+      >
+    </div>
+  </div>
+
+  <label>Течение беременности</label>
+  <textarea name="pregnancy_history">${esc(a?.pregnancy_history || '')}</textarea>
+
+  <label>Роды / ранний период</label>
+  <textarea name="birth_history">${esc(a?.birth_history || '')}</textarea>
+
+  <div class="row">
+    <div>
+      <label>Способ родоразрешения</label>
+      <select name="delivery_type">
+        ${option('', 'Не указано', hx.delivery_type)}
+        ${option('vaginal', 'Естественные роды', hx.delivery_type)}
+        ${option('cesarean', 'Кесарево сечение', hx.delivery_type)}
+        ${option('assisted', 'Оперативное вагинальное', hx.delivery_type)}
+        ${option('other', 'Другое', hx.delivery_type)}
+      </select>
+    </div>
+
+    <div>
+      <label>Апгар</label>
+      <input
+        name="apgar"
+        value="${esc(hx.apgar || '')}"
+        placeholder="8 / 9"
+      >
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Вес при рождении, г</label>
+      <input
+        inputmode="numeric"
+        name="birth_weight"
+        value="${esc(hx.birth_weight || '')}"
+      >
+    </div>
+
+    <div>
+      <label>Рост при рождении, см</label>
+      <input
+        inputmode="decimal"
+        name="birth_length"
+        value="${esc(hx.birth_length || '')}"
+      >
+    </div>
+  </div>
+
+  <label>Реанимация / ОРИТ / выхаживание</label>
+  <select name="nicu">
+    ${option('', 'Не указано', hx.nicu)}
+    ${option('no', 'Нет', hx.nicu)}
+    ${option('yes', 'Да', hx.nicu)}
+    ${option('unknown', 'Неизвестно', hx.nicu)}
+  </select>
+
+  <label>Осложнения неонатального периода</label>
+  <textarea
+    name="neonatal_complications"
+    placeholder="ИВЛ, гипоксия, желтуха, инфекции, судороги и др."
+  >${esc(hx.neonatal_complications || '')}</textarea>
+
+  <label>Диагнозы, операции, госпитализации</label>
+  <textarea
+    name="medical_history"
+    placeholder="Основные диагнозы, операции, значимые госпитализации"
+  >${esc(hx.medical_history || '')}</textarea>
+
+  <label>Предыдущая реабилитация / физическая терапия</label>
+  <textarea name="previous_rehab">${esc(hx.previous_rehab || '')}</textarea>
+</div>
         <div class="row"><div><label>Беременность по счёту</label><input inputmode="numeric" name="pregnancy_number" value="${esc(hx.pregnancy_number || '')}"></div><div><label>Срок рождения, нед.</label><input inputmode="numeric" name="gestational_age" value="${esc(hx.gestational_age || '')}"></div></div>
         <label>Течение беременности</label><textarea name="pregnancy_history">${esc(a?.pregnancy_history || '')}</textarea>
         <label>Роды / ранний период</label><textarea name="birth_history">${esc(a?.birth_history || '')}</textarea>
@@ -1173,8 +1268,120 @@ function assessmentHtml(a) {
         <label>Другие наблюдения</label><textarea name="neuro_observations">${esc(a?.neuro_observations || '')}</textarea>
       </div>
 
-      <div class="section-card">
-        <div class="section-head"><div class="section-num">8</div><div class="section-title">Стандартизированные оценки</div></div>
+     <div class="section-card">
+  <div class="section-head">
+    <div class="section-num">8</div>
+    <div class="section-title">Стандартизированные оценки</div>
+  </div>
+
+  <div class="help">
+    Заполняйте только те классификации и шкалы, которые реально применялись.
+  </div>
+
+  <div class="row">
+    <div>
+      <label>GMFCS</label>
+      <select name="gmfcs">
+        ${option('', 'Не оценено', tests.gmfcs)}
+        ${option('I', 'I', tests.gmfcs)}
+        ${option('II', 'II', tests.gmfcs)}
+        ${option('III', 'III', tests.gmfcs)}
+        ${option('IV', 'IV', tests.gmfcs)}
+        ${option('V', 'V', tests.gmfcs)}
+      </select>
+    </div>
+
+    <div>
+      <label>MACS</label>
+      <select name="macs">
+        ${option('', 'Не оценено', tests.macs)}
+        ${option('I', 'I', tests.macs)}
+        ${option('II', 'II', tests.macs)}
+        ${option('III', 'III', tests.macs)}
+        ${option('IV', 'IV', tests.macs)}
+        ${option('V', 'V', tests.macs)}
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>CFCS</label>
+      <select name="cfcs">
+        ${option('', 'Не оценено', tests.cfcs)}
+        ${option('I', 'I', tests.cfcs)}
+        ${option('II', 'II', tests.cfcs)}
+        ${option('III', 'III', tests.cfcs)}
+        ${option('IV', 'IV', tests.cfcs)}
+        ${option('V', 'V', tests.cfcs)}
+      </select>
+    </div>
+
+    <div>
+      <label>EDACS</label>
+      <select name="edacs">
+        ${option('', 'Не оценено', tests.edacs)}
+        ${option('I', 'I', tests.edacs)}
+        ${option('II', 'II', tests.edacs)}
+        ${option('III', 'III', tests.edacs)}
+        ${option('IV', 'IV', tests.edacs)}
+        ${option('V', 'V', tests.edacs)}
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>HINE, баллы</label>
+      <input
+        inputmode="decimal"
+        name="hine_score"
+        value="${esc(tests.hine_score || '')}"
+        placeholder="например, 58"
+      >
+    </div>
+
+    <div>
+      <label>Дата HINE</label>
+      <input
+        type="date"
+        name="hine_date"
+        value="${esc(tests.hine_date || '')}"
+      >
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>GMFM-66, баллы</label>
+      <input
+        inputmode="decimal"
+        name="gmfm66_score"
+        value="${esc(tests.gmfm66_score || '')}"
+        placeholder="например, 52.4"
+      >
+    </div>
+
+    <div>
+      <label>Дата GMFM</label>
+      <input
+        type="date"
+        name="gmfm66_date"
+        value="${esc(tests.gmfm66_date || '')}"
+      >
+    </div>
+  </div>
+
+  <label>Другой инструмент / шкала</label>
+  <input
+    name="test_name"
+    value="${esc(tests.name || '')}"
+    placeholder="например, PEDI-CAT, AIMS, TIMP"
+  >
+
+  <label>Результат / комментарий</label>
+  <textarea name="test_result">${esc(tests.result || '')}</textarea>
+</div>
         <label>Инструмент / шкала</label><input name="test_name" value="${esc(tests.name || '')}" placeholder="например, HINE">
         <label>Результат / комментарий</label><textarea name="test_result">${esc(tests.result || '')}</textarea>
         <div class="help">На следующих этапах отдельные шкалы будут встроены структурированно и только при разрешённом использовании.</div>
@@ -1197,13 +1404,38 @@ function structuredFromAssessmentForm(fd) {
   const categories = formValue(fd, 'complaint_categories').split(',').map(x => x.trim()).filter(Boolean);
   return {
     complaint: { noticed_when: formValue(fd, 'noticed_when'), trend: formValue(fd, 'trend'), main_concern: formValue(fd, 'main_concern'), categories },
-    history: { pregnancy_number: formValue(fd, 'pregnancy_number'), gestational_age: formValue(fd, 'gestational_age'), birth_weight: formValue(fd, 'birth_weight'), apgar: formValue(fd, 'apgar'), previous_rehab: formValue(fd, 'previous_rehab') },
+    history: {
+  pregnancy_number: formValue(fd, 'pregnancy_number'),
+  gestational_age: formValue(fd, 'gestational_age'),
+  delivery_type: formValue(fd, 'delivery_type'),
+  birth_weight: formValue(fd, 'birth_weight'),
+  birth_length: formValue(fd, 'birth_length'),
+  apgar: formValue(fd, 'apgar'),
+  nicu: formValue(fd, 'nicu'),
+  neonatal_complications: formValue(fd, 'neonatal_complications'),
+  medical_history: formValue(fd, 'medical_history'),
+  previous_rehab: formValue(fd, 'previous_rehab')
+},
     milestones: milestonesFromForm(fd),
     observation: { symmetry: formValue(fd, 'symmetry'), transitions: formValue(fd, 'transitions'), side_use: formValue(fd, 'side_use') },
     body: { head_neck: formValue(fd, 'head_neck'), shoulders: formValue(fd, 'shoulders'), trunk: formValue(fd, 'trunk'), pelvis: formValue(fd, 'pelvis'), hips: formValue(fd, 'hips'), knees: formValue(fd, 'knees'), feet: formValue(fd, 'feet') },
     ankle: { df_right: formValue(fd, 'df_right'), df_left: formValue(fd, 'df_left'), knee_position: formValue(fd, 'knee_position'), foot_support_right: formValue(fd, 'foot_support_right'), foot_support_left: formValue(fd, 'foot_support_left'), heel_right: formValue(fd, 'heel_right'), heel_left: formValue(fd, 'heel_left') },
     neuro: { tone_arms: formValue(fd, 'tone_arms'), tone_legs: formValue(fd, 'tone_legs'), reflexes: formValue(fd, 'reflexes'), plantar: formValue(fd, 'plantar'), clonus: formValue(fd, 'clonus') },
-    tests: { name: formValue(fd, 'test_name'), result: formValue(fd, 'test_result') }
+    tests: {
+  gmfcs: formValue(fd, 'gmfcs'),
+  macs: formValue(fd, 'macs'),
+  cfcs: formValue(fd, 'cfcs'),
+  edacs: formValue(fd, 'edacs'),
+
+  hine_score: formValue(fd, 'hine_score'),
+  hine_date: formValue(fd, 'hine_date'),
+
+  gmfm66_score: formValue(fd, 'gmfm66_score'),
+  gmfm66_date: formValue(fd, 'gmfm66_date'),
+
+  name: formValue(fd, 'test_name'),
+  result: formValue(fd, 'test_result')
+},
   };
 }
 
