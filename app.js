@@ -482,6 +482,7 @@ const aiDocumentTypeLabels = {
   eeg: 'ЭЭГ',
   enmg: 'ЭНМГ',
   ultrasound: 'УЗИ',
+  doppler: 'Допплерография',
   doctor_report: 'Заключение врача',
   discharge: 'Выписка',
   labs: 'Анализы',
@@ -1004,8 +1005,22 @@ ${JSON.stringify(patientData, null, 2)}
 
      const aiAnswer = await callAI(prompt, aiFiles);
 
+const usedDocumentsText = aiFiles.length
+  ? aiFiles
+      .map(file => {
+        const dateText = file.date
+          ? new Date(file.date).toLocaleDateString('ru-RU')
+          : 'дата не указана';
+
+        return `• ${file.label} — ${dateText}`;
+      })
+      .join('\n')
+  : '• Документы не использовались';
+
 const answer =
-  `📎 Файлов передано ИИ: ${aiFiles.length} из ${selectedDocumentRows.length} выбранных\n\n${aiAnswer}`;
+  `📎 Файлов передано ИИ: ${aiFiles.length} из ${selectedDocumentRows.length} выбранных\n` +
+  `Использованы документы:\n${usedDocumentsText}\n\n` +
+  aiAnswer;
 
       const analysisUpdatedAt = new Date().toISOString();
 
@@ -1221,6 +1236,7 @@ box.insertAdjacentHTML('beforeend', `
         <option value="eeg">ЭЭГ</option>
         <option value="enmg">ЭНМГ</option>
         <option value="ultrasound">УЗИ</option>
+        <option value="doppler">Допплерография</option>
         <option value="doctor_report">Заключение врача</option>
         <option value="discharge">Выписка</option>
         <option value="labs">Анализы</option>
@@ -1293,10 +1309,12 @@ const documentTypeLabels = {
   eeg: 'ЭЭГ',
   enmg: 'ЭНМГ',
   ultrasound: 'УЗИ',
+  doppler: 'Допплерография',
   doctor_report: 'Заключение врача',
   discharge: 'Выписка',
   labs: 'Анализы',
   genetic: 'Генетические исследования',
+  doppler: 'Допплерография',
   other: 'Другое'
 };
 
