@@ -137,14 +137,15 @@ function enableVoiceInput(root) {
   if (!root) return;
 
   const SpeechRecognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
 
   if (!SpeechRecognition) {
     const note = document.createElement('div');
     note.className = 'muted tiny';
     note.style.marginBottom = '12px';
     note.textContent =
-      '🎤 Голосовой ввод не поддерживается этим браузером.';
+      '🎙 Голосовой ввод не поддерживается этим браузером.';
     root.prepend(note);
     return;
   }
@@ -159,14 +160,55 @@ function enableVoiceInput(root) {
 
     field.dataset.voiceReady = '1';
 
-    const voiceBtn = document.createElement('button');
-    voiceBtn.type = 'button';
-    voiceBtn.className = 'btn';
-    voiceBtn.style.marginTop = '6px';
-    voiceBtn.style.marginBottom = '10px';
-    voiceBtn.textContent = '🎤 Диктовать';
+    const wrapper = document.createElement('div');
 
-    field.insertAdjacentElement('afterend', voiceBtn);
+    wrapper.style.position = 'relative';
+    wrapper.style.width = '100%';
+
+    field.parentNode.insertBefore(wrapper, field);
+    wrapper.appendChild(field);
+
+    field.style.width = '100%';
+    field.style.boxSizing = 'border-box';
+    field.style.paddingRight = '52px';
+
+    const voiceBtn =
+      document.createElement('button');
+
+    voiceBtn.type = 'button';
+    voiceBtn.textContent = '🎙️';
+    voiceBtn.title = 'Голосовой ввод';
+    voiceBtn.setAttribute(
+      'aria-label',
+      'Голосовой ввод'
+    );
+
+    voiceBtn.style.position = 'absolute';
+    voiceBtn.style.right = '9px';
+    voiceBtn.style.width = '36px';
+    voiceBtn.style.height = '36px';
+    voiceBtn.style.padding = '0';
+    voiceBtn.style.margin = '0';
+    voiceBtn.style.border = '1px solid #d1d5db';
+    voiceBtn.style.borderRadius = '50%';
+    voiceBtn.style.background = '#ffffff';
+    voiceBtn.style.cursor = 'pointer';
+    voiceBtn.style.fontSize = '18px';
+    voiceBtn.style.lineHeight = '1';
+    voiceBtn.style.display = 'flex';
+    voiceBtn.style.alignItems = 'center';
+    voiceBtn.style.justifyContent = 'center';
+    voiceBtn.style.zIndex = '2';
+
+    if (field.tagName === 'TEXTAREA') {
+      voiceBtn.style.bottom = '9px';
+    } else {
+      voiceBtn.style.top = '50%';
+      voiceBtn.style.transform =
+        'translateY(-50%)';
+    }
+
+    wrapper.appendChild(voiceBtn);
 
     let recognition = null;
     let listening = false;
@@ -175,47 +217,61 @@ function enableVoiceInput(root) {
     let recognizedText = '';
     let recognitionError = false;
 
+    const resetButton = () => {
+      voiceBtn.textContent = '🎙️';
+      voiceBtn.title = 'Голосовой ввод';
+      voiceBtn.style.background = '#ffffff';
+    };
+
     voiceBtn.onclick = () => {
       if (listening && recognition) {
-        voiceBtn.textContent = '⏳ Завершаю...';
+        voiceBtn.textContent = '⏳';
+        voiceBtn.title = 'Завершаю запись';
         recognition.stop();
         return;
       }
 
-      recognition = new SpeechRecognition();
+      recognition =
+        new SpeechRecognition();
 
       recognition.lang = 'ru-RU';
-
-      // Главное изменение:
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
-      // Запоминаем текст, который уже был в поле
       baseText = field.value.trim();
       recognizedText = '';
       recognitionError = false;
 
       recognition.onstart = () => {
         listening = true;
-        voiceBtn.textContent =
-          '🔴 Слушаю... Нажмите для остановки';
+
+        voiceBtn.textContent = '🔴';
+        voiceBtn.title =
+          'Идёт запись. Нажмите для остановки';
+        voiceBtn.style.background = '#fff1f2';
       };
 
       recognition.onresult = event => {
         const parts = [];
 
-        // Берём и финальный, и промежуточный распознанный текст
-        for (let i = 0; i < event.results.length; i++) {
+        for (
+          let i = 0;
+          i < event.results.length;
+          i++
+        ) {
           const text =
-            event.results[i]?.[0]?.transcript?.trim();
+            event.results[i]?.[0]
+              ?.transcript
+              ?.trim();
 
           if (text) {
             parts.push(text);
           }
         }
 
-        recognizedText = parts.join(' ').trim();
+        recognizedText =
+          parts.join(' ').trim();
 
         if (!recognizedText) return;
 
@@ -224,7 +280,9 @@ function enableVoiceInput(root) {
           : recognizedText;
 
         field.dispatchEvent(
-          new Event('input', { bubbles: true })
+          new Event('input', {
+            bubbles: true
+          })
         );
       };
 
@@ -236,29 +294,53 @@ function enableVoiceInput(root) {
 
         recognitionError = true;
 
+        voiceBtn.textContent = '⚠️';
+
         if (event.error === 'not-allowed') {
-          voiceBtn.textContent =
-            '🚫 Нет доступа к микрофону';
-        } else if (event.error === 'no-speech') {
-          voiceBtn.textContent =
-            '⚠️ Речь не распознана';
+          voiceBtn.title =
+            'Нет доступа к микрофону';
+        } else if (
+          event.error === 'no-speech'
+        ) {
+          voiceBtn.title =
+            'Речь не распознана';
         } else {
-          voiceBtn.textContent =
-            '⚠️ Не удалось распознать';
+          voiceBtn.title =
+            'Не удалось распознать речь';
         }
       };
 
       recognition.onend = () => {
         listening = false;
 
-        if (!recognitionError) {
-          voiceBtn.textContent = recognizedText
-            ? '✓ Текст добавлен'
-            : '⚠️ Речь не распознана';
+        if (
+          !recognitionError &&
+          recognizedText
+        ) {
+          voiceBtn.textContent = '✓';
+          voiceBtn.title =
+            'Текст добавлен';
 
-          setTimeout(() => {
-            voiceBtn.textContent = '🎤 Диктовать';
-          }, 1200);
+          setTimeout(
+            resetButton,
+            900
+          );
+        } else if (
+          !recognitionError
+        ) {
+          voiceBtn.textContent = '⚠️';
+          voiceBtn.title =
+            'Речь не распознана';
+
+          setTimeout(
+            resetButton,
+            1200
+          );
+        } else {
+          setTimeout(
+            resetButton,
+            1500
+          );
         }
       };
 
@@ -266,9 +348,16 @@ function enableVoiceInput(root) {
         recognition.start();
       } catch (error) {
         console.error(error);
+
         listening = false;
-        voiceBtn.textContent =
-          '⚠️ Не удалось запустить микрофон';
+        voiceBtn.textContent = '⚠️';
+        voiceBtn.title =
+          'Не удалось запустить микрофон';
+
+        setTimeout(
+          resetButton,
+          1500
+        );
       }
     };
   });
@@ -3142,7 +3231,7 @@ if (saveStandardizedHistoryBtn) {
       state.assessment = r.data; setButtonSaved(btn); status.textContent = '✓ Данные сохранены в облаке';
     };
   }
-  
+
   if (state.tab === 'goals') {
     box.innerHTML = `<div class="card"><h3>Активные цели</h3>${goalsHtml(state.goals, true)}</div><form class="card" id="goalForm"><h3>＋ Новая цель</h3><label>Функциональная цель</label><textarea name="title" required></textarea><label>Исходное состояние</label><textarea name="baseline"></textarea><label>Критерий достижения</label><input name="criterion"><label>Срок</label><input type="date" name="deadline"><label>Прогресс</label><select name="progress"><option value="0">0%</option><option value="20">20%</option><option value="40">40%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option></select><div class="actions"><button id="goalSaveBtn" class="btn primary full" type="submit">Добавить цель</button></div><div id="goalStatus" class="save-status"></div></form>`;
     const form = document.getElementById('goalForm'), btn = document.getElementById('goalSaveBtn'), status = document.getElementById('goalStatus');
