@@ -1207,12 +1207,7 @@ function assessmentHtml(a) {
   <label>Предыдущая реабилитация / физическая терапия</label>
   <textarea name="previous_rehab">${esc(hx.previous_rehab || '')}</textarea>
 </div>
-        <div class="row"><div><label>Беременность по счёту</label><input inputmode="numeric" name="pregnancy_number" value="${esc(hx.pregnancy_number || '')}"></div><div><label>Срок рождения, нед.</label><input inputmode="numeric" name="gestational_age" value="${esc(hx.gestational_age || '')}"></div></div>
-        <label>Течение беременности</label><textarea name="pregnancy_history">${esc(a?.pregnancy_history || '')}</textarea>
-        <label>Роды / ранний период</label><textarea name="birth_history">${esc(a?.birth_history || '')}</textarea>
-        <div class="row"><div><label>Вес при рождении, г</label><input inputmode="numeric" name="birth_weight" value="${esc(hx.birth_weight || '')}"></div><div><label>Apgar</label><input name="apgar" value="${esc(hx.apgar || '')}" placeholder="8 / 9"></div></div>
-        <label>Предыдущая реабилитация / физическая терапия</label><textarea name="previous_rehab">${esc(hx.previous_rehab || '')}</textarea>
-      </div>
+        
 
       <div class="section-card">
         <div class="section-head"><div class="section-num">3</div><div class="section-title">Моторное развитие</div></div>
@@ -1230,43 +1225,426 @@ function assessmentHtml(a) {
       </div>
 
       <div class="section-card">
-        <div class="section-head"><div class="section-num">4</div><div class="section-title">Осмотр и спонтанная моторика</div></div>
-        <label>Основная запись осмотра</label><textarea name="observation">${esc(a?.observation || '')}</textarea>
-        <div class="row"><div><label>Симметрия</label><select name="symmetry">${option('', 'Не указано', obs.symmetry)}${option('yes', 'Симметрично', obs.symmetry)}${option('no', 'Есть асимметрия', obs.symmetry)}${option('unclear', 'Трудно оценить', obs.symmetry)}</select></div><div><label>Переходы</label><select name="transitions">${option('', 'Не указано', obs.transitions)}${option('free', 'Свободные', obs.transitions)}${option('limited', 'Ограничены', obs.transitions)}</select></div></div>
-        <label>Использование сторон</label><select name="side_use">${option('symmetric', 'Симметричное', obs.side_use)}${option('left', 'Преимущественно слева', obs.side_use)}${option('right', 'Преимущественно справа', obs.side_use)}${option('unclear', 'Трудно оценить', obs.side_use)}</select>
-      </div>
+  <div class="section-head">
+    <div class="section-num">4</div>
+    <div class="section-title">Осмотр и спонтанная моторика</div>
+  </div>
+
+  <label>Основная запись осмотра</label>
+  <textarea
+    name="observation"
+    placeholder="Опишите поведение ребёнка, ведущие двигательные особенности и функциональные ограничения"
+  >${esc(a?.observation || '')}</textarea>
+
+  <div class="row">
+    <div>
+      <label>Спонтанная двигательная активность</label>
+      <select name="spontaneous_activity">
+        ${option('', 'Не указано', obs.spontaneous_activity)}
+        ${option('active', 'Активная', obs.spontaneous_activity)}
+        ${option('reduced', 'Сниженная', obs.spontaneous_activity)}
+        ${option('minimal', 'Минимальная', obs.spontaneous_activity)}
+        ${option('variable', 'Нестабильная / вариабельная', obs.spontaneous_activity)}
+        ${option('unclear', 'Трудно оценить', obs.spontaneous_activity)}
+      </select>
+    </div>
+
+    <div>
+      <label>Качество движений</label>
+      <select name="movement_quality">
+        ${option('', 'Не указано', obs.movement_quality)}
+        ${option('smooth', 'Плавные / координированные', obs.movement_quality)}
+        ${option('fragmented', 'Фрагментарные / затруднённые', obs.movement_quality)}
+        ${option('stereotyped', 'Стереотипные', obs.movement_quality)}
+        ${option('variable', 'Вариабельные', obs.movement_quality)}
+        ${option('unclear', 'Трудно оценить', obs.movement_quality)}
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Симметрия</label>
+      <select name="symmetry">
+        ${option('', 'Не указано', obs.symmetry)}
+        ${option('yes', 'Симметрично', obs.symmetry)}
+        ${option('no', 'Есть асимметрия', obs.symmetry)}
+        ${option('unclear', 'Трудно оценить', obs.symmetry)}
+      </select>
+    </div>
+
+    <div>
+      <label>Использование сторон</label>
+      <select name="side_use">
+        ${option('', 'Не указано', obs.side_use)}
+        ${option('symmetric', 'Симметричное', obs.side_use)}
+        ${option('left', 'Преимущественно слева', obs.side_use)}
+        ${option('right', 'Преимущественно справа', obs.side_use)}
+        ${option('unclear', 'Трудно оценить', obs.side_use)}
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Переходы</label>
+      <select name="transitions">
+        ${option('', 'Не указано', obs.transitions)}
+        ${option('free', 'Свободные', obs.transitions)}
+        ${option('limited', 'Ограниченные', obs.transitions)}
+        ${option('absent', 'Самостоятельно не выполняет', obs.transitions)}
+        ${option('unclear', 'Трудно оценить', obs.transitions)}
+      </select>
+    </div>
+
+    <div>
+      <label>Помощь при переходах</label>
+      <select name="transition_assistance">
+        ${option('', 'Не указано', obs.transition_assistance)}
+        ${option('independent', 'Самостоятельно', obs.transition_assistance)}
+        ${option('supervision', 'Только контроль / страховка', obs.transition_assistance)}
+        ${option('minimal', 'Минимальная помощь', obs.transition_assistance)}
+        ${option('moderate', 'Умеренная помощь', obs.transition_assistance)}
+        ${option('maximal', 'Значительная помощь', obs.transition_assistance)}
+        ${option('dependent', 'Полностью зависит от помощи', obs.transition_assistance)}
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Постуральный контроль</label>
+      <select name="postural_control">
+        ${option('', 'Не указано', obs.postural_control)}
+        ${option('good', 'Хороший', obs.postural_control)}
+        ${option('limited', 'Ограниченный', obs.postural_control)}
+        ${option('poor', 'Выраженно нарушен', obs.postural_control)}
+        ${option('unclear', 'Трудно оценить', obs.postural_control)}
+      </select>
+    </div>
+
+    <div>
+      <label>Выносливость / утомляемость</label>
+      <select name="endurance">
+        ${option('', 'Не указано', obs.endurance)}
+        ${option('good', 'Хорошая', obs.endurance)}
+        ${option('reduced', 'Сниженная', obs.endurance)}
+        ${option('rapid_fatigue', 'Быстро утомляется', obs.endurance)}
+        ${option('unclear', 'Трудно оценить', obs.endurance)}
+      </select>
+    </div>
+  </div>
+</div>
+       
 
       <div class="section-card">
-        <div class="section-head"><div class="section-num">5</div><div class="section-title">Положение тела</div></div>
-        <details open><summary>Голова / шея / плечевой пояс / туловище</summary>
-          <label>Голова и шея</label><textarea name="head_neck">${esc(body.head_neck || '')}</textarea>
-          <label>Плечевой пояс</label><textarea name="shoulders">${esc(body.shoulders || '')}</textarea>
-          <label>Туловище</label><textarea name="trunk">${esc(body.trunk || '')}</textarea>
-        </details>
-        <details><summary>Таз / тазобедренные / колени</summary>
-          <label>Таз</label><textarea name="pelvis">${esc(body.pelvis || '')}</textarea>
-          <label>Тазобедренные суставы</label><textarea name="hips">${esc(body.hips || '')}</textarea>
-          <label>Колени</label><textarea name="knees">${esc(body.knees || '')}</textarea>
-        </details>
-        <details><summary>Стопы</summary><label>Описание стоп</label><textarea name="feet">${esc(body.feet || '')}</textarea></details>
-      </div>
+  <div class="section-head">
+    <div class="section-num">5</div>
+    <div class="section-title">Положение тела</div>
+  </div>
 
-      <div class="section-card">
-        <div class="section-head"><div class="section-num">6</div><div class="section-title">Голеностоп и опора стоп</div></div>
-        <div class="row"><div><label>Дорсифлексия R, °</label><input inputmode="decimal" name="df_right" value="${esc(ankle.df_right || '')}"></div><div><label>Дорсифлексия L, °</label><input inputmode="decimal" name="df_left" value="${esc(ankle.df_left || '')}"></div></div>
-        <label>Положение колена при измерении</label><select name="knee_position">${option('', 'Не указано', ankle.knee_position)}${option('flexed', 'Согнуто', ankle.knee_position)}${option('extended', 'Разогнуто', ankle.knee_position)}${option('both', 'Оба положения', ankle.knee_position)}</select>
-        <div class="row"><div><label>Опора R</label><select name="foot_support_right">${option('', 'Не указано', ankle.foot_support_right)}${option('full', 'Полная стопа', ankle.foot_support_right)}${option('forefoot', 'Передний отдел', ankle.foot_support_right)}${option('other', 'Другое', ankle.foot_support_right)}</select></div><div><label>Опора L</label><select name="foot_support_left">${option('', 'Не указано', ankle.foot_support_left)}${option('full', 'Полная стопа', ankle.foot_support_left)}${option('forefoot', 'Передний отдел', ankle.foot_support_left)}${option('other', 'Другое', ankle.foot_support_left)}</select></div></div>
-        <div class="row"><div><label>Пятка R</label><select name="heel_right">${option('', 'Не указано', ankle.heel_right)}${option('neutral', 'Нейтрально', ankle.heel_right)}${option('valgus', 'Вальгус', ankle.heel_right)}${option('varus', 'Варус', ankle.heel_right)}</select></div><div><label>Пятка L</label><select name="heel_left">${option('', 'Не указано', ankle.heel_left)}${option('neutral', 'Нейтрально', ankle.heel_left)}${option('valgus', 'Вальгус', ankle.heel_left)}${option('varus', 'Варус', ankle.heel_left)}</select></div></div>
-      </div>
+  <div class="row">
+    <div>
+      <label>Основное положение осмотра</label>
+      <select name="assessment_position">
+        ${option('', 'Не указано', body.assessment_position)}
+        ${option('supine', 'Лёжа на спине', body.assessment_position)}
+        ${option('prone', 'Лёжа на животе', body.assessment_position)}
+        ${option('sitting', 'Сидя', body.assessment_position)}
+        ${option('standing', 'Стоя', body.assessment_position)}
+        ${option('mixed', 'Несколько положений', body.assessment_position)}
+      </select>
+    </div>
 
+    <div>
+      <label>Положение головы</label>
+      <select name="head_alignment">
+        ${option('', 'Не указано', body.head_alignment)}
+        ${option('midline', 'По средней линии', body.head_alignment)}
+        ${option('tilt_left', 'Наклон влево', body.head_alignment)}
+        ${option('tilt_right', 'Наклон вправо', body.head_alignment)}
+        ${option('rotation_left', 'Ротация влево', body.head_alignment)}
+        ${option('rotation_right', 'Ротация вправо', body.head_alignment)}
+        ${option('variable', 'Положение меняется', body.head_alignment)}
+        ${option('unclear', 'Трудно оценить', body.head_alignment)}
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Плечевой пояс</label>
+      <select name="shoulder_alignment">
+        ${option('', 'Не указано', body.shoulder_alignment)}
+        ${option('symmetric', 'Симметричный', body.shoulder_alignment)}
+        ${option('left_high', 'Левое плечо выше', body.shoulder_alignment)}
+        ${option('right_high', 'Правое плечо выше', body.shoulder_alignment)}
+        ${option('protracted', 'Плечи преимущественно вперёд', body.shoulder_alignment)}
+        ${option('retracted', 'Плечи преимущественно назад', body.shoulder_alignment)}
+        ${option('asymmetric', 'Другая асимметрия', body.shoulder_alignment)}
+        ${option('unclear', 'Трудно оценить', body.shoulder_alignment)}
+      </select>
+    </div>
+
+    <div>
+      <label>Туловище</label>
+      <select name="trunk_alignment">
+        ${option('', 'Не указано', body.trunk_alignment)}
+        ${option('neutral', 'Относительно нейтрально', body.trunk_alignment)}
+        ${option('flexion', 'Преобладает сгибание', body.trunk_alignment)}
+        ${option('extension', 'Преобладает разгибание', body.trunk_alignment)}
+        ${option('lateral_left', 'Наклон влево', body.trunk_alignment)}
+        ${option('lateral_right', 'Наклон вправо', body.trunk_alignment)}
+        ${option('rotation', 'Выражена ротация', body.trunk_alignment)}
+        ${option('asymmetric', 'Другая асимметрия', body.trunk_alignment)}
+        ${option('unclear', 'Трудно оценить', body.trunk_alignment)}
+      </select>
+    </div>
+  </div>
+
+  <label>Положение таза</label>
+  <select name="pelvis_alignment">
+    ${option('', 'Не указано', body.pelvis_alignment)}
+    ${option('neutral', 'Относительно нейтральное', body.pelvis_alignment)}
+    ${option('anterior_tilt', 'Передний наклон', body.pelvis_alignment)}
+    ${option('posterior_tilt', 'Задний наклон', body.pelvis_alignment)}
+    ${option('left_high', 'Левая сторона выше', body.pelvis_alignment)}
+    ${option('right_high', 'Правая сторона выше', body.pelvis_alignment)}
+    ${option('rotation', 'Ротация таза', body.pelvis_alignment)}
+    ${option('asymmetric', 'Другая асимметрия', body.pelvis_alignment)}
+    ${option('unclear', 'Трудно оценить', body.pelvis_alignment)}
+  </select>
+
+  <details style="margin-top:14px">
+    <summary style="cursor:pointer;font-weight:600">
+      Подробное описание положения тела
+    </summary>
+
+    <label>Голова / шея</label>
+    <textarea name="head_neck">${esc(body.head_neck || '')}</textarea>
+
+    <label>Плечевой пояс</label>
+    <textarea name="shoulders">${esc(body.shoulders || '')}</textarea>
+
+    <label>Туловище</label>
+    <textarea name="trunk">${esc(body.trunk || '')}</textarea>
+
+    <label>Таз</label>
+    <textarea name="pelvis">${esc(body.pelvis || '')}</textarea>
+
+    <label>Тазобедренные суставы / бёдра</label>
+    <textarea name="hips">${esc(body.hips || '')}</textarea>
+
+    <label>Колени</label>
+    <textarea name="knees">${esc(body.knees || '')}</textarea>
+
+    <label>Стопы</label>
+    <textarea name="feet">${esc(body.feet || '')}</textarea>
+  </details>
+</div>
+        
+
+    <div class="section-card">
+  <div class="section-head">
+    <div class="section-num">6</div>
+    <div class="section-title">Голеностоп и опора стоп</div>
+  </div>
+
+  <div class="help">
+    Дорсифлексию указывайте в градусах. При возможности измеряйте отдельно при согнутом и разогнутом колене.
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Дорсифлексия R, колено согнуто, °</label>
+      <input
+        inputmode="decimal"
+        name="df_right_flexed"
+        value="${esc(ankle.df_right_flexed || '')}"
+      >
+    </div>
+
+    <div>
+      <label>Дорсифлексия L, колено согнуто, °</label>
+      <input
+        inputmode="decimal"
+        name="df_left_flexed"
+        value="${esc(ankle.df_left_flexed || '')}"
+      >
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Дорсифлексия R, колено разогнуто, °</label>
+      <input
+        inputmode="decimal"
+        name="df_right_extended"
+        value="${esc(ankle.df_right_extended || '')}"
+      >
+    </div>
+
+    <div>
+      <label>Дорсифлексия L, колено разогнуто, °</label>
+      <input
+        inputmode="decimal"
+        name="df_left_extended"
+        value="${esc(ankle.df_left_extended || '')}"
+      >
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Опора R</label>
+      <select name="foot_support_right">
+        ${option('', 'Не указано', ankle.foot_support_right)}
+        ${option('full', 'Полная стопа', ankle.foot_support_right)}
+        ${option('forefoot', 'Передний отдел', ankle.foot_support_right)}
+        ${option('lateral', 'Преимущественно наружный край', ankle.foot_support_right)}
+        ${option('medial', 'Преимущественно внутренний край', ankle.foot_support_right)}
+        ${option('variable', 'Вариабельная', ankle.foot_support_right)}
+        ${option('other', 'Другое', ankle.foot_support_right)}
+      </select>
+    </div>
+
+    <div>
+      <label>Опора L</label>
+      <select name="foot_support_left">
+        ${option('', 'Не указано', ankle.foot_support_left)}
+        ${option('full', 'Полная стопа', ankle.foot_support_left)}
+        ${option('forefoot', 'Передний отдел', ankle.foot_support_left)}
+        ${option('lateral', 'Преимущественно наружный край', ankle.foot_support_left)}
+        ${option('medial', 'Преимущественно внутренний край', ankle.foot_support_left)}
+        ${option('variable', 'Вариабельная', ankle.foot_support_left)}
+        ${option('other', 'Другое', ankle.foot_support_left)}
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Пятка R</label>
+      <select name="heel_right">
+        ${option('', 'Не указано', ankle.heel_right)}
+        ${option('neutral', 'Нейтрально', ankle.heel_right)}
+        ${option('valgus', 'Вальгус', ankle.heel_right)}
+        ${option('varus', 'Варус', ankle.heel_right)}
+        ${option('no_contact', 'Нет контакта пяткой', ankle.heel_right)}
+      </select>
+    </div>
+
+    <div>
+      <label>Пятка L</label>
+      <select name="heel_left">
+        ${option('', 'Не указано', ankle.heel_left)}
+        ${option('neutral', 'Нейтрально', ankle.heel_left)}
+        ${option('valgus', 'Вальгус', ankle.heel_left)}
+        ${option('varus', 'Варус', ankle.heel_left)}
+        ${option('no_contact', 'Нет контакта пяткой', ankle.heel_left)}
+      </select>
+    </div>
+  </div>
+
+  <label>Комментарий по стопам / голеностопу</label>
+  <textarea
+    name="ankle_notes"
+    placeholder="Например: эквинус справа выражен больше, при поддержке пятка опускается..."
+  >${esc(ankle.notes || '')}</textarea>
+</div>
       <div class="section-card">
-        <div class="section-head"><div class="section-num">7</div><div class="section-title">Неврологические признаки</div></div>
-        <div class="row"><div><label>Тонус рук</label><select name="tone_arms">${option('', 'Не оценён', neuro.tone_arms)}${option('normal', 'Без явных особенностей', neuro.tone_arms)}${option('high', 'Повышен', neuro.tone_arms)}${option('low', 'Снижен', neuro.tone_arms)}${option('asymmetry', 'Асимметрия', neuro.tone_arms)}</select></div><div><label>Тонус ног</label><select name="tone_legs">${option('', 'Не оценён', neuro.tone_legs)}${option('normal', 'Без явных особенностей', neuro.tone_legs)}${option('high', 'Повышен', neuro.tone_legs)}${option('low', 'Снижен', neuro.tone_legs)}${option('asymmetry', 'Асимметрия', neuro.tone_legs)}</select></div></div>
-        <label>Сухожильные рефлексы</label><input name="reflexes" value="${esc(neuro.reflexes || '')}">
-        <label>Подошвенный ответ</label><input name="plantar" value="${esc(neuro.plantar || '')}">
-        <label>Клонус</label><select name="clonus">${option('', 'Не проверял', neuro.clonus)}${option('none', 'Нет', neuro.clonus)}${option('present', 'Есть', neuro.clonus)}</select>
-        <label>Другие наблюдения</label><textarea name="neuro_observations">${esc(a?.neuro_observations || '')}</textarea>
-      </div>
+  <div class="section-head">
+    <div class="section-num">7</div>
+    <div class="section-title">Неврологические признаки</div>
+  </div>
+
+  <div class="help">
+    Отмечайте только фактически наблюдаемые или проверенные признаки.
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Тонус рук</label>
+      <select name="tone_arms">
+        ${option('', 'Не оценён', neuro.tone_arms)}
+        ${option('normal', 'Без явных особенностей', neuro.tone_arms)}
+        ${option('high', 'Повышен', neuro.tone_arms)}
+        ${option('low', 'Снижен', neuro.tone_arms)}
+        ${option('asymmetry', 'Асимметрия', neuro.tone_arms)}
+        ${option('variable', 'Вариабельный', neuro.tone_arms)}
+      </select>
+    </div>
+
+    <div>
+      <label>Тонус ног</label>
+      <select name="tone_legs">
+        ${option('', 'Не оценён', neuro.tone_legs)}
+        ${option('normal', 'Без явных особенностей', neuro.tone_legs)}
+        ${option('high', 'Повышен', neuro.tone_legs)}
+        ${option('low', 'Снижен', neuro.tone_legs)}
+        ${option('asymmetry', 'Асимметрия', neuro.tone_legs)}
+        ${option('variable', 'Вариабельный', neuro.tone_legs)}
+      </select>
+    </div>
+  </div>
+
+  <label>Характер изменения тонуса</label>
+  <select name="tone_pattern">
+    ${option('', 'Не указано', neuro.tone_pattern)}
+    ${option('spastic', 'Преимущественно спастический', neuro.tone_pattern)}
+    ${option('dystonic', 'Преимущественно дистонический', neuro.tone_pattern)}
+    ${option('mixed', 'Смешанный', neuro.tone_pattern)}
+    ${option('hypotonic', 'Преимущественно гипотонический', neuro.tone_pattern)}
+    ${option('unclear', 'Трудно классифицировать', neuro.tone_pattern)}
+  </select>
+
+  <label>Сухожильные рефлексы</label>
+  <input
+    name="reflexes"
+    value="${esc(neuro.reflexes || '')}"
+    placeholder="Например: оживлены симметрично, справа выше"
+  >
+
+  <div class="row">
+    <div>
+      <label>Клонус справа</label>
+      <select name="clonus_right">
+        ${option('', 'Не проверял', neuro.clonus_right)}
+        ${option('none', 'Нет', neuro.clonus_right)}
+        ${option('unsustained', 'Несколько колебаний', neuro.clonus_right)}
+        ${option('sustained', 'Устойчивый', neuro.clonus_right)}
+      </select>
+    </div>
+
+    <div>
+      <label>Клонус слева</label>
+      <select name="clonus_left">
+        ${option('', 'Не проверял', neuro.clonus_left)}
+        ${option('none', 'Нет', neuro.clonus_left)}
+        ${option('unsustained', 'Несколько колебаний', neuro.clonus_left)}
+        ${option('sustained', 'Устойчивый', neuro.clonus_left)}
+      </select>
+    </div>
+  </div>
+
+  <label>Подошвенный ответ</label>
+  <input
+    name="plantar"
+    value="${esc(neuro.plantar || '')}"
+  >
+
+  <label>Непроизвольные движения / дистонические проявления</label>
+  <select name="involuntary_movements">
+    ${option('', 'Не указано', neuro.involuntary_movements)}
+    ${option('none', 'Не наблюдаются', neuro.involuntary_movements)}
+    ${option('present', 'Наблюдаются', neuro.involuntary_movements)}
+    ${option('variable', 'Эпизодические / вариабельные', neuro.involuntary_movements)}
+    ${option('unclear', 'Трудно оценить', neuro.involuntary_movements)}
+  </select>
+
+  <label>Другие наблюдения</label>
+  <textarea name="neuro_observations">${esc(a?.neuro_observations || '')}</textarea>
+</div>
 
      <div class="section-card">
   <div class="section-head">
@@ -1469,11 +1847,22 @@ function assessmentHtml(a) {
 </details>
 </div>
         
+<div class="section-card">
+  <div class="section-head">
+    <div class="section-num">9</div>
+    <div class="section-title">Физиотерапевтическое заключение</div>
+  </div>
 
-      <div class="section-card">
-        <div class="section-head"><div class="section-num">9</div><div class="section-title">Физиотерапевтическое заключение</div></div>
-        <textarea name="conclusion" placeholder="Подтверждается специалистом">${esc(a?.conclusion || '')}</textarea>
-      </div>
+  <div class="help">
+    Кратко сформулируйте ведущие функциональные проблемы, возможности ребёнка и основные направления физической терапии.
+  </div>
+
+  <textarea
+    name="conclusion"
+    placeholder="Например: самостоятельное сидение сохранено, переход сидя–стоя требует помощи; ограничение самостоятельного передвижения связано с недостаточным постуральным контролем и нарушением опоры стоп..."
+    style="min-height:150px"
+  >${esc(a?.conclusion || '')}</textarea>
+</div>
 
       <div class="actions">
         <button id="assessmentSaveBtn" class="btn primary full" type="submit">${a?.id ? 'Сохранить изменения' : 'Сохранить оценку в облако'}</button>
@@ -1500,10 +1889,60 @@ function structuredFromAssessmentForm(fd) {
   previous_rehab: formValue(fd, 'previous_rehab')
 },
     milestones: milestonesFromForm(fd),
-    observation: { symmetry: formValue(fd, 'symmetry'), transitions: formValue(fd, 'transitions'), side_use: formValue(fd, 'side_use') },
-    body: { head_neck: formValue(fd, 'head_neck'), shoulders: formValue(fd, 'shoulders'), trunk: formValue(fd, 'trunk'), pelvis: formValue(fd, 'pelvis'), hips: formValue(fd, 'hips'), knees: formValue(fd, 'knees'), feet: formValue(fd, 'feet') },
-    ankle: { df_right: formValue(fd, 'df_right'), df_left: formValue(fd, 'df_left'), knee_position: formValue(fd, 'knee_position'), foot_support_right: formValue(fd, 'foot_support_right'), foot_support_left: formValue(fd, 'foot_support_left'), heel_right: formValue(fd, 'heel_right'), heel_left: formValue(fd, 'heel_left') },
-    neuro: { tone_arms: formValue(fd, 'tone_arms'), tone_legs: formValue(fd, 'tone_legs'), reflexes: formValue(fd, 'reflexes'), plantar: formValue(fd, 'plantar'), clonus: formValue(fd, 'clonus') },
+    observation: {
+  spontaneous_activity: formValue(fd, 'spontaneous_activity'),
+  movement_quality: formValue(fd, 'movement_quality'),
+  symmetry: formValue(fd, 'symmetry'),
+  side_use: formValue(fd, 'side_use'),
+  transitions: formValue(fd, 'transitions'),
+  transition_assistance: formValue(fd, 'transition_assistance'),
+  postural_control: formValue(fd, 'postural_control'),
+  endurance: formValue(fd, 'endurance')
+},
+
+    body: {
+  assessment_position: formValue(fd, 'assessment_position'),
+  head_alignment: formValue(fd, 'head_alignment'),
+  shoulder_alignment: formValue(fd, 'shoulder_alignment'),
+  trunk_alignment: formValue(fd, 'trunk_alignment'),
+  pelvis_alignment: formValue(fd, 'pelvis_alignment'),
+
+  head_neck: formValue(fd, 'head_neck'),
+  shoulders: formValue(fd, 'shoulders'),
+  trunk: formValue(fd, 'trunk'),
+  pelvis: formValue(fd, 'pelvis'),
+  hips: formValue(fd, 'hips'),
+  knees: formValue(fd, 'knees'),
+  feet: formValue(fd, 'feet')
+},
+   ankle: {
+  df_right_flexed: formValue(fd, 'df_right_flexed'),
+  df_left_flexed: formValue(fd, 'df_left_flexed'),
+  df_right_extended: formValue(fd, 'df_right_extended'),
+  df_left_extended: formValue(fd, 'df_left_extended'),
+
+  foot_support_right: formValue(fd, 'foot_support_right'),
+  foot_support_left: formValue(fd, 'foot_support_left'),
+
+  heel_right: formValue(fd, 'heel_right'),
+  heel_left: formValue(fd, 'heel_left'),
+
+  notes: formValue(fd, 'ankle_notes')
+},
+    neuro: {
+  tone_arms: formValue(fd, 'tone_arms'),
+  tone_legs: formValue(fd, 'tone_legs'),
+  tone_pattern: formValue(fd, 'tone_pattern'),
+
+  reflexes: formValue(fd, 'reflexes'),
+
+  clonus_right: formValue(fd, 'clonus_right'),
+  clonus_left: formValue(fd, 'clonus_left'),
+
+  plantar: formValue(fd, 'plantar'),
+
+  involuntary_movements: formValue(fd, 'involuntary_movements')
+},
     tests: {
   gmfcs: formValue(fd, 'gmfcs'),
   macs: formValue(fd, 'macs'),
