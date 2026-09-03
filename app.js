@@ -1381,21 +1381,24 @@ function assessmentHtml(a) {
 
   <label>Результат / комментарий</label>
   <textarea name="test_result">${esc(tests.result || '')}</textarea>
-  <div
+
+  <details
   style="
     margin-top:18px;
     padding-top:16px;
     border-top:1px solid #e5e7eb;
   "
 >
-  <div
+  <summary
     style="
       font-weight:700;
-      margin-bottom:10px;
+      cursor:pointer;
+      user-select:none;
+      padding:4px 0 10px;
     "
   >
-    📈 История оценок
-  </div>
+    📈 История и динамика оценок
+  </summary>
 
   <div class="row">
     <div>
@@ -1463,7 +1466,7 @@ function assessmentHtml(a) {
     </div>
   </div>
 </div>
-</div>
+</details>
 </div>
         
 
@@ -2119,19 +2122,42 @@ function renderStandardizedLineChart(
         (index / (points.length - 1)) *
           plotWidth;
 
-  const yFor = value => {
-    const safeValue = Math.max(
-      0,
-      Math.min(maxScore, value)
-    );
+  const values = points.map(point => point.value);
 
-    return (
-      top +
-      plotHeight -
-      (safeValue / maxScore) *
-        plotHeight
-    );
-  };
+const observedMin = Math.min(...values);
+const observedMax = Math.max(...values);
+
+const padding = Math.max(
+  2,
+  (observedMax - observedMin) * 0.35
+);
+
+const chartMin = Math.max(
+  0,
+  Math.floor(observedMin - padding)
+);
+
+const chartMax = Math.min(
+  maxScore,
+  Math.ceil(observedMax + padding)
+);
+
+const chartRange =
+  Math.max(1, chartMax - chartMin);
+
+const yFor = value => {
+  const safeValue = Math.max(
+    chartMin,
+    Math.min(chartMax, value)
+  );
+
+  return (
+    top +
+    plotHeight -
+    ((safeValue - chartMin) / chartRange) *
+      plotHeight
+  );
+};
 
   const polyline = points
     .map(
@@ -2141,24 +2167,35 @@ function renderStandardizedLineChart(
     .join(' ');
 
   const dots = points
-    .map(
-      (point, index) => `
-        <circle
-          cx="${xFor(index)}"
-          cy="${yFor(point.value)}"
-          r="4"
-          fill="currentColor"
-        >
-          <title>
-            ${new Date(
-              `${point.date}T12:00:00`
-            ).toLocaleDateString('ru-RU')}
-            — ${point.value}
-          </title>
-        </circle>
-      `
-    )
-    .join('');
+  .map(
+    (point, index) => `
+      <circle
+        cx="${xFor(index)}"
+        cy="${yFor(point.value)}"
+        r="4"
+        fill="currentColor"
+      >
+        <title>
+          ${new Date(
+            `${point.date}T12:00:00`
+          ).toLocaleDateString('ru-RU')}
+          — ${point.value}
+        </title>
+      </circle>
+
+      <text
+        x="${xFor(index)}"
+        y="${yFor(point.value) - 9}"
+        text-anchor="middle"
+        font-size="10"
+        font-weight="600"
+        fill="currentColor"
+      >
+        ${point.value}
+      </text>
+    `
+  )
+  .join('');
 
   const first = points[0];
   const last = points[points.length - 1];
@@ -2240,7 +2277,7 @@ function renderStandardizedLineChart(
           font-size="10"
           fill="#6b7280"
         >
-          ${maxScore}
+          ${chartMax}
         </text>
 
         <text
@@ -2250,7 +2287,7 @@ function renderStandardizedLineChart(
           font-size="10"
           fill="#6b7280"
         >
-          0
+          ${chartMin}
         </text>
 
         <polyline
