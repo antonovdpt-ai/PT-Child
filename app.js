@@ -1431,6 +1431,38 @@ function assessmentHtml(a) {
       Загружаю историю оценок...
     </div>
   </div>
+  <div
+  id="standardizedCharts"
+  style="
+    margin-top:18px;
+    padding-top:16px;
+    border-top:1px solid #e5e7eb;
+  "
+>
+  <div
+    style="
+      font-weight:700;
+      margin-bottom:10px;
+    "
+  >
+    📊 Динамика показателей
+  </div>
+
+  <div
+    id="gmfm66Chart"
+    style="margin-bottom:18px"
+  >
+    <div class="muted">
+      Для графика GMFM-66 нужно минимум 2 измерения.
+    </div>
+  </div>
+
+  <div id="hineChart">
+    <div class="muted">
+      Для графика HINE нужно минимум 2 измерения.
+    </div>
+  </div>
+</div>
 </div>
 </div>
         
@@ -2028,6 +2060,242 @@ if (standardizedHistoryDate && !standardizedHistoryDate.value) {
   standardizedHistoryDate.value = localDate;
 }
 
+function renderStandardizedLineChart(
+  containerId,
+  items,
+  scale,
+  title,
+  maxScore
+) {
+  const container =
+    document.getElementById(containerId);
+
+  if (!container) return;
+
+  const points = items
+    .filter(
+      item =>
+        item.scale === scale &&
+        item.assessed_at &&
+        item.value_numeric !== null &&
+        item.value_numeric !== undefined
+    )
+    .map(item => ({
+      date: item.assessed_at,
+      value: Number(item.value_numeric)
+    }))
+    .filter(item => Number.isFinite(item.value))
+    .sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+
+  if (points.length < 2) {
+    container.innerHTML = `
+      <div class="muted">
+        Для графика ${title} нужно минимум 2 измерения.
+      </div>
+    `;
+    return;
+  }
+
+  const width = 320;
+  const height = 150;
+
+  const left = 34;
+  const right = 12;
+  const top = 18;
+  const bottom = 28;
+
+  const plotWidth =
+    width - left - right;
+
+  const plotHeight =
+    height - top - bottom;
+
+  const xFor = index =>
+    points.length === 1
+      ? left + plotWidth / 2
+      : left +
+        (index / (points.length - 1)) *
+          plotWidth;
+
+  const yFor = value => {
+    const safeValue = Math.max(
+      0,
+      Math.min(maxScore, value)
+    );
+
+    return (
+      top +
+      plotHeight -
+      (safeValue / maxScore) *
+        plotHeight
+    );
+  };
+
+  const polyline = points
+    .map(
+      (point, index) =>
+        `${xFor(index)},${yFor(point.value)}`
+    )
+    .join(' ');
+
+  const dots = points
+    .map(
+      (point, index) => `
+        <circle
+          cx="${xFor(index)}"
+          cy="${yFor(point.value)}"
+          r="4"
+          fill="currentColor"
+        >
+          <title>
+            ${new Date(
+              `${point.date}T12:00:00`
+            ).toLocaleDateString('ru-RU')}
+            — ${point.value}
+          </title>
+        </circle>
+      `
+    )
+    .join('');
+
+  const first = points[0];
+  const last = points[points.length - 1];
+
+  const firstDate = new Date(
+    `${first.date}T12:00:00`
+  ).toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit'
+  });
+
+  const lastDate = new Date(
+    `${last.date}T12:00:00`
+  ).toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit'
+  });
+
+  const difference =
+    last.value - first.value;
+
+  const differenceText =
+    difference > 0
+      ? `+${difference.toFixed(1)}`
+      : difference.toFixed(1);
+
+  container.innerHTML = `
+    <div
+      style="
+        padding:12px;
+        border:1px solid #e5e7eb;
+        border-radius:12px;
+      "
+    >
+      <div
+        style="
+          display:flex;
+          justify-content:space-between;
+          gap:12px;
+          margin-bottom:8px;
+        "
+      >
+        <strong>${title}</strong>
+
+        <span class="muted tiny">
+          Изменение: ${differenceText}
+        </span>
+      </div>
+
+      <svg
+        viewBox="0 0 ${width} ${height}"
+        style="
+          width:100%;
+          height:auto;
+          display:block;
+          overflow:visible;
+        "
+      >
+        <line
+          x1="${left}"
+          y1="${top}"
+          x2="${left}"
+          y2="${top + plotHeight}"
+          stroke="#d1d5db"
+        />
+
+        <line
+          x1="${left}"
+          y1="${top + plotHeight}"
+          x2="${left + plotWidth}"
+          y2="${top + plotHeight}"
+          stroke="#d1d5db"
+        />
+
+        <text
+          x="${left - 6}"
+          y="${top + 4}"
+          text-anchor="end"
+          font-size="10"
+          fill="#6b7280"
+        >
+          ${maxScore}
+        </text>
+
+        <text
+          x="${left - 6}"
+          y="${top + plotHeight}"
+          text-anchor="end"
+          font-size="10"
+          fill="#6b7280"
+        >
+          0
+        </text>
+
+        <polyline
+          points="${polyline}"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+
+        ${dots}
+
+        <text
+          x="${left}"
+          y="${height - 6}"
+          text-anchor="start"
+          font-size="10"
+          fill="#6b7280"
+        >
+          ${firstDate}
+        </text>
+
+        <text
+          x="${left + plotWidth}"
+          y="${height - 6}"
+          text-anchor="end"
+          font-size="10"
+          fill="#6b7280"
+        >
+          ${lastDate}
+        </text>
+      </svg>
+
+      <div
+        class="muted tiny"
+        style="margin-top:4px"
+      >
+        ${points.length} измерений ·
+        последнее значение: ${last.value}
+      </div>
+    </div>
+  `;
+}
+
 async function loadStandardizedHistory() {
   if (!standardizedHistoryList) return;
 
@@ -2052,6 +2320,22 @@ async function loadStandardizedHistory() {
     if (error) throw error;
 
     const items = data || [];
+renderStandardizedLineChart(
+  'gmfm66Chart',
+  items,
+  'gmfm66',
+  'GMFM-66',
+  100
+);
+
+renderStandardizedLineChart(
+  'hineChart',
+  items,
+  'hine',
+  'HINE',
+  78
+);
+
 
     if (!items.length) {
       standardizedHistoryList.innerHTML =
