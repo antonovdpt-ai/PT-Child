@@ -3142,6 +3142,7 @@ if (saveStandardizedHistoryBtn) {
       state.assessment = r.data; setButtonSaved(btn); status.textContent = '✓ Данные сохранены в облаке';
     };
   }
+  
   if (state.tab === 'goals') {
     box.innerHTML = `<div class="card"><h3>Активные цели</h3>${goalsHtml(state.goals, true)}</div><form class="card" id="goalForm"><h3>＋ Новая цель</h3><label>Функциональная цель</label><textarea name="title" required></textarea><label>Исходное состояние</label><textarea name="baseline"></textarea><label>Критерий достижения</label><input name="criterion"><label>Срок</label><input type="date" name="deadline"><label>Прогресс</label><select name="progress"><option value="0">0%</option><option value="20">20%</option><option value="40">40%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option></select><div class="actions"><button id="goalSaveBtn" class="btn primary full" type="submit">Добавить цель</button></div><div id="goalStatus" class="save-status"></div></form>`;
     const form = document.getElementById('goalForm'), btn = document.getElementById('goalSaveBtn'), status = document.getElementById('goalStatus');
