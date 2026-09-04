@@ -363,6 +363,79 @@ function enableVoiceInput(root) {
   });
 }
 
+function enableAssessmentSectionCollapse(form) {
+  if (!form) return;
+
+  const sections =
+    form.querySelectorAll('.section-card');
+
+  sections.forEach((section, index) => {
+    if (
+      section.dataset.collapsibleReady === '1'
+    ) {
+      return;
+    }
+
+    const head =
+      section.querySelector(':scope > .section-head');
+
+    if (!head) return;
+
+    section.dataset.collapsibleReady = '1';
+
+    const body =
+      document.createElement('div');
+
+    body.className =
+      'assessment-section-body';
+
+    while (head.nextSibling) {
+      body.appendChild(head.nextSibling);
+    }
+
+    section.appendChild(body);
+
+    head.style.cursor = 'pointer';
+    head.style.userSelect = 'none';
+    head.style.display = 'flex';
+    head.style.alignItems = 'center';
+    head.style.gap = '8px';
+
+    const toggle =
+      document.createElement('span');
+
+    toggle.style.marginLeft = 'auto';
+    toggle.style.fontSize = '14px';
+    toggle.style.color = '#6b7280';
+
+    head.appendChild(toggle);
+
+    const setOpen = open => {
+      body.hidden = !open;
+
+      section.dataset.open =
+        open ? '1' : '0';
+
+      toggle.textContent =
+        open ? '▼' : '▶';
+
+      head.setAttribute(
+        'aria-expanded',
+        String(open)
+      );
+    };
+
+    setOpen(index === 0);
+
+    head.onclick = () => {
+      const currentlyOpen =
+        section.dataset.open === '1';
+
+      setOpen(!currentlyOpen);
+    };
+  });
+}
+
 async function init() {
   const { data } = await sb.auth.getSession(); session = data.session; user = session?.user || null; renderHeader();
   sb.auth.onAuthStateChange(async (_e, s) => { session = s; user = s?.user || null; renderHeader(); if (user) { await loadPatients(); await renderPatients() } else renderLogin() });
@@ -2137,6 +2210,7 @@ box.insertAdjacentHTML('beforeend', `
 
     const form = document.getElementById('assessmentForm'), btn = document.getElementById('assessmentSaveBtn'), status = document.getElementById('assessmentSaveStatus');
     watchFormDirty(form, btn, state.assessment?.id ? 'Сохранить изменения' : 'Сохранить оценку в облако');
+    enableAssessmentSectionCollapse(form);
     enableVoiceInput(form);
 
 const documentForm = document.getElementById('documentForm');
