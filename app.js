@@ -3653,8 +3653,14 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
 document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () => { const { error } = await sb.from('goals').delete().eq('id', b.dataset.delGoal); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
   }
   if (state.tab === 'sessions') {
-    box.innerHTML = `<form class="card" id="sessionForm"><h3>＋ Новое занятие</h3><label>Дата</label><input type="date" name="session_date" value="${new Date().toISOString().slice(0, 10)}"><label>Запись занятия</label><textarea name="note" required></textarea><label>Переносимость</label><select name="tolerance"><option value="good">Хорошая</option><option value="medium">Средняя</option><option value="low">Низкая</option><option value="unclear">Трудно оценить</option>
-    </select>
+    box.innerHTML = `<form class="card" id="sessionForm"><h3>＋ Новое занятие</h3><label>Дата</label><input type="date" name="session_date" value="${new Date().toISOString().slice(0, 10)}"><label>Запись занятия</label><textarea name="note" required></textarea><label>Переносимость</label>
+    <select name="tolerance">
+  <option value="">Не указано</option>
+  <option value="good">Хорошая</option>
+  <option value="medium">Средняя</option>
+  <option value="low">Низкая</option>
+  <option value="unclear">Трудно оценить</option>
+</select>
 
 <label>Динамика</label>
 <select name="dynamics_status">
@@ -3754,7 +3760,7 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
     patient_id: p.id,
     session_date: fd.get('session_date'),
     note: fd.get('note').trim(),
-    tolerance: fd.get('tolerance'),
+    tolerance: fd.get('tolerance') || null,
     dynamics_status:
       fd.get('dynamics_status') || null,
     function_changes:
