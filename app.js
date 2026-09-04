@@ -3804,8 +3804,41 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
   await loadPatientData();
   renderPatient();
 };
-     document.querySelectorAll('[data-del-session]').forEach(b => b.onclick = async () => { const { error } = await sb.from('sessions').delete().eq('id', b.dataset.delSession); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
-  }
+     
+document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
+  deleteBtn.onclick = async () => {
+    const confirmed = confirm(
+      'Удалить это занятие? Действие нельзя отменить.'
+    );
+
+    if (!confirmed) return;
+
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = 'Удаляю...';
+
+    const { error } = await sb
+      .from('sessions')
+      .delete()
+      .eq('id', deleteBtn.dataset.delSession);
+
+    if (error) {
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = 'Удалить';
+
+      return flash(
+        'error',
+        error.message
+      );
+    }
+
+    await loadPatientData();
+    renderPatient();
+    
+  };
+  
+});
+}
+
   if (state.tab === 'progress') {
   const sessionsWithDynamics = state.sessions.filter(
     s => s.dynamics_status || s.function_changes
