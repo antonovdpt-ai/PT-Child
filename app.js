@@ -3581,7 +3581,7 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
       const { error } = await sb
         .from('goals')
         .update({
-          status: 'completed',
+          status: 'achieved',
           progress: 100
         })
         .eq('id', goalId);
