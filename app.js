@@ -436,6 +436,66 @@ function enableAssessmentSectionCollapse(form) {
   });
 }
 
+function enableAssessmentFloatingSave(form, btn, status) {
+  if (!form || !btn) return;
+
+  if (form.dataset.floatingSaveReady === '1') {
+    return;
+  }
+
+  form.dataset.floatingSaveReady = '1';
+
+  const actions =
+    btn.closest('.actions') ||
+    btn.parentElement;
+
+  if (!actions) return;
+
+  actions.style.position = 'fixed';
+  actions.style.left = '50%';
+  actions.style.bottom =
+    'max(12px, env(safe-area-inset-bottom))';
+  actions.style.transform =
+    'translateX(-50%)';
+
+  actions.style.width =
+    'min(470px, calc(100vw - 24px))';
+
+  actions.style.boxSizing = 'border-box';
+  actions.style.zIndex = '999';
+
+  actions.style.margin = '0';
+  actions.style.padding = '10px';
+
+  actions.style.background =
+    'rgba(255, 255, 255, 0.96)';
+
+  actions.style.backdropFilter =
+    'blur(8px)';
+
+  actions.style.border =
+    '1px solid #e5e7eb';
+
+  actions.style.borderRadius = '14px';
+
+  actions.style.boxShadow =
+    '0 10px 30px rgba(0, 0, 0, 0.12)';
+
+  actions.style.display = 'block';
+
+  btn.style.width = '100%';
+  btn.style.margin = '0';
+
+  if (status) {
+    actions.appendChild(status);
+
+    status.style.marginTop = '6px';
+    status.style.marginBottom = '0';
+  }
+
+  form.style.paddingBottom = '100px';
+}
+
 async function init() {
   const { data } = await sb.auth.getSession(); session = data.session; user = session?.user || null; renderHeader();
   sb.auth.onAuthStateChange(async (_e, s) => { session = s; user = s?.user || null; renderHeader(); if (user) { await loadPatients(); await renderPatients() } else renderLogin() });
@@ -2210,6 +2270,11 @@ box.insertAdjacentHTML('beforeend', `
 
     const form = document.getElementById('assessmentForm'), btn = document.getElementById('assessmentSaveBtn'), status = document.getElementById('assessmentSaveStatus');
     watchFormDirty(form, btn, state.assessment?.id ? 'Сохранить изменения' : 'Сохранить оценку в облако');
+    enableAssessmentFloatingSave(
+  form,
+  btn,
+  status
+);
     enableAssessmentSectionCollapse(form);
     enableVoiceInput(form);
 
