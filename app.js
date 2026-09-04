@@ -3671,21 +3671,133 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
   placeholder="Например: стал отпускать опору на 3–4 секунды, появились самостоятельные шаги"
 ></textarea>
 
-<div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form><div class="card"><h3>История занятий</h3>${state.sessions.map(s => `<div class="item"><div class="item-title">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</div><div class="item-sub">${esc(s.note || '')}</div>${sessionDynamicsHtml(s)}<button class="link" style="color:#9b3333;margin-top:7px" data-del-session="${s.id}">Удалить</button></div>`).join('') || `<div class="empty">Занятий пока нет.</div>`}</div>`;
+<div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form><div class="card"><h3>История занятий</h3>${state.sessions.map(s => `<div class="item"><div class="item-title">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</div><div class="item-sub">${esc(s.note || '')}</div>${sessionDynamicsHtml(s)}
+
+<div
+  style="
+    display:flex;
+    gap:14px;
+    margin-top:7px;
+    flex-wrap:wrap;
+  "
+>
+  <button
+    type="button"
+    class="link"
+    data-edit-session="${s.id}"
+  >
+    Изменить
+  </button>
+
+  <button
+    type="button"
+    class="link"
+    style="color:#9b3333"
+    data-del-session="${s.id}"
+  >
+    Удалить
+  </button>
+</div>
+</div>`).join('') || `<div class="empty">Занятий пока нет.</div>`}</div>`;
     const form = document.getElementById('sessionForm'), btn = document.getElementById('sessionSaveBtn'), status = document.getElementById('sessionStatus'); watchFormDirty(form, btn, 'Сохранить занятие');
 
     enableVoiceInput(form);
-    form.onsubmit = async e => { e.preventDefault(); setButtonSaving(btn); const fd = new FormData(e.target);
 
-    const payload = {
-     patient_id: p.id,
-     session_date: fd.get('session_date'),
-     note: fd.get('note').trim(),
-     tolerance: fd.get('tolerance'),
-     dynamics_status: fd.get('dynamics_status') || null,
-     function_changes: fd.get('function_changes').trim() || null
-    };
-   const { error } = await sb.from('sessions').insert(payload); if (error) { setButtonError(btn, 'Сохранить занятие'); return flash('error', error.message) } setButtonSaved(btn, '✓ Занятие сохранено'); status.textContent = '✓ Данные сохранены в облаке'; await sleep(700); await loadPatientData(); renderPatient() };
+let editingSessionId = null;
+
+document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
+  editBtn.onclick = () => {
+    const session = state.sessions.find(
+      s => s.id === editBtn.dataset.editSession
+    );
+
+    if (!session) return;
+
+    editingSessionId = session.id;
+
+    form.querySelector('h3').textContent =
+      '✏️ Изменить занятие';
+
+    form.elements.session_date.value =
+      session.session_date || '';
+
+    form.elements.note.value =
+      session.note || '';
+
+    form.elements.tolerance.value =
+      session.tolerance || '';
+
+    form.elements.dynamics_status.value =
+      session.dynamics_status || '';
+
+    form.elements.function_changes.value =
+      session.function_changes || '';
+
+    btn.textContent =
+      'Сохранить изменения';
+
+    form.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    });
+  };
+});
+
+   form.onsubmit = async e => {
+  e.preventDefault();
+
+  setButtonSaving(btn);
+
+  const fd = new FormData(e.target);
+
+  const payload = {
+    patient_id: p.id,
+    session_date: fd.get('session_date'),
+    note: fd.get('note').trim(),
+    tolerance: fd.get('tolerance'),
+    dynamics_status:
+      fd.get('dynamics_status') || null,
+    function_changes:
+      fd.get('function_changes').trim() || null
+  };
+
+  const { error } = editingSessionId
+    ? await sb
+        .from('sessions')
+        .update(payload)
+        .eq('id', editingSessionId)
+    : await sb
+        .from('sessions')
+        .insert(payload);
+
+  if (error) {
+    setButtonError(
+      btn,
+      editingSessionId
+        ? 'Сохранить изменения'
+        : 'Сохранить занятие'
+    );
+
+    return flash(
+      'error',
+      error.message
+    );
+  }
+
+  setButtonSaved(
+    btn,
+    editingSessionId
+      ? '✓ Изменения сохранены'
+      : '✓ Занятие сохранено'
+  );
+
+  status.textContent =
+    '✓ Данные сохранены в облаке';
+
+  await sleep(700);
+  await loadPatientData();
+  renderPatient();
+};
      document.querySelectorAll('[data-del-session]').forEach(b => b.onclick = async () => { const { error } = await sb.from('sessions').delete().eq('id', b.dataset.delSession); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
   }
   if (state.tab === 'progress') {
