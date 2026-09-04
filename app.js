@@ -401,14 +401,73 @@ function enableAssessmentSectionCollapse(form) {
     head.style.alignItems = 'center';
     head.style.gap = '8px';
 
+    const statusBadge =
+      document.createElement('span');
+
+    statusBadge.style.marginLeft = 'auto';
+    statusBadge.style.fontSize = '12px';
+    statusBadge.style.fontWeight = '600';
+    statusBadge.style.whiteSpace = 'nowrap';
+
+    head.appendChild(statusBadge);
+
     const toggle =
       document.createElement('span');
 
-    toggle.style.marginLeft = 'auto';
     toggle.style.fontSize = '14px';
     toggle.style.color = '#6b7280';
+    toggle.style.marginLeft = '4px';
 
     head.appendChild(toggle);
+
+    const controls =
+      body.querySelectorAll(
+        'textarea, select, input:not([type="button"]):not([type="submit"]):not([type="file"]):not([type="hidden"])'
+      );
+
+    const hasValue = control => {
+      if (
+        control.type === 'checkbox' ||
+        control.type === 'radio'
+      ) {
+        return control.checked;
+      }
+
+      return String(
+        control.value || ''
+      ).trim() !== '';
+    };
+
+    const updateStatus = () => {
+      const hasData =
+        Array.from(controls).some(hasValue);
+
+      if (hasData) {
+        statusBadge.textContent =
+          '✓ есть данные';
+
+        statusBadge.style.color =
+          '#15803d';
+      } else {
+        statusBadge.textContent =
+          'пусто';
+
+        statusBadge.style.color =
+          '#9ca3af';
+      }
+    };
+
+    controls.forEach(control => {
+      control.addEventListener(
+        'input',
+        updateStatus
+      );
+
+      control.addEventListener(
+        'change',
+        updateStatus
+      );
+    });
 
     const setOpen = open => {
       body.hidden = !open;
@@ -424,6 +483,8 @@ function enableAssessmentSectionCollapse(form) {
         String(open)
       );
     };
+
+    updateStatus();
 
     setOpen(index === 0);
 
