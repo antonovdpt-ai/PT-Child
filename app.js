@@ -3936,19 +3936,18 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
           ? recentChanges
               .map(
                 s => `
-                  <div class="item">
-                    <div class="item-title">
-                      ${fmtDate(s.session_date)}
-                    </div>
-
-                    <div class="item-sub">
-                      ${esc(dynamicsLabel(s.dynamics_status))}
-                    </div>
+                 <details class="item">
+  <summary
+    class="item-title"
+    style="cursor:pointer"
+  >
+    ${fmtDate(s.session_date)} · ${esc(dynamicsLabel(s.dynamics_status))}
+  </summary>
 
                     <div>
                       ${esc(s.function_changes)}
                     </div>
-                  </div>
+                  </details>
                 `
               )
               .join('')
