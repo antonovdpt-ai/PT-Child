@@ -4390,6 +4390,7 @@ if (state.tab === 'media') {
 
         <label style="margin-top:14px">Категория</label>
 <select name="category">
+<option value="other" selected>Другое</option>
   <option value="posture">Поза / осанка</option>
   <option value="sitting">Сидение</option>
   <option value="crawling">Ползание</option>
@@ -4399,7 +4400,7 @@ if (state.tab === 'media') {
   <option value="lower_limb">Стопы / ноги</option>
   <option value="upper_limb">Руки</option>
   <option value="equipment">ТСР / ортезы</option>
-  <option value="other">Другое</option>
+  
 </select>
 
         <label style="margin-top:14px">Комментарий</label>
