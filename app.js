@@ -3677,7 +3677,11 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
   placeholder="Например: стал отпускать опору на 3–4 секунды, появились самостоятельные шаги"
 ></textarea>
 
-<div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form><div class="card"><h3>История занятий</h3>${state.sessions.map(s => `<div class="item"><div class="item-title">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</div><div class="item-sub">${esc(s.note || '')}</div>${sessionDynamicsHtml(s)}
+<div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form><div class="card"><h3>История занятий</h3>${state.sessions.map(s => `
+  
+  <details class="item"><summary class="item-title" style="cursor:pointer">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</summary>
+  
+  <div class="item-sub">${esc(s.note || '')}</div>${sessionDynamicsHtml(s)}
 
 <div
   style="
@@ -3704,7 +3708,7 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
     Удалить
   </button>
 </div>
-</div>`).join('') || `<div class="empty">Занятий пока нет.</div>`}</div>`;
+</details>`).join('') || `<div class="empty">Занятий пока нет.</div>`}</div>`;
     const form = document.getElementById('sessionForm'), btn = document.getElementById('sessionSaveBtn'), status = document.getElementById('sessionStatus'); watchFormDirty(form, btn, 'Сохранить занятие');
 
     enableVoiceInput(form);
