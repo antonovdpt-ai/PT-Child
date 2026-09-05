@@ -4480,7 +4480,19 @@ async function loadPatientMedia() {
   })
 );
 
-const availableItems = items.filter(Boolean);
+const availableItems = items
+  .filter(Boolean)
+  .sort((a, b) => {
+    const dateA = new Date(
+      a.captured_at || a.created_at || 0
+    ).getTime();
+
+    const dateB = new Date(
+      b.captured_at || b.created_at || 0
+    ).getTime();
+
+    return dateB - dateA;
+  });
 
 if (!availableItems.length) {
   mediaList.innerHTML =
