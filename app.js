@@ -3960,9 +3960,10 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
       <h3>Динамика по целям</h3>
 
       ${
-        state.goals.length
-          ? state.goals
-              .map(
+       state.goals.some(g => g.status === 'active')
+  ? state.goals
+      .filter(g => g.status === 'active')
+      .map(
                 g => `
                   <div class="goal">
                     <div class="goal-top">
@@ -3990,6 +3991,23 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
               .join('')
           : `<div class="empty">Активных целей пока нет.</div>`
       }
+
+${state.goals.some(g => g.status === 'achieved') ? `
+  <div style="margin-top:18px">
+    <div
+      class="item-title"
+      style="margin-bottom:10px"
+    >
+      ✅ Достигнутые цели
+    </div>
+
+    ${goalsHtml(
+      state.goals.filter(g => g.status === 'achieved'),
+      false
+    )}
+  </div>
+` : ''}
+
     </div>
   `;
 
