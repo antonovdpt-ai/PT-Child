@@ -4409,7 +4409,7 @@ if (state.tab === 'media') {
           placeholder="Например: стойка у опоры, вид сбоку"
         ></textarea>
 
-        <label>Дата съёмки</label>
+        <label>Дата материала / исследования</label>
         <input
           name="captured_at"
           type="date"
