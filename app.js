@@ -691,15 +691,23 @@ function renderPatient() {
   app.innerHTML = `<div class="card"><div class="patient-top"><div><div class="muted tiny">Карточка ребёнка</div><h1>${esc(p.display_name)}</h1><div class="meta">${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}</div></div><span class="badge">облако</span></div><div class="sep"></div><div class="item-title">${esc(p.primary_complaint || 'Причина обращения пока не заполнена')}</div><div class="actions"><button class="btn full" id="backPatients">← К пациентам</button></div></div><div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('')}</div><div id="flash"></div><div id="tabContent"></div>`;
   document.getElementById('backPatients').onclick = renderPatients; document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderPatient() }); renderTab(p);
   const actions = app.querySelector(".actions");
-  const deletePatientBtn = document.createElement("button");
+  
+  const deletePatientWrap = document.createElement("div");
+deletePatientWrap.style.textAlign = "center";
+deletePatientWrap.style.margin = "28px 0 8px";
+
+const deletePatientBtn = document.createElement("button");
 deletePatientBtn.id = "deletePatientBtn";
-deletePatientBtn.className = "btn full";
+deletePatientBtn.className = "btn";
 deletePatientBtn.textContent = "Удалить пациента";
-deletePatientBtn.style.marginTop = "10px";
+deletePatientBtn.style.padding = "8px 14px";
+deletePatientBtn.style.fontSize = "13px";
 deletePatientBtn.style.color = "#b42318";
 deletePatientBtn.style.borderColor = "#f0b4ae";
 deletePatientBtn.style.background = "#fff";
-actions.append(deletePatientBtn);
+
+deletePatientWrap.append(deletePatientBtn);
+app.append(deletePatientWrap);
 
 deletePatientBtn.onclick = () => {
   const confirmed = confirm(
