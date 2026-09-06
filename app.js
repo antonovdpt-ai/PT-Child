@@ -709,7 +709,7 @@ deletePatientBtn.style.background = "#fff";
 deletePatientWrap.append(deletePatientBtn);
 app.append(deletePatientWrap);
 
-deletePatientBtn.onclick = () => {
+deletePatientBtn.onclick = async () => {
   const confirmed = confirm(
     `Удалить пациента "${p.display_name}"?\n\nБудут безвозвратно удалены карточка, оценки, цели, занятия, анализы, документы и медиа.`
   );
@@ -725,7 +725,53 @@ deletePatientBtn.onclick = () => {
     return;
   }
 
-  alert("Подтверждение работает. Само удаление пока не подключено.");
+  deletePatientBtn.disabled = true;
+  deletePatientBtn.textContent = "Удаляю...";
+
+  try {
+    // Получаем пути всех фото и документов пациента
+    const { data: mediaRows, error: mediaError } = await sb
+      .from("patient_media")
+      .select("storage_path")
+      .eq("patient_id", p.id);
+
+    if (mediaError) throw mediaError;
+
+    const paths = (mediaRows || [])
+      .map(item => item.storage_path)
+      .filter(Boolean);
+
+    // Сначала удаляем физические файлы из Storage
+    if (paths.length) {
+      const { error: storageError } = await sb.storage
+        .from("patient-media")
+        .remove(paths);
+
+      if (storageError) throw storageError;
+    }
+
+    // Затем удаляем пациента.
+    // Остальные таблицы очистятся автоматически через ON DELETE CASCADE.
+    const { error: patientError } = await sb
+      .from("patients")
+      .delete()
+      .eq("id", p.id);
+
+    if (patientError) throw patientError;
+
+    alert(`Пациент "${p.display_name}" полностью удалён.`);
+    location.reload();
+
+  } catch (error) {
+    console.error("Не удалось удалить пациента:", error);
+
+    alert(
+      "Не удалось полностью удалить пациента. Попробуйте ещё раз."
+    );
+
+    deletePatientBtn.disabled = false;
+    deletePatientBtn.textContent = "Удалить пациента";
+  }
 };
 
   const aiBtn = document.createElement("button");
