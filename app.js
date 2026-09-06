@@ -691,6 +691,34 @@ function renderPatient() {
   app.innerHTML = `<div class="card"><div class="patient-top"><div><div class="muted tiny">Карточка ребёнка</div><h1>${esc(p.display_name)}</h1><div class="meta">${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}</div></div><span class="badge">облако</span></div><div class="sep"></div><div class="item-title">${esc(p.primary_complaint || 'Причина обращения пока не заполнена')}</div><div class="actions"><button class="btn full" id="backPatients">← К пациентам</button></div></div><div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('')}</div><div id="flash"></div><div id="tabContent"></div>`;
   document.getElementById('backPatients').onclick = renderPatients; document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderPatient() }); renderTab(p);
   const actions = app.querySelector(".actions");
+  const deletePatientBtn = document.createElement("button");
+deletePatientBtn.id = "deletePatientBtn";
+deletePatientBtn.className = "btn full";
+deletePatientBtn.textContent = "Удалить пациента";
+deletePatientBtn.style.marginTop = "10px";
+deletePatientBtn.style.color = "#b42318";
+deletePatientBtn.style.borderColor = "#f0b4ae";
+deletePatientBtn.style.background = "#fff";
+actions.append(deletePatientBtn);
+
+deletePatientBtn.onclick = () => {
+  const confirmed = confirm(
+    `Удалить пациента "${p.display_name}"?\n\nБудут безвозвратно удалены карточка, оценки, цели, занятия, анализы, документы и медиа.`
+  );
+
+  if (!confirmed) return;
+
+  const typedName = prompt(
+    `Для окончательного подтверждения введите имя пациента:\n${p.display_name}`
+  );
+
+  if (typedName !== p.display_name) {
+    alert("Имя не совпало. Удаление отменено.");
+    return;
+  }
+
+  alert("Подтверждение работает. Само удаление пока не подключено.");
+};
 
   const aiBtn = document.createElement("button");
   aiBtn.id = "aiAnalyzeBtn";
