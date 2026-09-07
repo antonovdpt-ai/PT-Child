@@ -752,12 +752,19 @@ deletePatientBtn.onclick = async () => {
 
     // Затем удаляем пациента.
     // Остальные таблицы очистятся автоматически через ON DELETE CASCADE.
-    const { error: patientError } = await sb
-      .from("patients")
-      .delete()
-      .eq("id", p.id);
+    const { data: deletedPatients, error: patientError } = await sb
+  .from("patients")
+  .delete()
+  .eq("id", p.id)
+  .select("id");
 
-    if (patientError) throw patientError;
+if (patientError) throw patientError;
+
+if (!deletedPatients || deletedPatients.length !== 1) {
+  throw new Error(
+    `Пациент не удалён из базы. Удалено строк: ${deletedPatients?.length || 0}`
+  );
+}
 
     alert(`Пациент "${p.display_name}" полностью удалён.`);
     location.reload();
@@ -766,8 +773,8 @@ deletePatientBtn.onclick = async () => {
     console.error("Не удалось удалить пациента:", error);
 
     alert(
-      "Не удалось полностью удалить пациента. Попробуйте ещё раз."
-    );
+  `Не удалось полностью удалить пациента.\n\n${error.message || "Неизвестная ошибка"}`
+);
 
     deletePatientBtn.disabled = false;
     deletePatientBtn.textContent = "Удалить пациента";
