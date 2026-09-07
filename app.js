@@ -22,7 +22,35 @@ let state = {
 
 const esc = (v = '') => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
 const fmtDate = v => { if (!v) return 'дата не указана'; const d = new Date(v + 'T12:00:00'); return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) };
-const ageFromDob = dob => { if (!dob) return 'Возраст не указан'; const b = new Date(dob + 'T12:00:00'), n = new Date(); let m = (n.getFullYear() - b.getFullYear()) * 12 + n.getMonth() - b.getMonth(); if (n.getDate() < b.getDate()) m--; if (m < 24) return `${m} мес.`; const y = Math.floor(m / 12), r = m % 12; return r ? `${y} г. ${r} мес.` : `${y} г.` };
+const ageFromDob = dob => {
+  if (!dob) return 'Возраст не указан';
+
+  const b = new Date(dob + 'T12:00:00');
+  const n = new Date();
+
+  let m =
+    (n.getFullYear() - b.getFullYear()) * 12 +
+    n.getMonth() -
+    b.getMonth();
+
+  if (n.getDate() < b.getDate()) m--;
+
+  if (m < 24) return `${m} мес.`;
+
+  const y = Math.floor(m / 12);
+  const r = m % 12;
+
+  const yearWord =
+    y === 1
+      ? 'год'
+      : y >= 2 && y <= 4
+        ? 'года'
+        : 'лет';
+
+  return r
+    ? `${y} ${yearWord} ${r} мес.`
+    : `${y} ${yearWord}`;
+};
 const sexLabel = v => v === 'male' ? 'Мальчик' : v === 'female' ? 'Девочка' : 'Не указано';
 const toleranceLabel = v => ({ good: 'Хорошая', medium: 'Средняя', low: 'Низкая', unclear: 'Трудно оценить' }[v] || 'Не указана');
 
