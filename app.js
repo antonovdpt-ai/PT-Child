@@ -3952,6 +3952,83 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
 
     enableVoiceInput(form);
 
+    const analyzeSessionBtn =
+  document.getElementById('analyzeSessionBtn');
+
+const sessionTranscript =
+  document.getElementById('sessionTranscript');
+
+const sessionAiStatus =
+  document.getElementById('sessionAiStatus');
+
+analyzeSessionBtn.onclick = async () => {
+  const transcript = sessionTranscript.value.trim();
+
+  if (!transcript) {
+    sessionAiStatus.textContent =
+      'Сначала расскажите о занятии.';
+    return;
+  }
+
+  analyzeSessionBtn.disabled = true;
+  analyzeSessionBtn.textContent = '✨ Анализирую...';
+  sessionAiStatus.textContent =
+    'PT Child разбирает запись занятия...';
+
+  try {
+    const activeGoals = state.goals
+      .filter(goal => goal.status === 'active')
+      .map(goal => ({
+        id: goal.id,
+        title: goal.title,
+        progress: goal.progress,
+        baseline: goal.baseline,
+        criterion: goal.criterion
+      }));
+
+    const recentSessions = state.sessions
+      .slice(0, 3)
+      .map(session => ({
+        note: session.note,
+        dynamics_status: session.dynamics_status,
+        function_changes: session.function_changes
+      }));
+
+    const result = await analyzeSessionDraft({
+      transcript,
+      goals: activeGoals,
+      recentSessions
+    });
+
+    form.elements.note.value =
+      result.session_note || transcript;
+
+    form.elements.tolerance.value =
+      result.tolerance || '';
+
+    form.elements.dynamics_status.value =
+      result.dynamics_status || '';
+
+    form.elements.function_changes.value =
+      result.function_changes || '';
+
+    sessionAiStatus.textContent =
+      '✓ Черновик подготовлен. Проверьте данные перед сохранением.';
+  } catch (error) {
+    console.error(
+      'Ошибка разбора занятия ИИ:',
+      error
+    );
+
+    sessionAiStatus.textContent =
+      `Ошибка ИИ: ${error.message}`;
+  } finally {
+    analyzeSessionBtn.disabled = false;
+    analyzeSessionBtn.textContent =
+      '✨ Разобрать с ИИ';
+  }
+};
+
 let editingSessionId = null;
 
 document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
