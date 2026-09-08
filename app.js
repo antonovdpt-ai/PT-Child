@@ -3841,7 +3841,58 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
 document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () => { const { error } = await sb.from('goals').delete().eq('id', b.dataset.delGoal); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
   }
   if (state.tab === 'sessions') {
-    box.innerHTML = `<form class="card" id="sessionForm"><h3>＋ Новое занятие</h3><label>Дата</label><input type="date" name="session_date" value="${new Date().toISOString().slice(0, 10)}"><label>Запись занятия</label><textarea name="note" required></textarea><label>Переносимость</label>
+    box.innerHTML = `<form class="card" id="sessionForm"><h3>➕ Новое занятие</h3>
+
+<div
+  class="item"
+  style="margin-bottom:18px"
+>
+  <div
+    class="item-title"
+    style="margin-bottom:6px"
+  >
+    🎙 Рассказать о занятии
+  </div>
+
+  <div
+    class="muted"
+    style="margin-bottom:10px"
+  >
+    Расскажите своими словами, что делали, как ребёнок реагировал и что изменилось.
+  </div>
+
+  <textarea
+    name="session_transcript"
+    id="sessionTranscript"
+    placeholder="Надиктуйте или напишите рассказ о занятии..."
+  ></textarea>
+
+  <button
+    type="button"
+    class="btn full"
+    id="analyzeSessionBtn"
+    style="margin-top:10px"
+  >
+    ✨ Разобрать с ИИ
+  </button>
+
+  <div
+    id="sessionAiStatus"
+    class="muted tiny"
+    style="margin-top:8px"
+  >
+    ИИ ничего не сохранит без вашего подтверждения.
+  </div>
+</div>
+
+<div
+  class="muted tiny"
+  style="text-align:center; margin:4px 0 14px"
+>
+  или заполните занятие вручную
+</div>
+
+<label>Дата</label><input type="date" name="session_date" value="${new Date().toISOString().slice(0, 10)}"><label>Запись занятия</label><textarea name="note" required></textarea><label>Переносимость</label>
     <select name="tolerance">
   <option value="">Не указано</option>
   <option value="good">Хорошая</option>
