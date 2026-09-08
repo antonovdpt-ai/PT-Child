@@ -100,6 +100,60 @@ async function callAI(prompt, files = []) {
   return data.text;
 }
 
+async function analyzeSessionDraft({
+  transcript,
+  goals = [],
+  recentSessions = []
+}) {
+  const prompt = `
+Ты помогаешь специалисту структурировать запись проведённого занятия.
+
+ВАЖНЫЕ ПРАВИЛА:
+- Не придумывай факты, которых нет в исходном тексте.
+- Если переносимость не указана, используй null.
+- Если динамику нельзя определить, используй null.
+- Если функциональные изменения не описаны, используй null.
+- Изменение прогресса цели — только предложение.
+- Верни ТОЛЬКО JSON без пояснений и markdown.
+
+Расшифровка специалиста:
+${transcript}
+
+Активные цели:
+${JSON.stringify(goals)}
+
+Последние занятия:
+${JSON.stringify(recentSessions)}
+
+Верни JSON строго такого вида:
+
+{
+  "session_note": "краткая структурированная запись занятия",
+  "tolerance": "good | medium | low | unclear | null",
+  "dynamics_status": "improved | stable | worse | unclear | null",
+  "function_changes": "краткое описание изменений или null",
+  "goal_updates": [
+    {
+      "goal_id": "id цели",
+      "current_progress": 0,
+      "suggested_progress": 0,
+      "reason": "краткое основание"
+    }
+  ],
+  "needs_review": false
+}
+`;
+
+  const text = await callAI(prompt);
+
+  const cleaned = String(text)
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+
+  return JSON.parse(cleaned);
+}
+
 // Временно для проверки из консоли браузера
 window.callAI = callAI;
 
