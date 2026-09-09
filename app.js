@@ -4257,6 +4257,33 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
     );
   }
 
+  let goalUpdateFailed = false;
+
+for (const update of pendingGoalUpdates) {
+  const { error: goalError } = await sb
+    .from('goals')
+    .update({
+      progress: update.progress
+    })
+    .eq('id', update.goal_id)
+    .eq('patient_id', p.id)
+    .eq('status', 'active')
+    .select('id')
+    .single();
+
+  if (goalError) {
+    console.error(
+      'Не удалось обновить прогресс цели:',
+      goalError
+    );
+
+    goalUpdateFailed = true;
+    break;
+  }
+}
+
+
+
   setButtonSaved(
     btn,
     editingSessionId
@@ -4264,8 +4291,9 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
       : '✓ Занятие сохранено'
   );
 
-  status.textContent =
-    '✓ Данные сохранены в облаке';
+  status.textContent = goalUpdateFailed
+  ? '⚠️ Занятие сохранено, но прогресс цели обновить не удалось.'
+  : '✓ Данные сохранены в облаке';
 
   await sleep(700);
   await loadPatientData();
