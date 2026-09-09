@@ -3961,6 +3961,19 @@ const sessionTranscript =
 const sessionAiStatus =
   document.getElementById('sessionAiStatus');
 
+  const sessionGoalSuggestions =
+  document.createElement('div');
+
+sessionGoalSuggestions.id = 'sessionGoalSuggestions';
+sessionGoalSuggestions.style.marginTop = '12px';
+
+sessionAiStatus.insertAdjacentElement(
+  'afterend',
+  sessionGoalSuggestions
+);
+
+let pendingGoalUpdates = [];
+
 analyzeSessionBtn.onclick = async () => {
   const transcript = sessionTranscript.value.trim();
 
@@ -4011,6 +4024,132 @@ analyzeSessionBtn.onclick = async () => {
 
     form.elements.function_changes.value =
       result.function_changes || '';
+
+      pendingGoalUpdates = [];
+sessionGoalSuggestions.innerHTML = '';
+
+const goalUpdates =
+  Array.isArray(result.goal_updates)
+    ? result.goal_updates
+    : [];
+
+goalUpdates.forEach(update => {
+  const goal = state.goals.find(
+    g =>
+      g.id === update.goal_id &&
+      g.status === 'active'
+  );
+
+  if (!goal) return;
+
+  const currentProgress =
+    Number(goal.progress ?? 0);
+
+  const suggestedProgress =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(update.suggested_progress)
+      )
+    );
+
+  if (
+    !Number.isFinite(suggestedProgress) ||
+    suggestedProgress === currentProgress
+  ) {
+    return;
+  }
+
+  const card = document.createElement('div');
+  card.className = 'item';
+  card.style.marginTop = '10px';
+
+  card.innerHTML = `
+    <div class="item-title">
+      🎯 ${esc(goal.title)}
+    </div>
+
+    <div class="muted" style="margin-top:6px">
+      Сейчас: ${currentProgress}% →
+      ИИ предлагает: <b>${suggestedProgress}%</b>
+    </div>
+
+    ${
+      update.reason
+        ? `<div class="muted tiny" style="margin-top:6px">
+             ${esc(update.reason)}
+           </div>`
+        : ''
+    }
+
+    <div class="actions" style="margin-top:10px">
+      <button
+        type="button"
+        class="btn"
+        data-apply-goal
+      >
+        Применить
+      </button>
+
+      <button
+        type="button"
+        class="btn"
+        data-ignore-goal
+      >
+        Не менять
+      </button>
+    </div>
+  `;
+
+  const applyBtn =
+    card.querySelector('[data-apply-goal]');
+
+  const ignoreBtn =
+    card.querySelector('[data-ignore-goal]');
+
+  applyBtn.onclick = () => {
+    pendingGoalUpdates =
+      pendingGoalUpdates.filter(
+        item => item.goal_id !== goal.id
+      );
+
+    pendingGoalUpdates.push({
+      goal_id: goal.id,
+      progress: suggestedProgress
+    });
+
+    applyBtn.textContent =
+      '✓ Будет применено';
+
+    applyBtn.disabled = true;
+    ignoreBtn.disabled = false;
+  };
+
+  ignoreBtn.onclick = () => {
+    pendingGoalUpdates =
+      pendingGoalUpdates.filter(
+        item => item.goal_id !== goal.id
+      );
+
+    ignoreBtn.textContent =
+      '✓ Не менять';
+
+    ignoreBtn.disabled = true;
+    applyBtn.disabled = false;
+    applyBtn.textContent = 'Применить';
+  };
+
+  sessionGoalSuggestions.append(card);
+});
+
+if (!sessionGoalSuggestions.children.length) {
+  sessionGoalSuggestions.innerHTML = `
+    <div class="muted tiny">
+      🎯 ИИ не предлагает менять прогресс активных целей.
+    </div>
+  `;
+}
 
     sessionAiStatus.textContent =
       '✓ Черновик подготовлен. Проверьте данные перед сохранением.';
