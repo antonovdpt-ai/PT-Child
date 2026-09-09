@@ -4324,6 +4324,193 @@ if (!sessionGoalSuggestions.children.length) {
   }
 };
 
+const prepareNextSessionBtn =
+  document.getElementById('prepareNextSessionBtn');
+
+const nextSessionPlanStatus =
+  document.getElementById('nextSessionPlanStatus');
+
+const nextSessionPlan =
+  document.getElementById('nextSessionPlan');
+
+if (prepareNextSessionBtn) {
+  prepareNextSessionBtn.onclick = async () => {
+    prepareNextSessionBtn.disabled = true;
+    prepareNextSessionBtn.textContent =
+      '✨ Готовлю план...';
+
+    nextSessionPlanStatus.textContent =
+      'PT Child анализирует цели и последние занятия...';
+
+    nextSessionPlan.innerHTML = '';
+
+    try {
+      const context = buildNextSessionContext(p);
+
+      const result =
+        await prepareNextSessionPlan(context);
+
+      const workBlocks =
+        Array.isArray(result.work_blocks)
+          ? result.work_blocks
+          : [];
+
+      const whatToTrack =
+        Array.isArray(result.what_to_track)
+          ? result.what_to_track
+          : [];
+
+      const successCriteria =
+        Array.isArray(result.session_success_criteria)
+          ? result.session_success_criteria
+          : [];
+
+      const cautions =
+        Array.isArray(result.cautions)
+          ? result.cautions
+          : [];
+
+      nextSessionPlan.innerHTML = `
+        <div class="item">
+          <div class="item-title">
+            🎯 Главная задача
+          </div>
+          <div style="margin-top:6px">
+            ${esc(result.main_task || 'Не определена')}
+          </div>
+        </div>
+
+        ${
+          result.start_check
+            ? `
+              <div class="item">
+                <div class="item-title">
+                  👀 Проверить в начале
+                </div>
+
+                <div style="margin-top:6px">
+                  ${esc(result.start_check.action || '')}
+                </div>
+
+                ${
+                  result.start_check.why
+                    ? `
+                      <div class="muted tiny" style="margin-top:5px">
+                        Зачем: ${esc(result.start_check.why)}
+                      </div>
+                    `
+                    : ''
+                }
+              </div>
+            `
+            : ''
+        }
+
+        ${workBlocks.map((block, index) => `
+          <div class="item">
+            <div class="item-title">
+              ${index + 1}. ${esc(block.title || 'Рабочий блок')}
+            </div>
+
+            <div style="margin-top:6px">
+              ${esc(block.action || '')}
+            </div>
+
+            ${
+              block.why
+                ? `
+                  <div class="muted tiny" style="margin-top:5px">
+                    Зачем: ${esc(block.why)}
+                  </div>
+                `
+                : ''
+            }
+
+            ${
+              block.progress_if
+                ? `
+                  <div class="muted tiny" style="margin-top:5px">
+                    Усложнить, если: ${esc(block.progress_if)}
+                  </div>
+                `
+                : ''
+            }
+          </div>
+        `).join('')}
+
+        ${
+          whatToTrack.length
+            ? `
+              <div class="item">
+                <div class="item-title">
+                  📌 Что отслеживать
+                </div>
+
+                <ul>
+                  ${whatToTrack
+                    .map(item => `<li>${esc(item)}</li>`)
+                    .join('')}
+                </ul>
+              </div>
+            `
+            : ''
+        }
+
+        ${
+          successCriteria.length
+            ? `
+              <div class="item">
+                <div class="item-title">
+                  ✅ Признаки прогресса
+                </div>
+
+                <ul>
+                  ${successCriteria
+                    .map(item => `<li>${esc(item)}</li>`)
+                    .join('')}
+                </ul>
+              </div>
+            `
+            : ''
+        }
+
+        ${
+          cautions.length
+            ? `
+              <div class="item">
+                <div class="item-title">
+                  ⚠️ Учесть
+                </div>
+
+                <ul>
+                  ${cautions
+                    .map(item => `<li>${esc(item)}</li>`)
+                    .join('')}
+                </ul>
+              </div>
+            `
+            : ''
+        }
+      `;
+
+      nextSessionPlanStatus.textContent =
+        '✓ План подготовлен. Специалист принимает окончательное решение.';
+    } catch (error) {
+      console.error(
+        'Ошибка подготовки следующего занятия:',
+        error
+      );
+
+      nextSessionPlanStatus.textContent =
+        `Ошибка ИИ: ${error.message}`;
+    } finally {
+      prepareNextSessionBtn.disabled = false;
+      prepareNextSessionBtn.textContent =
+        '✨ Подготовить следующее занятие';
+    }
+  };
+}
+
 let editingSessionId = null;
 
 document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
