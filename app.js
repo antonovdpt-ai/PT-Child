@@ -73,6 +73,77 @@ function sessionDynamicsHtml(s) {
   return dynamics + changes;
 }
 
+function plannedSessionHtml(plan) {
+  if (!plan || typeof plan !== 'object') return '';
+
+  const workBlocks = Array.isArray(plan.work_blocks)
+    ? plan.work_blocks
+    : [];
+
+  const whatToTrack = Array.isArray(plan.what_to_track)
+    ? plan.what_to_track
+    : [];
+
+  return `
+    <details style="margin-top:12px">
+      <summary
+        class="item-title"
+        style="cursor:pointer"
+      >
+        📋 План этого занятия
+      </summary>
+
+      ${
+        plan.main_task
+          ? `
+            <div class="item-sub" style="margin-top:10px">
+              <b>🎯 Главная задача:</b><br>
+              ${esc(plan.main_task)}
+            </div>
+          `
+          : ''
+      }
+
+      ${
+        plan.start_check?.action
+          ? `
+            <div class="item-sub" style="margin-top:10px">
+              <b>👀 Проверить в начале:</b><br>
+              ${esc(plan.start_check.action)}
+            </div>
+          `
+          : ''
+      }
+
+      ${workBlocks
+        .map(
+          (block, index) => `
+            <div class="item-sub" style="margin-top:10px">
+              <b>${index + 1}. ${esc(block.title || 'Рабочий блок')}</b><br>
+              ${esc(block.action || '')}
+            </div>
+          `
+        )
+        .join('')}
+
+      ${
+        whatToTrack.length
+          ? `
+            <div class="item-sub" style="margin-top:10px">
+              <b>📌 Что отслеживали:</b>
+              <ul>
+                ${whatToTrack
+                  .map(item => `<li>${esc(item)}</li>`)
+                  .join('')}
+              </ul>
+            </div>
+          `
+          : ''
+      }
+    </details>
+  `;
+}
+
 function flash(type, msg) { const el = document.getElementById('flash'); if (el) el.innerHTML = `<div class="${type}">${esc(msg)}</div>` }
 
 async function callAI(prompt, files = []) {
@@ -4074,7 +4145,7 @@ ${state.sessions.map(s => `
   
   <details class="item"><summary class="item-title" style="cursor:pointer">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</summary>
   
-  <div class="item-sub">${esc(s.note || '')}</div>${sessionDynamicsHtml(s)}
+ <div class="item-sub">${esc(s.note || '')}</div>${sessionDynamicsHtml(s)}${plannedSessionHtml(s.planned_session)}
 
 <div
   style="
