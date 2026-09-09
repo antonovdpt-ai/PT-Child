@@ -4333,6 +4333,138 @@ const nextSessionPlanStatus =
 const nextSessionPlan =
   document.getElementById('nextSessionPlan');
 
+  const savedNextSessionPlan = p.next_session_plan;
+
+if (savedNextSessionPlan && nextSessionPlan) {
+  const savedWorkBlocks =
+    Array.isArray(savedNextSessionPlan.work_blocks)
+      ? savedNextSessionPlan.work_blocks
+      : [];
+
+  const savedWhatToTrack =
+    Array.isArray(savedNextSessionPlan.what_to_track)
+      ? savedNextSessionPlan.what_to_track
+      : [];
+
+  const savedSuccessCriteria =
+    Array.isArray(savedNextSessionPlan.session_success_criteria)
+      ? savedNextSessionPlan.session_success_criteria
+      : [];
+
+  const savedCautions =
+    Array.isArray(savedNextSessionPlan.cautions)
+      ? savedNextSessionPlan.cautions
+      : [];
+
+  nextSessionPlanStatus.textContent =
+    '✓ Сохранённый план следующего занятия';
+
+  nextSessionPlan.innerHTML = `
+    <div class="item">
+      <div class="item-title">
+        🎯 Главная задача
+      </div>
+
+      <div style="margin-top:6px">
+        ${esc(savedNextSessionPlan.main_task || 'Не определена')}
+      </div>
+    </div>
+
+    ${
+      savedNextSessionPlan.start_check
+        ? `
+          <div class="item">
+            <div class="item-title">
+              👀 Проверить в начале
+            </div>
+
+            <div style="margin-top:6px">
+              ${esc(savedNextSessionPlan.start_check.action || '')}
+            </div>
+          </div>
+        `
+        : ''
+    }
+
+    ${savedWorkBlocks.slice(0, 3).map((block, index) => `
+      <div class="item">
+        <div class="item-title">
+          ${index + 1}. ${esc(block.title || 'Рабочий блок')}
+        </div>
+
+        <div style="margin-top:6px">
+          ${esc(block.action || '')}
+        </div>
+      </div>
+    `).join('')}
+
+    <details class="item" style="margin-top:12px">
+      <summary
+        class="item-title"
+        style="cursor:pointer"
+      >
+        ▶ Подробнее о плане
+      </summary>
+
+      ${
+        savedNextSessionPlan.start_check?.why
+          ? `
+            <div class="item-sub" style="margin-top:12px">
+              <b>Почему начинаем с проверки:</b><br>
+              ${esc(savedNextSessionPlan.start_check.why)}
+            </div>
+          `
+          : ''
+      }
+
+      ${
+        savedWhatToTrack.length
+          ? `
+            <div class="item-sub" style="margin-top:16px">
+              <b>📌 Что отслеживать</b>
+              <ul>
+                ${savedWhatToTrack
+                  .map(item => `<li>${esc(item)}</li>`)
+                  .join('')}
+              </ul>
+            </div>
+          `
+          : ''
+      }
+
+      ${
+        savedSuccessCriteria.length
+          ? `
+            <div class="item-sub" style="margin-top:16px">
+              <b>✅ Признаки прогресса</b>
+              <ul>
+                ${savedSuccessCriteria
+                  .map(item => `<li>${esc(item)}</li>`)
+                  .join('')}
+              </ul>
+            </div>
+          `
+          : ''
+      }
+
+      ${
+        savedCautions.length
+          ? `
+            <div class="item-sub" style="margin-top:16px">
+              <b>⚠️ Учесть</b>
+              <ul>
+                ${savedCautions
+                  .map(item => `<li>${esc(item)}</li>`)
+                  .join('')}
+              </ul>
+            </div>
+          `
+          : ''
+      }
+    </details>
+  `;
+}
+
 if (prepareNextSessionBtn) {
   prepareNextSessionBtn.onclick = async () => {
     prepareNextSessionBtn.disabled = true;
