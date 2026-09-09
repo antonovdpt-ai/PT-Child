@@ -4038,7 +4038,39 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
   placeholder="Например: стал отпускать опору на 3–4 секунды, появились самостоятельные шаги"
 ></textarea>
 
-<div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form><div class="card"><h3>История занятий</h3>${state.sessions.map(s => `
+<div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form>
+
+<div class="card" style="margin-top:16px">
+  <h3>✨ Следующее занятие</h3>
+
+  <div class="muted" style="margin-bottom:12px">
+    PT Child может подготовить следующий шаг с учётом целей,
+    последних занятий и оценки ребёнка.
+  </div>
+
+  <button
+    type="button"
+    class="btn full"
+    id="prepareNextSessionBtn"
+  >
+    ✨ Подготовить следующее занятие
+  </button>
+
+  <div
+    id="nextSessionPlanStatus"
+    class="muted tiny"
+    style="margin-top:10px"
+  ></div>
+
+  <div
+    id="nextSessionPlan"
+    style="margin-top:12px"
+  ></div>
+</div>
+
+<div class="card"><h3>История занятий</h3>
+
+${state.sessions.map(s => `
   
   <details class="item"><summary class="item-title" style="cursor:pointer">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</summary>
   
