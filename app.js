@@ -4505,7 +4505,64 @@ if (prepareNextSessionBtn) {
         : ''
     }
   </details>
+
+<div class="actions" style="margin-top:14px">
+  <button
+    type="button"
+    class="btn primary full"
+    id="useNextSessionPlanBtn"
+  >
+    ✅ Использовать как план занятия
+  </button>
+</div>
+
 `;
+
+const useNextSessionPlanBtn =
+  document.getElementById('useNextSessionPlanBtn');
+
+if (useNextSessionPlanBtn) {
+  useNextSessionPlanBtn.onclick = async () => {
+    useNextSessionPlanBtn.disabled = true;
+    useNextSessionPlanBtn.textContent =
+      'Сохраняю план...';
+
+    const savedPlan = {
+      ...result,
+      saved_at: new Date().toISOString()
+    };
+
+    const { error: savePlanError } = await sb
+      .from('patients')
+      .update({
+        next_session_plan: savedPlan
+      })
+      .eq('id', p.id)
+      .eq('therapist_id', user.id);
+
+    if (savePlanError) {
+      console.error(
+        'Не удалось сохранить план занятия:',
+        savePlanError
+      );
+
+      useNextSessionPlanBtn.disabled = false;
+      useNextSessionPlanBtn.textContent =
+        '✅ Использовать как план занятия';
+
+      nextSessionPlanStatus.textContent =
+        `Ошибка сохранения: ${savePlanError.message}`;
+
+      return;
+    }
+
+    useNextSessionPlanBtn.textContent =
+      '✓ План сохранён';
+
+    nextSessionPlanStatus.textContent =
+      '✓ План выбран для следующего занятия.';
+  };
+}
 
       nextSessionPlanStatus.textContent =
         '✓ План подготовлен. Специалист принимает окончательное решение.';
