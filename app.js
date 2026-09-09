@@ -4825,18 +4825,22 @@ for (const update of pendingGoalUpdates) {
 }
 
 if (!editingSessionId && p.next_session_plan) {
-  const { error: clearPlanError } = await sb
+  const { data: clearedPlanRows, error: clearPlanError } = await sb
     .from('patients')
     .update({
       next_session_plan: null
     })
     .eq('id', p.id)
-    .eq('therapist_id', user.id);
+    .select('id');
 
   if (clearPlanError) {
     console.error(
       'Занятие сохранено, но план не удалось закрыть:',
       clearPlanError
+    );
+  } else if (!clearedPlanRows || !clearedPlanRows.length) {
+    console.error(
+      'Занятие сохранено, но строка пациента не была обновлена.'
     );
   } else {
     p.next_session_plan = null;
