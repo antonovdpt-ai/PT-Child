@@ -114,6 +114,12 @@ async function analyzeSessionDraft({
 - Если динамику нельзя определить, используй null.
 - Если функциональные изменения не описаны, используй null.
 - Изменение прогресса цели — только предложение.
+- Не предлагай уменьшение прогресса цели.
+- За одно занятие не увеличивай прогресс цели более чем на 20 процентных пунктов.
+- Никогда не предлагай значение выше 90%.
+- 100% означает подтверждённое достижение цели и может быть установлено только специалистом.
+- Если по описанию кажется, что критерий цели уже выполнен, не ставь 100%. В reason укажи: "Возможно, цель достигнута — специалисту стоит проверить критерий."
+- Если данных для изменения прогресса недостаточно, не добавляй эту цель в goal_updates.
 - Верни ТОЛЬКО JSON без пояснений и markdown.
 
 Расшифровка специалиста:
@@ -4045,21 +4051,23 @@ goalUpdates.forEach(update => {
   const currentProgress =
     Number(goal.progress ?? 0);
 
-  const suggestedProgress =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        Number(update.suggested_progress)
-      )
-    );
+  
+const rawSuggestedProgress =
+  Number(update.suggested_progress);
+
+const suggestedProgress =
+  Math.min(
+    90,
+    currentProgress + 20,
+    rawSuggestedProgress
+  );
 
   if (
-    !Number.isFinite(suggestedProgress) ||
-    suggestedProgress === currentProgress
-  ) {
-    return;
-  }
+  !Number.isFinite(suggestedProgress) ||
+  suggestedProgress <= currentProgress
+) {
+  return;
+}
 
   const card = document.createElement('div');
   card.className = 'item';
