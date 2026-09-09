@@ -776,7 +776,7 @@ async function loadPatients() {
   const { data, error } = await sb
     .from("patients")
     .select(
-  "id,display_name,date_of_birth,sex,primary_complaint,status,created_at,ai_analysis,ai_analysis_updated_at,ai_dynamics_analysis,ai_dynamics_updated_at"
+  "id,display_name,date_of_birth,sex,primary_complaint,status,created_at,ai_analysis,ai_analysis_updated_at,ai_dynamics_analysis,ai_dynamics_updated_at,next_session_plan"
 )
     .order("created_at", { ascending: false });
 
