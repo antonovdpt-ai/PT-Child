@@ -4370,128 +4370,142 @@ if (prepareNextSessionBtn) {
           ? result.cautions
           : [];
 
-      nextSessionPlan.innerHTML = `
+     nextSessionPlan.innerHTML = `
+  <div class="item">
+    <div class="item-title">
+      🎯 Главная задача
+    </div>
+
+    <div style="margin-top:6px">
+      ${esc(result.main_task || 'Не определена')}
+    </div>
+  </div>
+
+  ${
+    result.start_check
+      ? `
         <div class="item">
           <div class="item-title">
-            🎯 Главная задача
+            👀 Проверить в начале
           </div>
+
           <div style="margin-top:6px">
-            ${esc(result.main_task || 'Не определена')}
+            ${esc(result.start_check.action || '')}
           </div>
         </div>
+      `
+      : ''
+  }
 
-        ${
-          result.start_check
-            ? `
-              <div class="item">
-                <div class="item-title">
-                  👀 Проверить в начале
-                </div>
+  ${workBlocks.slice(0, 3).map((block, index) => `
+    <div class="item">
+      <div class="item-title">
+        ${index + 1}. ${esc(block.title || 'Рабочий блок')}
+      </div>
 
-                <div style="margin-top:6px">
-                  ${esc(result.start_check.action || '')}
-                </div>
+      <div style="margin-top:6px">
+        ${esc(block.action || '')}
+      </div>
+    </div>
+  `).join('')}
 
-                ${
-                  result.start_check.why
-                    ? `
-                      <div class="muted tiny" style="margin-top:5px">
-                        Зачем: ${esc(result.start_check.why)}
-                      </div>
-                    `
-                    : ''
-                }
-              </div>
-            `
-            : ''
-        }
+  <details class="item" style="margin-top:12px">
+    <summary
+      class="item-title"
+      style="cursor:pointer"
+    >
+      ▶ Подробнее о плане
+    </summary>
 
-        ${workBlocks.map((block, index) => `
-          <div class="item">
-            <div class="item-title">
-              ${index + 1}. ${esc(block.title || 'Рабочий блок')}
-            </div>
-
-            <div style="margin-top:6px">
-              ${esc(block.action || '')}
-            </div>
-
-            ${
-              block.why
-                ? `
-                  <div class="muted tiny" style="margin-top:5px">
-                    Зачем: ${esc(block.why)}
-                  </div>
-                `
-                : ''
-            }
-
-            ${
-              block.progress_if
-                ? `
-                  <div class="muted tiny" style="margin-top:5px">
-                    Усложнить, если: ${esc(block.progress_if)}
-                  </div>
-                `
-                : ''
-            }
+    ${
+      result.start_check?.why
+        ? `
+          <div class="item-sub" style="margin-top:12px">
+            <b>Почему начинаем с проверки:</b><br>
+            ${esc(result.start_check.why)}
           </div>
-        `).join('')}
+        `
+        : ''
+    }
 
-        ${
-          whatToTrack.length
-            ? `
-              <div class="item">
-                <div class="item-title">
-                  📌 Что отслеживать
-                </div>
+    ${workBlocks.slice(0, 3).map((block, index) => `
+      ${
+        block.why || block.progress_if
+          ? `
+            <div class="item-sub" style="margin-top:12px">
+              <b>${index + 1}. ${esc(block.title || 'Рабочий блок')}</b>
 
-                <ul>
-                  ${whatToTrack
-                    .map(item => `<li>${esc(item)}</li>`)
-                    .join('')}
-                </ul>
-              </div>
-            `
-            : ''
-        }
+              ${
+                block.why
+                  ? `
+                    <div style="margin-top:5px">
+                      Зачем: ${esc(block.why)}
+                    </div>
+                  `
+                  : ''
+              }
 
-        ${
-          successCriteria.length
-            ? `
-              <div class="item">
-                <div class="item-title">
-                  ✅ Признаки прогресса
-                </div>
+              ${
+                block.progress_if
+                  ? `
+                    <div style="margin-top:5px">
+                      Усложнить, если: ${esc(block.progress_if)}
+                    </div>
+                  `
+                  : ''
+              }
+            </div>
+          `
+          : ''
+      }
+    `).join('')}
 
-                <ul>
-                  ${successCriteria
-                    .map(item => `<li>${esc(item)}</li>`)
-                    .join('')}
-                </ul>
-              </div>
-            `
-            : ''
-        }
+    ${
+      whatToTrack.length
+        ? `
+          <div class="item-sub" style="margin-top:16px">
+            <b>📌 Что отслеживать</b>
+            <ul>
+              ${whatToTrack
+                .map(item => `<li>${esc(item)}</li>`)
+                .join('')}
+            </ul>
+          </div>
+        `
+        : ''
+    }
 
-        ${
-          cautions.length
-            ? `
-              <div class="item">
-                <div class="item-title">
-                  ⚠️ Учесть
-                </div>
+    ${
+      successCriteria.length
+        ? `
+          <div class="item-sub" style="margin-top:16px">
+            <b>✅ Признаки прогресса</b>
+            <ul>
+              ${successCriteria
+                .map(item => `<li>${esc(item)}</li>`)
+                .join('')}
+            </ul>
+          </div>
+        `
+        : ''
+    }
 
-                <ul>
-                  ${cautions
-                    .map(item => `<li>${esc(item)}</li>`)
-                    .join('')}
-                </ul>
-              </div>
-            `
-            : ''
-        }
-      `;
+    ${
+      cautions.length
+        ? `
+          <div class="item-sub" style="margin-top:16px">
+            <b>⚠️ Учесть</b>
+            <ul>
+              ${cautions
+                .map(item => `<li>${esc(item)}</li>`)
+                .join('')}
+            </ul>
+          </div>
+        `
+        : ''
+    }
+  </details>
+`;
 
       nextSessionPlanStatus.textContent =
         '✓ План подготовлен. Специалист принимает окончательное решение.';
