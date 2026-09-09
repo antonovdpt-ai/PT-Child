@@ -232,6 +232,50 @@ ${JSON.stringify(context)}
   return result;
 }
 
+function buildNextSessionContext(p) {
+  const activeGoals = state.goals
+    .filter(goal => goal.status === 'active')
+    .map(goal => ({
+      id: goal.id,
+      title: goal.title,
+      baseline: goal.baseline || null,
+      criterion: goal.criterion || null,
+      progress: Number(goal.progress ?? 0)
+    }));
+
+  const recentSessions = state.sessions
+    .slice(0, 3)
+    .map(session => ({
+      date: session.session_date,
+      note: session.note || null,
+      tolerance: session.tolerance || null,
+      dynamics_status: session.dynamics_status || null,
+      function_changes: session.function_changes || null
+    }));
+
+  const assessment = state.assessment
+    ? {
+        motor_development:
+          state.assessment.motor_development || null,
+        observation:
+          state.assessment.observation || null,
+        neuro_observations:
+          state.assessment.neuro_observations || null,
+        conclusion:
+          state.assessment.conclusion || null
+      }
+    : null;
+
+  return {
+    age: ageFromDob(p.date_of_birth),
+    primary_complaint:
+      p.primary_complaint || null,
+    active_goals: activeGoals,
+    recent_sessions: recentSessions,
+    assessment
+  };
+}
+
 // Временно для проверки из консоли браузера
 window.callAI = callAI;
 
