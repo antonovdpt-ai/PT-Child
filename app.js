@@ -4772,6 +4772,10 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
       fd.get('function_changes').trim() || null
   };
 
+  if (!editingSessionId && p.next_session_plan) {
+  payload.planned_session = p.next_session_plan;
+}
+
   const { error } = editingSessionId
     ? await sb
         .from('sessions')
@@ -4820,7 +4824,24 @@ for (const update of pendingGoalUpdates) {
   }
 }
 
+if (!editingSessionId && p.next_session_plan) {
+  const { error: clearPlanError } = await sb
+    .from('patients')
+    .update({
+      next_session_plan: null
+    })
+    .eq('id', p.id)
+    .eq('therapist_id', user.id);
 
+  if (clearPlanError) {
+    console.error(
+      'Занятие сохранено, но план не удалось закрыть:',
+      clearPlanError
+    );
+  } else {
+    p.next_session_plan = null;
+  }
+}
 
   setButtonSaved(
     btn,
