@@ -984,6 +984,7 @@ const sortedPatients = [...state.patients].sort((a, b) => {
   );
 });
 
+
   app.innerHTML = `
   <div class="topline">
     <div>
