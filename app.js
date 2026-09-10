@@ -998,6 +998,9 @@ const patientCardHtml = p => `
     type="button"
     class="patient-card"
     data-pid="${p.id}"
+
+data-patient-name="${esc(String(p.display_name || ''))}"
+
     style="
       padding:10px 12px;
       text-align:left;
@@ -1080,10 +1083,23 @@ const patientCardHtml = p => `
 
   <div id="flash"></div>
 
+  <div style="margin-top:12px">
+  <input
+    id="patientSearch"
+    type="search"
+    placeholder="🔎 Найти пациента по имени"
+    autocomplete="off"
+    style="
+      width:100%;
+      box-sizing:border-box;
+    "
+  >
+</div>
+
   ${
   state.patients.length
     ? `
-      <div style="margin-top:14px">
+      <div id="recentPatientsSection" style="margin-top:14px">
         <div
           class="item-title"
           style="margin-bottom:8px"
@@ -1099,7 +1115,7 @@ const patientCardHtml = p => `
         </div>
       </div>
 
-      <div style="margin-top:22px">
+      <div id="allPatientsSection" style="margin-top:22px">
         <div
           class="item-title"
           style="margin-bottom:8px"
@@ -1123,6 +1139,33 @@ const patientCardHtml = p => `
 }
 `;
   document.getElementById('addPatient').onclick = renderNewPatient;
+
+const patientSearch = document.getElementById('patientSearch');
+const recentPatientsSection = document.getElementById('recentPatientsSection');
+
+if (patientSearch) {
+  patientSearch.oninput = () => {
+    const query = patientSearch.value
+      .trim()
+      .toLocaleLowerCase('ru-RU');
+
+    if (recentPatientsSection) {
+      recentPatientsSection.style.display = query ? 'none' : '';
+    }
+
+    document
+      .querySelectorAll('#allPatientsSection [data-patient-name]')
+      .forEach(card => {
+        const name = String(
+          card.dataset.patientName || ''
+        ).toLocaleLowerCase('ru-RU');
+
+        card.style.display =
+          name.includes(query) ? '' : 'none';
+      });
+  };
+}
+
   document.querySelectorAll('[data-pid]').forEach(b => b.onclick = async () => { state.patientId = b.dataset.pid; state.tab = 'overview'; await loadPatientData(); renderPatient() });
 }
 
