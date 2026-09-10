@@ -1274,11 +1274,55 @@ function renderNewPatient() {
 }
 
 const currentPatient = () => state.patients.find(p => p.id === state.patientId);
+
 async function loadPatientData() {
   const pid = state.patientId;
-  const [g, s, a] = await Promise.all([sb.from('goals').select('*').eq('patient_id', pid).order('created_at', { ascending: false }), sb.from('sessions').select('*').eq('patient_id', pid).order('session_date', { ascending: false }), sb.from('assessments').select('*').eq('patient_id', pid).eq('assessment_type', 'initial').order('created_at', { ascending: false }).limit(1)]);
-  if (g.error || s.error || a.error) throw new Error((g.error || s.error || a.error).message); state.goals = g.data || []; state.sessions = s.data || []; state.assessment = (a.data || [])[0] || null;
+
+  const [g, s, a, c] = await Promise.all([
+    sb
+      .from('goals')
+      .select('*')
+      .eq('patient_id', pid)
+      .order('created_at', { ascending: false }),
+
+    sb
+      .from('sessions')
+      .select('*')
+      .eq('patient_id', pid)
+      .order('session_date', { ascending: false }),
+
+    sb
+      .from('assessments')
+      .select('*')
+      .eq('patient_id', pid)
+      .eq('assessment_type', 'initial')
+      .order('created_at', { ascending: false })
+      .limit(1),
+
+    sb
+      .from('patient_contacts')
+      .select('*')
+      .eq('patient_id', pid)
+      .order('is_primary', { ascending: false })
+      .order('created_at', { ascending: true })
+  ]);
+
+  const loadError =
+    g.error ||
+    s.error ||
+    a.error ||
+    c.error;
+
+  if (loadError) {
+    throw new Error(loadError.message);
+  }
+
+  state.goals = g.data || [];
+  state.sessions = s.data || [];
+  state.assessment = (a.data || [])[0] || null;
+  state.contacts = c.data || [];
 }
+
 function goalsHtml(goals, deletable = false) {
   if (!goals.length) return `<div class="empty">Целей пока нет.</div>`;
   return goals.map(g => `<div class="goal"><div class="goal-top"><div class="item-title">${esc(g.title)}</div><div class="goal-pct">${g.progress}%</div></div><div class="progress"><span style="width:${Math.max(0, Math.min(100, g.progress))}%"></span></div><div class="item-sub">${esc(g.criterion || 'Критерий не указан')} · ${g.deadline ? fmtDate(g.deadline) : 'срок не указан'}</div>${deletable ? `<div style="display:flex;gap:14px;margin-top:7px;flex-wrap:wrap">
@@ -2986,11 +3030,252 @@ function structuredFromAssessmentForm(fd) {
 
 function renderTab(p) {
   const box = document.getElementById('tabContent');
-  if (state.tab === 'overview') {
-    box.innerHTML = `<div class="card"><h3>Сводка</h3><div class="metric-grid"><div class="metric"><b>${state.goals.filter(g => g.status === 'active').length}</b><span>активных целей</span></div><div class="metric"><b>${state.sessions.length}</b><span>занятий</span></div></div><div class="actions"><button class="btn primary" id="goSession">＋ Занятие</button><button class="btn" id="goGoal">＋ Цель</button></div></div><div class="card"><h3>Последнее занятие</h3>${state.sessions[0] ? `<div class="item-title">${fmtDate(state.sessions[0].session_date)} · ${esc(toleranceLabel(state.sessions[0].tolerance))}</div><div class="item-sub">${esc(state.sessions[0].note || '')}</div>` : `<div class="empty">Занятий пока нет.</div>`}</div><div class="card"><h3>Текущие цели</h3>${goalsHtml(state.goals)}</div>`;
-    document.getElementById('goSession').onclick = () => { state.tab = 'sessions'; renderPatient() };
-    document.getElementById('goGoal').onclick = () => { state.tab = 'goals'; renderPatient() };
-  }
+
+ box.insertAdjacentHTML('beforeend', `
+  <div class="card" style="margin-top:12px">
+    <div
+      style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:12px;
+      "
+    >
+      <h3 style="margin:0">
+        Контакты родителей / представителей
+      </h3>
+
+      <button
+        type="button"
+        class="btn small"
+        id="addContactBtn"
+      >
+        + Контакт
+      </button>
+    </div>
+
+    <div style="margin-top:10px">
+      ${
+        (state.contacts || []).length
+          ? (state.contacts || [])
+              .map(contact => `
+                <div class="item">
+                  <div class="item-title">
+                    ${esc(contact.full_name)}
+                    ${
+                      contact.is_primary
+                        ? '<span class="badge">Основной</span>'
+                        : ''
+                    }
+                  </div>
+
+                  ${
+                    contact.relation
+                      ? `<div class="item-sub">${esc(contact.relation)}</div>`
+                      : ''
+                  }
+
+                  ${
+                    contact.phone
+                      ? `<div class="item-sub">📞 ${esc(contact.phone)}</div>`
+                      : ''
+                  }
+
+                  ${
+                    contact.telegram
+                      ? `<div class="item-sub">✈️ ${esc(contact.telegram)}</div>`
+                      : ''
+                  }
+                </div>
+              `)
+              .join('')
+          : '<div class="empty">Контакты пока не добавлены.</div>'
+      }
+    </div>
+  </div>
+`);
+
+box.insertAdjacentHTML('beforeend', `
+  <div
+    id="contactFormWrap"
+    class="card"
+    style="
+      margin-top:12px;
+      display:none;
+    "
+  >
+    <h3>Новый контакт</h3>
+
+    <form id="contactForm">
+      <label>Имя родителя / представителя</label>
+      <input
+        name="full_name"
+        required
+        placeholder="Например: Марина"
+      >
+
+      <label>Кем приходится ребёнку</label>
+      <input
+        name="relation"
+        placeholder="Например: мама"
+      >
+
+      <label>Телефон</label>
+      <input
+        name="phone"
+        type="tel"
+        placeholder="+7..."
+      >
+
+      <label>Telegram</label>
+      <input
+        name="telegram"
+        placeholder="@username"
+      >
+
+      <label style="display:flex; gap:8px; align-items:center">
+        <input
+          name="is_primary"
+          type="checkbox"
+          style="width:auto"
+        >
+        Основной контакт
+      </label>
+
+      <div class="actions">
+        <button
+          type="submit"
+          class="btn primary full"
+          id="contactSaveBtn"
+        >
+          Сохранить контакт
+        </button>
+
+        <button
+          type="button"
+          class="btn full"
+          id="contactCancelBtn"
+        >
+          Отмена
+        </button>
+      </div>
+
+      <div
+        id="contactStatus"
+        class="save-status"
+      ></div>
+    </form>
+  </div>
+`);
+
+const addContactBtn =
+  document.getElementById('addContactBtn');
+
+const contactFormWrap =
+  document.getElementById('contactFormWrap');
+
+const contactCancelBtn =
+  document.getElementById('contactCancelBtn');
+
+const contactForm =
+  document.getElementById('contactForm');
+
+if (addContactBtn && contactFormWrap) {
+  addContactBtn.onclick = () => {
+    contactFormWrap.style.display = 'block';
+
+    contactFormWrap.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    });
+  };
+}
+
+if (contactCancelBtn && contactFormWrap) {
+  contactCancelBtn.onclick = () => {
+    if (contactForm) {
+      contactForm.reset();
+    }
+
+    contactFormWrap.style.display = 'none';
+  };
+}
+
+if (contactForm) {
+  contactForm.onsubmit = async e => {
+    e.preventDefault();
+
+    const contactSaveBtn =
+      document.getElementById('contactSaveBtn');
+
+    const contactStatus =
+      document.getElementById('contactStatus');
+
+    const fd = new FormData(contactForm);
+
+    const payload = {
+      patient_id: p.id,
+      therapist_id: user.id,
+      full_name: String(fd.get('full_name') || '').trim(),
+      relation: String(fd.get('relation') || '').trim() || null,
+      phone: String(fd.get('phone') || '').trim() || null,
+      telegram: String(fd.get('telegram') || '').trim() || null,
+      is_primary: fd.get('is_primary') === 'on'
+    };
+
+    contactSaveBtn.disabled = true;
+    contactSaveBtn.textContent = 'Сохраняю...';
+
+    if (contactStatus) {
+      contactStatus.textContent = '';
+    }
+
+    if (payload.is_primary) {
+      const { error: resetPrimaryError } = await sb
+        .from('patient_contacts')
+        .update({ is_primary: false })
+        .eq('patient_id', p.id)
+        .eq('therapist_id', user.id);
+
+      if (resetPrimaryError) {
+        contactSaveBtn.disabled = false;
+        contactSaveBtn.textContent = 'Сохранить контакт';
+
+        if (contactStatus) {
+          contactStatus.textContent =
+            'Ошибка: ' + resetPrimaryError.message;
+        }
+
+        return;
+      }
+    }
+
+    const { error } = await sb
+      .from('patient_contacts')
+      .insert(payload);
+
+    if (error) {
+      contactSaveBtn.disabled = false;
+      contactSaveBtn.textContent = 'Сохранить контакт';
+
+      if (contactStatus) {
+        contactStatus.textContent =
+          'Ошибка: ' + error.message;
+      }
+
+      return;
+    }
+
+    if (contactStatus) {
+      contactStatus.textContent = '✓ Контакт сохранён';
+    }
+
+    await loadPatientData();
+    renderPatient();
+  };
+}
+
+
   if (state.tab === 'assessment') {
     box.innerHTML = assessmentHtml(state.assessment);
 
