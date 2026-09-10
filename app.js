@@ -993,6 +993,19 @@ const alphabeticPatients = [...state.patients].sort((a, b) =>
   )
 );
 
+const patientLetters = [
+  ...new Set(
+    alphabeticPatients
+      .map(p =>
+        String(p.display_name || '')
+          .trim()
+          .charAt(0)
+          .toLocaleUpperCase('ru-RU')
+      )
+      .filter(Boolean)
+  )
+];
+
 const patientCardHtml = p => `
   <button
     type="button"
@@ -1122,7 +1135,44 @@ data-patient-name="${esc(String(p.display_name || ''))}"
         >
           Все пациенты
         </div>
+<div
+  id="patientAlphabet"
+  style="
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:10px;
+  "
+>
 
+<button
+  type="button"
+  class="btn small"
+  id="showAllPatients"
+  style="
+    min-width:42px;
+    padding:6px 9px;
+  "
+>
+  Все
+</button>
+
+  ${patientLetters
+    .map(letter => `
+      <button
+        type="button"
+        class="btn small"
+        data-patient-letter="${esc(letter)}"
+        style="
+          min-width:36px;
+          padding:6px 9px;
+        "
+      >
+        ${esc(letter)}
+      </button>
+    `)
+    .join('')}
+</div>
         <div
           class="patient-list"
           style="display:grid; gap:8px"
@@ -1138,6 +1188,53 @@ data-patient-name="${esc(String(p.display_name || ''))}"
     `
 }
 `;
+document.querySelectorAll('[data-patient-letter]').forEach(letterBtn => {
+  letterBtn.onclick = () => {
+    const letter = String(
+      letterBtn.dataset.patientLetter || ''
+    ).toLocaleLowerCase('ru-RU');
+
+    if (patientSearch) {
+      patientSearch.value = '';
+    }
+
+    if (recentPatientsSection) {
+      recentPatientsSection.style.display = 'none';
+    }
+
+    document
+      .querySelectorAll('#allPatientsSection [data-patient-name]')
+      .forEach(card => {
+        const name = String(
+          card.dataset.patientName || ''
+        ).toLocaleLowerCase('ru-RU');
+
+        card.style.display =
+          name.startsWith(letter) ? '' : 'none';
+      });
+  };
+});
+
+const showAllPatientsBtn = document.getElementById('showAllPatients');
+
+if (showAllPatientsBtn) {
+  showAllPatientsBtn.onclick = () => {
+    if (patientSearch) {
+      patientSearch.value = '';
+    }
+
+    if (recentPatientsSection) {
+      recentPatientsSection.style.display = '';
+    }
+
+    document
+      .querySelectorAll('#allPatientsSection [data-patient-name]')
+      .forEach(card => {
+        card.style.display = '';
+      });
+  };
+}
+
   document.getElementById('addPatient').onclick = renderNewPatient;
 
 const patientSearch = document.getElementById('patientSearch');
