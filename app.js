@@ -984,6 +984,81 @@ const sortedPatients = [...state.patients].sort((a, b) => {
   );
 });
 
+const recentPatients = sortedPatients.slice(0, 3);
+
+const alphabeticPatients = [...state.patients].sort((a, b) =>
+  String(a.display_name || '').localeCompare(
+    String(b.display_name || ''),
+    'ru'
+  )
+);
+
+const patientCardHtml = p => `
+  <button
+    type="button"
+    class="patient-card"
+    data-pid="${p.id}"
+    style="
+      padding:10px 12px;
+      text-align:left;
+    "
+  >
+    <div
+      style="
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        align-items:center;
+      "
+    >
+      <div style="min-width:0; flex:1">
+        <div
+          class="name"
+          style="margin-bottom:2px"
+        >
+          ${esc(p.display_name)}
+        </div>
+
+        <div class="muted tiny">
+          ${esc(ageFromDob(p.date_of_birth))}
+          ·
+          ${esc(sexLabel(p.sex))}
+        </div>
+
+        ${
+          p.primary_complaint
+            ? `
+              <div
+                class="item-sub"
+                style="
+                  margin-top:5px;
+                  white-space:nowrap;
+                  overflow:hidden;
+                  text-overflow:ellipsis;
+                "
+              >
+                ${esc(p.primary_complaint)}
+              </div>
+            `
+            : ''
+        }
+      </div>
+
+      <div
+        class="muted tiny"
+        style="
+          flex:none;
+          text-align:right;
+          white-space:nowrap;
+        "
+      >
+        ${counts[p.id]?.goals || 0} целей
+        <br>
+        ${counts[p.id]?.sessions || 0} занятий
+      </div>
+    </div>
+  </button>
+`;
 
   app.innerHTML = `
   <div class="topline">
@@ -1005,85 +1080,47 @@ const sortedPatients = [...state.patients].sort((a, b) => {
 
   <div id="flash"></div>
 
-  <div
-    class="patient-list"
-    style="display:grid; gap:8px"
-  >
-    ${
-      state.patients.length
-       ? sortedPatients.map(p => `
-            <button
-              type="button"
-              class="patient-card"
-              data-pid="${p.id}"
-              style="
-                padding:10px 12px;
-                text-align:left;
-              "
-            >
-              <div
-                style="
-                  display:flex;
-                  justify-content:space-between;
-                  gap:12px;
-                  align-items:center;
-                "
-              >
-                <div style="min-width:0; flex:1">
-                  <div
-                    class="name"
-                    style="margin-bottom:2px"
-                  >
-                    ${esc(p.display_name)}
-                  </div>
+  ${
+  state.patients.length
+    ? `
+      <div style="margin-top:14px">
+        <div
+          class="item-title"
+          style="margin-bottom:8px"
+        >
+          🕘 Недавние
+        </div>
 
-                  <div class="muted tiny">
-                    ${esc(ageFromDob(p.date_of_birth))}
-                    ·
-                    ${esc(sexLabel(p.sex))}
-                  </div>
+        <div
+          class="patient-list"
+          style="display:grid; gap:8px"
+        >
+          ${recentPatients.map(patientCardHtml).join('')}
+        </div>
+      </div>
 
-                  ${
-                    p.primary_complaint
-                      ? `
-                        <div
-                          class="item-sub"
-                          style="
-                            margin-top:5px;
-                            white-space:nowrap;
-                            overflow:hidden;
-                            text-overflow:ellipsis;
-                          "
-                        >
-                          ${esc(p.primary_complaint)}
-                        </div>
-                      `
-                      : ''
-                  }
-                </div>
+      <div style="margin-top:22px">
+        <div
+          class="item-title"
+          style="margin-bottom:8px"
+        >
+          Все пациенты
+        </div>
 
-                <div
-                  class="muted tiny"
-                  style="
-                    flex:none;
-                    text-align:right;
-                    white-space:nowrap;
-                  "
-                >
-                  ${counts[p.id]?.goals || 0} целей
-                  <br>
-                  ${counts[p.id]?.sessions || 0} занятий
-                </div>
-              </div>
-            </button>
-          `).join('')
-        : `
-          <div class="card empty">
-            В облачной базе пока нет пациентов.
-          </div>
-        `
-    }
-  </div>
+        <div
+          class="patient-list"
+          style="display:grid; gap:8px"
+        >
+          ${alphabeticPatients.map(patientCardHtml).join('')}
+        </div>
+      </div>
+    `
+    : `
+      <div class="card empty">
+        В облачной базе пока нет пациентов.
+      </div>
+    `
+}
 `;
   document.getElementById('addPatient').onclick = renderNewPatient;
   document.querySelectorAll('[data-pid]').forEach(b => b.onclick = async () => { state.patientId = b.dataset.pid; state.tab = 'overview'; await loadPatientData(); renderPatient() });
