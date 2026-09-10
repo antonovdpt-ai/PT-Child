@@ -882,6 +882,54 @@ async function countsForPatients() {
   return out;
 }
 
+async function activityForPatients() {
+  const ids = state.patients.map(p => p.id);
+
+  if (!ids.length) return {};
+
+  const [sessionsResult, assessmentsResult] = await Promise.all([
+    sb
+      .from('sessions')
+      .select('patient_id, created_at')
+      .in('patient_id', ids),
+
+    sb
+      .from('assessments')
+      .select('patient_id, created_at')
+      .in('patient_id', ids)
+  ]);
+
+  if (sessionsResult.error) {
+    throw new Error(sessionsResult.error.message);
+  }
+
+  if (assessmentsResult.error) {
+    throw new Error(assessmentsResult.error.message);
+  }
+
+  const activity = {};
+
+  ids.forEach(id => {
+    activity[id] = null;
+  });
+
+  [...(sessionsResult.data || []), ...(assessmentsResult.data || [])]
+    .forEach(item => {
+      if (!item.created_at) return;
+
+      const current = activity[item.patient_id];
+
+      if (
+        !current ||
+        new Date(item.created_at) > new Date(current)
+      ) {
+        activity[item.patient_id] = item.created_at;
+      }
+    });
+
+  return activity;
+}
+
 async function loadAiAnalysisHistory(patientId) {
   const { data, error } = await sb
     .from("ai_analysis_history")
@@ -914,7 +962,128 @@ async function loadAiDynamicsHistory(patientId) {
 
 async function renderPatients() {
   const counts = await countsForPatients();
-  app.innerHTML = `<div class="topline"><div><h2 style="margin-bottom:2px">Пациенты</h2><div class="muted tiny">Облачная база · ${state.patients.length} пациентов</div></div><button class="btn primary small" id="addPatient">＋ Ребёнок</button></div><div id="flash"></div><div class="patient-list">${state.patients.map(p => `<button class="patient-card" data-pid="${p.id}"><div class="patient-top"><div><div class="name">${esc(p.display_name)}</div><div class="meta">${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}</div></div><span class="badge">активное ведение</span></div><div class="item-sub" style="margin-top:9px">${esc(p.primary_complaint || 'Причина обращения пока не заполнена')}</div><div class="metric-grid"><div class="metric"><b>${counts[p.id]?.goals || 0}</b><span>целей</span></div><div class="metric"><b>${counts[p.id]?.sessions || 0}</b><span>занятий</span></div></div></button>`).join('') || `<div class="card empty">В облачной базе пока нет пациентов.</div>`}</div>`;
+
+const activity = await activityForPatients();
+
+const sortedPatients = [...state.patients].sort((a, b) => {
+  const dateA = activity[a.id]
+    ? new Date(activity[a.id]).getTime()
+    : 0;
+
+  const dateB = activity[b.id]
+    ? new Date(activity[b.id]).getTime()
+    : 0;
+
+  if (dateA !== dateB) {
+    return dateB - dateA;
+  }
+
+  return String(a.display_name || '').localeCompare(
+    String(b.display_name || ''),
+    'ru'
+  );
+});
+
+  app.innerHTML = `
+  <div class="topline">
+    <div>
+      <h2 style="margin-bottom:2px">Пациенты</h2>
+      <div class="muted tiny">
+        Облачная база · ${state.patients.length} пациентов
+      </div>
+    </div>
+
+    <button
+      class="btn primary small"
+      id="addPatient"
+      type="button"
+    >
+      + Ребёнок
+    </button>
+  </div>
+
+  <div id="flash"></div>
+
+  <div
+    class="patient-list"
+    style="display:grid; gap:8px"
+  >
+    ${
+      state.patients.length
+       ? sortedPatients.map(p => `
+            <button
+              type="button"
+              class="patient-card"
+              data-pid="${p.id}"
+              style="
+                padding:10px 12px;
+                text-align:left;
+              "
+            >
+              <div
+                style="
+                  display:flex;
+                  justify-content:space-between;
+                  gap:12px;
+                  align-items:center;
+                "
+              >
+                <div style="min-width:0; flex:1">
+                  <div
+                    class="name"
+                    style="margin-bottom:2px"
+                  >
+                    ${esc(p.display_name)}
+                  </div>
+
+                  <div class="muted tiny">
+                    ${esc(ageFromDob(p.date_of_birth))}
+                    ·
+                    ${esc(sexLabel(p.sex))}
+                  </div>
+
+                  ${
+                    p.primary_complaint
+                      ? `
+                        <div
+                          class="item-sub"
+                          style="
+                            margin-top:5px;
+                            white-space:nowrap;
+                            overflow:hidden;
+                            text-overflow:ellipsis;
+                          "
+                        >
+                          ${esc(p.primary_complaint)}
+                        </div>
+                      `
+                      : ''
+                  }
+                </div>
+
+                <div
+                  class="muted tiny"
+                  style="
+                    flex:none;
+                    text-align:right;
+                    white-space:nowrap;
+                  "
+                >
+                  ${counts[p.id]?.goals || 0} целей
+                  <br>
+                  ${counts[p.id]?.sessions || 0} занятий
+                </div>
+              </div>
+            </button>
+          `).join('')
+        : `
+          <div class="card empty">
+            В облачной базе пока нет пациентов.
+          </div>
+        `
+    }
+  </div>
+`;
   document.getElementById('addPatient').onclick = renderNewPatient;
   document.querySelectorAll('[data-pid]').forEach(b => b.onclick = async () => { state.patientId = b.dataset.pid; state.tab = 'overview'; await loadPatientData(); renderPatient() });
 }
