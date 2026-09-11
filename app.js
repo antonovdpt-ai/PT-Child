@@ -5596,6 +5596,7 @@ if (useNextSessionPlanBtn) {
 }
 
 let editingSessionId = null;
+let editingContactId = null;
 
 document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
   editBtn.onclick = () => {
