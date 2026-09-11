@@ -3030,6 +3030,7 @@ function structuredFromAssessmentForm(fd) {
 
 function renderTab(p) {
   const box = document.getElementById('tabContent');
+let editingContactId = null;
 
  box.insertAdjacentHTML('beforeend', `
   <div class="card" style="margin-top:12px">
@@ -5596,7 +5597,7 @@ if (useNextSessionPlanBtn) {
 }
 
 let editingSessionId = null;
-let editingContactId = null;
+
 
 document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
   editBtn.onclick = () => {
