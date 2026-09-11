@@ -3317,7 +3317,14 @@ if (contactForm) {
       }
     }
 
-    const { error } = await sb
+    const { error } = editingContactId
+  ? await sb
+      .from('patient_contacts')
+      .update(payload)
+      .eq('id', editingContactId)
+      .eq('patient_id', p.id)
+      .eq('therapist_id', user.id)
+  : await sb
       .from('patient_contacts')
       .insert(payload);
 
@@ -3336,6 +3343,7 @@ if (contactForm) {
     if (contactStatus) {
       contactStatus.textContent = '✓ Контакт сохранён';
     }
+editingContactId = null;
 
     await loadPatientData();
     renderPatient();
