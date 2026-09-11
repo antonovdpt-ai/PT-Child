@@ -3086,6 +3086,69 @@ function renderTab(p) {
                       ? `<div class="item-sub">✈️ ${esc(contact.telegram)}</div>`
                       : ''
                   }
+
+<div
+  style="
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-top:8px;
+  "
+>
+  ${
+    contact.phone
+      ? `
+        <button
+          type="button"
+          class="link"
+          data-call-contact="${contact.id}"
+        >
+          📞 Позвонить
+        </button>
+
+        <button
+          type="button"
+          class="link"
+          data-sms-contact="${contact.id}"
+        >
+          ✉️ SMS
+        </button>
+      `
+      : ''
+  }
+
+  ${
+    contact.telegram
+      ? `
+        <button
+          type="button"
+          class="link"
+          data-telegram-contact="${contact.id}"
+        >
+          ✈️ Telegram
+        </button>
+      `
+      : ''
+  }
+
+  <button
+    type="button"
+    class="link"
+    data-edit-contact="${contact.id}"
+  >
+    Изменить
+  </button>
+
+  <button
+    type="button"
+    class="link"
+    data-delete-contact="${contact.id}"
+    style="color:#c62828"
+  >
+    Удалить
+  </button>
+</div>
+
                 </div>
               `)
               .join('')
@@ -3180,6 +3243,8 @@ const contactCancelBtn =
 const contactForm =
   document.getElementById('contactForm');
 
+  editingContactId = null;
+
 if (addContactBtn && contactFormWrap) {
   addContactBtn.onclick = () => {
     contactFormWrap.style.display = 'block';
@@ -3196,6 +3261,7 @@ if (contactCancelBtn && contactFormWrap) {
     if (contactForm) {
       contactForm.reset();
     }
+editingContactId = null;
 
     contactFormWrap.style.display = 'none';
   };
@@ -3274,7 +3340,67 @@ if (contactForm) {
     renderPatient();
   };
 }
+const findContactById = contactId =>
+  (state.contacts || []).find(
+    contact => String(contact.id) === String(contactId)
+  );
 
+document
+  .querySelectorAll('[data-call-contact]')
+  .forEach(callBtn => {
+    callBtn.onclick = () => {
+      const contact =
+        findContactById(callBtn.dataset.callContact);
+
+      if (!contact?.phone) return;
+
+      const phone = String(contact.phone)
+        .replace(/[^\d+]/g, '');
+
+      window.location.href = `tel:${phone}`;
+    };
+  });
+
+document
+  .querySelectorAll('[data-sms-contact]')
+  .forEach(smsBtn => {
+    smsBtn.onclick = () => {
+      const contact =
+        findContactById(smsBtn.dataset.smsContact);
+
+      if (!contact?.phone) return;
+
+      const phone = String(contact.phone)
+        .replace(/[^\d+]/g, '');
+
+      window.location.href = `sms:${phone}`;
+    };
+  });
+
+document
+  .querySelectorAll('[data-telegram-contact]')
+  .forEach(telegramBtn => {
+    telegramBtn.onclick = () => {
+      const contact =
+        findContactById(
+          telegramBtn.dataset.telegramContact
+        );
+
+      if (!contact?.telegram) return;
+
+      const username = String(contact.telegram)
+        .trim()
+        .replace(/^@/, '');
+
+      if (!username) return;
+
+      window.open(
+        `https://t.me/${encodeURIComponent(username)}`,
+        '_blank',
+        'noopener'
+      );
+    };
+  });
 
   if (state.tab === 'assessment') {
     box.innerHTML = assessmentHtml(state.assessment);
