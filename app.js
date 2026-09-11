@@ -3402,6 +3402,58 @@ document
     };
   });
 
+document
+  .querySelectorAll('[data-edit-contact]')
+  .forEach(editBtn => {
+    editBtn.onclick = () => {
+      const contact =
+        findContactById(editBtn.dataset.editContact);
+
+      if (!contact || !contactForm || !contactFormWrap) {
+        return;
+      }
+
+      editingContactId = contact.id;
+
+      contactForm.elements.full_name.value =
+        contact.full_name || '';
+
+      contactForm.elements.relation.value =
+        contact.relation || '';
+
+      contactForm.elements.phone.value =
+        contact.phone || '';
+
+      contactForm.elements.telegram.value =
+        contact.telegram || '';
+
+      contactForm.elements.is_primary.checked =
+        Boolean(contact.is_primary);
+
+      const formTitle =
+        contactFormWrap.querySelector('h3');
+
+      const contactSaveBtn =
+        document.getElementById('contactSaveBtn');
+
+      if (formTitle) {
+        formTitle.textContent = 'Изменить контакт';
+      }
+
+      if (contactSaveBtn) {
+        contactSaveBtn.textContent =
+          'Сохранить изменения';
+      }
+
+      contactFormWrap.style.display = 'block';
+
+      contactFormWrap.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    };
+  });
+
   if (state.tab === 'assessment') {
     box.innerHTML = assessmentHtml(state.assessment);
 
