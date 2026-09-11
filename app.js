@@ -3463,6 +3463,50 @@ document
     };
   });
 
+  document
+  .querySelectorAll('[data-delete-contact]')
+  .forEach(deleteBtn => {
+    deleteBtn.onclick = async () => {
+      const contact =
+        findContactById(deleteBtn.dataset.deleteContact);
+
+      if (!contact) return;
+
+      const confirmed = window.confirm(
+        `Удалить контакт «${contact.full_name}»?`
+      );
+
+      if (!confirmed) return;
+
+      const oldText = deleteBtn.textContent;
+
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Удаляю...';
+
+      const { error } = await sb
+        .from('patient_contacts')
+        .delete()
+        .eq('id', contact.id)
+        .eq('patient_id', p.id)
+        .eq('therapist_id', user.id);
+
+      if (error) {
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = oldText;
+
+        alert(
+          'Не удалось удалить контакт: ' +
+          error.message
+        );
+
+        return;
+      }
+
+      await loadPatientData();
+      renderPatient();
+    };
+  });
+
   if (state.tab === 'assessment') {
     box.innerHTML = assessmentHtml(state.assessment);
 
