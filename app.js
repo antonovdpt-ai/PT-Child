@@ -777,27 +777,55 @@ function renderHeader() {
     return;
   }
 
-  headerActions.innerHTML = `
-    <div class="user-pill">
+ headerActions.innerHTML = `
+  <div
+    style="
+      display:flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap:6px;
+    "
+  >
+    <div class="muted tiny">
       ${esc(user.email || '')}
     </div>
 
-    <button
-      class="link"
-      id="profileBtn"
-      type="button"
+    <div
+      style="
+        display:flex;
+        align-items:center;
+        gap:8px;
+      "
     >
-      Профиль
-    </button>
+      <button
+        id="profileBtn"
+        type="button"
+        class="btn"
+        style="
+          padding:7px 12px;
+          border-radius:999px;
+          font-size:14px;
+        "
+      >
+        👤 Профиль
+      </button>
 
-    <button
-      class="link"
-      id="logoutBtn"
-      type="button"
-    >
-      Выйти
-    </button>
-  `;
+      <button
+        id="logoutBtn"
+        type="button"
+        class="btn"
+        style="
+          padding:7px 12px;
+          border-radius:999px;
+          font-size:14px;
+          opacity:.75;
+        "
+      >
+        Выйти
+      </button>
+    </div>
+  </div>
+`;
 
 document.getElementById('profileBtn').onclick = () => {
   renderProfile();
