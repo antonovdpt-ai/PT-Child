@@ -3541,6 +3541,15 @@ if (state.tab === 'overview') {
   Открыть
 </button>
 
+<button
+  type="button"
+  class="link"
+  data-pdf-parent-report="${report.id}"
+  style="margin-top:6px; margin-left:12px"
+>
+  📄 PDF
+</button>
+
                 </div>
               `)
               .join('')
@@ -3862,6 +3871,28 @@ if (reportTherapistName) {
     field.readOnly = true;
   }
 });
+
+document
+  .querySelectorAll('[data-pdf-parent-report]')
+  .forEach(pdfBtn => {
+    pdfBtn.onclick = () => {
+      const report = (state.parentReports || []).find(
+        item =>
+          String(item.id) ===
+          String(pdfBtn.dataset.pdfParentReport)
+      );
+
+      if (!report) {
+        return;
+      }
+
+      openParentReportPrintView(
+        p,
+        report,
+        report.therapist_name || ''
+      );
+    };
+  });
 
 if (editParentReportBtn) {
   editParentReportBtn.onclick = () => {
