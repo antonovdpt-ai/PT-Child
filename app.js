@@ -447,6 +447,201 @@ ${JSON.stringify(context)}
   return result;
 }
 
+function openParentReportPrintView(p, report) {
+  const printWindow = window.open('', '_blank');
+
+  if (!printWindow) {
+    alert(
+      'Браузер заблокировал окно отчёта. Разреши всплывающие окна для PT Child.'
+    );
+    return;
+  }
+
+  const sectionHtml = (title, text) => {
+    const value = String(text || '').trim();
+
+    if (!value) return '';
+
+    return `
+      <section>
+        <h2>${esc(title)}</h2>
+        <div class="text">
+          ${esc(value).replace(/\n/g, '<br>')}
+        </div>
+      </section>
+    `;
+  };
+
+  const reportDate =
+    new Date().toLocaleDateString('ru-RU');
+
+  const childAge =
+    ageFromDob(p.date_of_birth);
+
+  printWindow.document.write(`
+    <!doctype html>
+    <html lang="ru">
+      <head>
+        <meta charset="UTF-8">
+
+        <title>
+          Отчёт для родителя — ${esc(p.display_name || '')}
+        </title>
+
+        <style>
+          @page {
+            size: A4;
+            margin: 18mm;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            margin: 0;
+            font-family:
+              Arial,
+              Helvetica,
+              sans-serif;
+            color: #1f2937;
+            font-size: 12.5pt;
+            line-height: 1.5;
+          }
+
+          .header {
+            border-bottom: 2px solid #2563eb;
+            padding-bottom: 14px;
+            margin-bottom: 24px;
+          }
+
+          .brand {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 4px;
+          }
+
+          h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #111827;
+          }
+
+          .meta {
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 11pt;
+          }
+
+          section {
+            margin-bottom: 22px;
+            page-break-inside: avoid;
+          }
+
+          h2 {
+            margin: 0 0 8px;
+            font-size: 15px;
+            color: #1d4ed8;
+          }
+
+          .text {
+            white-space: normal;
+          }
+
+          .disclaimer {
+            margin-top: 30px;
+            padding-top: 14px;
+            border-top: 1px solid #d1d5db;
+            color: #6b7280;
+            font-size: 9.5pt;
+          }
+
+          .footer {
+            margin-top: 12px;
+            color: #9ca3af;
+            font-size: 9pt;
+          }
+
+          @media print {
+            body {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+          }
+        </style>
+      </head>
+
+      <body>
+        <div class="header">
+          <div class="brand">
+            PT Child · Отчёт для родителя
+          </div>
+
+          <h1>
+            ${esc(p.display_name || 'Ребёнок')}
+          </h1>
+
+          <div class="meta">
+            ${
+              childAge
+                ? `Возраст: ${esc(childAge)} · `
+                : ''
+            }
+            Дата отчёта: ${esc(reportDate)}
+          </div>
+        </div>
+
+        ${sectionHtml(
+          'С чем обратились',
+          report.complaint
+        )}
+
+        ${sectionHtml(
+          'Что ребёнок сейчас умеет',
+          report.strengths
+        )}
+
+        ${sectionHtml(
+          'На что мы обратили внимание',
+          report.observations
+        )}
+
+        ${sectionHtml(
+          'Над чем будем работать',
+          report.goals
+        )}
+
+        ${sectionHtml(
+          'Динамика',
+          report.progress
+        )}
+
+        ${sectionHtml(
+          'Рекомендации домой',
+          report.recommendations
+        )}
+
+        <div class="disclaimer">
+          Отчёт отражает результаты физиотерапевтической
+          оценки и работы специалиста и не заменяет
+          медицинское заключение врача.
+        </div>
+
+        <div class="footer">
+          Сформировано в PT Child
+        </div>
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+  printWindow.focus();
+
+  setTimeout(() => {
+    printWindow.print();
+  }, 300);
+}
+
 // Временно для проверки из консоли браузера
 window.callAI = callAI;
 
@@ -3229,6 +3424,14 @@ if (state.tab === 'overview') {
         </button>
 
         <button
+  type="button"
+  class="btn full"
+  id="saveParentReportPdfBtn"
+>
+  📄 Сохранить PDF
+</button>
+
+        <button
           type="button"
           class="btn full"
           id="closeParentReportBtn"
@@ -3250,6 +3453,9 @@ if (state.tab === 'overview') {
 
     const generateParentReportBtn =
   document.getElementById('generateParentReportBtn');
+
+  const saveParentReportPdfBtn =
+  document.getElementById('saveParentReportPdfBtn');
 
   if (parentReportBtn && parentReportEditor) {
     parentReportBtn.onclick = () => {
@@ -3320,6 +3526,33 @@ if (generateParentReportBtn) {
     } finally {
       generateParentReportBtn.disabled = false;
     }
+  };
+}
+
+
+if (saveParentReportPdfBtn) {
+  saveParentReportPdfBtn.onclick = () => {
+    const report = {
+      complaint:
+        document.getElementById('reportComplaint')?.value || '',
+
+      strengths:
+        document.getElementById('reportStrengths')?.value || '',
+
+      observations:
+        document.getElementById('reportObservations')?.value || '',
+
+      goals:
+        document.getElementById('reportGoals')?.value || '',
+
+      progress:
+        document.getElementById('reportProgress')?.value || '',
+
+      recommendations:
+        document.getElementById('reportRecommendations')?.value || ''
+    };
+
+    openParentReportPrintView(p, report);
   };
 }
 
