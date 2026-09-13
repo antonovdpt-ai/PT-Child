@@ -3032,6 +3032,37 @@ function renderTab(p) {
   const box = document.getElementById('tabContent');
 let editingContactId = null;
 
+if (state.tab === 'overview') {
+  box.insertAdjacentHTML('beforeend', `
+    <div
+      class="card"
+      style="
+        margin-top:12px;
+        padding:16px;
+      "
+    >
+      <button
+        type="button"
+        class="btn primary full"
+        id="parentReportBtn"
+      >
+        📄 Отчёт для родителя
+      </button>
+
+      <div
+        class="muted tiny"
+        style="
+          margin-top:8px;
+          text-align:center;
+        "
+      >
+        Сформировать понятную обратную связь
+        по результатам работы с ребёнком
+      </div>
+    </div>
+  `);
+}
+
  box.insertAdjacentHTML('beforeend', `
   <div class="card" style="margin-top:12px">
     <div
