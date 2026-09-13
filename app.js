@@ -723,7 +723,42 @@ function formatAIResult(text) {
     // Переносы строк
     .replace(/\n/g, "<br>");
 }
-function renderHeader() { if (!user) { headerActions.innerHTML = ''; return } headerActions.innerHTML = `<div class="user-pill">${esc(user.email || '')}</div><button class="link" id="logoutBtn">Выйти</button>`; document.getElementById('logoutBtn').onclick = () => sb.auth.signOut() }
+
+function renderHeader() {
+  if (!user) {
+    headerActions.innerHTML = '';
+    return;
+  }
+
+  headerActions.innerHTML = `
+    <div class="user-pill">
+      ${esc(user.email || '')}
+    </div>
+
+    <button
+      class="link"
+      id="profileBtn"
+      type="button"
+    >
+      Профиль
+    </button>
+
+    <button
+      class="link"
+      id="logoutBtn"
+      type="button"
+    >
+      Выйти
+    </button>
+  `;
+
+document.getElementById('profileBtn').onclick = () => {
+  renderProfile();
+};
+
+  document.getElementById('logoutBtn').onclick = () =>
+    sb.auth.signOut();
+}
 
 function setButtonSaving(btn, text = 'Сохраняю…') { btn.disabled = true; btn.classList.remove('saved'); btn.classList.add('saving'); btn.textContent = text }
 function setButtonSaved(btn, text = '✓ Сохранено') { btn.disabled = true; btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = text }
@@ -1164,7 +1199,15 @@ async function loadProfile() {
 
   const { data, error } = await sb
     .from('profiles')
-    .select('id, full_name, profession')
+    .select(`
+  id,
+  full_name,
+  profession,
+  organization,
+  phone,
+  logo_path,
+  updated_at
+`)
     .eq('id', user.id)
     .maybeSingle();
 
@@ -1218,6 +1261,201 @@ async function init() {
 function renderLogin() {
   app.innerHTML = `<div class="auth-wrap"><div class="card"><h2>Вход специалиста</h2><div id="flash"></div><form id="loginForm"><label>Email</label><input type="email" name="email" required autocomplete="email"><label>Пароль PT Child</label><input type="password" name="password" required autocomplete="current-password"><div class="actions"><button class="btn primary full" type="submit">Войти</button></div></form></div><div class="note">Используйте тестовую учётную запись, созданную в Supabase Authentication.</div></div>`;
   document.getElementById('loginForm').onsubmit = async e => { e.preventDefault(); const btn = e.submitter; setButtonSaving(btn, 'Вхожу…'); const fd = new FormData(e.target); const { error } = await sb.auth.signInWithPassword({ email: fd.get('email').trim(), password: fd.get('password') }); if (error) { setButtonError(btn, 'Войти'); flash('error', 'Не удалось войти: ' + error.message) } };
+}
+
+function renderProfile() {
+  const profile = state.profile || {};
+
+  app.innerHTML = `
+    <div class="card">
+      <div class="topline">
+        <div>
+          <h2 style="margin-bottom:4px">
+            Профиль специалиста
+          </h2>
+
+          <div class="muted tiny">
+            Эти данные будут использоваться в документах PT Child.
+          </div>
+        </div>
+      </div>
+
+      <form id="profileForm">
+        <label>ФИО</label>
+        <input
+          name="full_name"
+          required
+          value="${esc(profile.full_name || '')}"
+          placeholder="Например: Алексей Антонов"
+        >
+
+        <label>Профессия / специализация</label>
+        <input
+          name="profession"
+          required
+          value="${esc(profile.profession || '')}"
+          placeholder="Например: Физический терапевт"
+        >
+
+        <label>Организация / место работы</label>
+        <input
+          name="organization"
+          value="${esc(profile.organization || '')}"
+          placeholder="Например: Центр детской реабилитации"
+        >
+
+        <label>Телефон</label>
+        <input
+          name="phone"
+          type="tel"
+          value="${esc(profile.phone || '')}"
+          placeholder="+7..."
+        >
+
+        <label>Email</label>
+        <input
+          value="${esc(user?.email || '')}"
+          readonly
+        >
+
+        <label>Логотип</label>
+        <input
+          id="profileLogoFile"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+        >
+
+        <div
+          id="profileLogoPreview"
+          style="margin-top:10px"
+        ></div>
+
+        <div class="actions">
+          <button
+            type="submit"
+            class="btn primary full"
+            id="profileSaveBtn"
+          >
+            Сохранить профиль
+          </button>
+
+          <button
+            type="button"
+            class="btn full"
+            id="profileBackBtn"
+          >
+            ← К пациентам
+          </button>
+        </div>
+
+        <div
+          id="profileStatus"
+          class="save-status"
+        ></div>
+      </form>
+    </div>
+  `;
+
+  const profileForm =
+  document.getElementById('profileForm');
+
+if (profileForm) {
+  profileForm.onsubmit = async e => {
+    e.preventDefault();
+
+    const profileSaveBtn =
+      document.getElementById('profileSaveBtn');
+
+    const profileStatus =
+      document.getElementById('profileStatus');
+
+    const fd = new FormData(profileForm);
+
+    const profilePayload = {
+      id: user.id,
+      full_name:
+        String(fd.get('full_name') || '').trim(),
+      profession:
+        String(fd.get('profession') || '').trim(),
+      organization:
+        String(fd.get('organization') || '').trim() || null,
+      phone:
+        String(fd.get('phone') || '').trim() || null,
+      updated_at: new Date().toISOString()
+    };
+
+    profileSaveBtn.disabled = true;
+    profileSaveBtn.textContent = 'Сохраняю...';
+
+    if (profileStatus) {
+      profileStatus.textContent = '';
+    }
+
+    const { data, error } = await sb
+      .from('profiles')
+      .upsert(
+        profilePayload,
+        {
+          onConflict: 'id'
+        }
+      )
+      .select(`
+        id,
+        full_name,
+        profession,
+        organization,
+        phone,
+        logo_path,
+        updated_at
+      `)
+      .single();
+
+    if (error) {
+      console.error(
+        'Ошибка сохранения профиля:',
+        error
+      );
+
+      profileSaveBtn.disabled = false;
+      profileSaveBtn.textContent =
+        'Сохранить профиль';
+
+      if (profileStatus) {
+        profileStatus.textContent =
+          'Ошибка: ' + error.message;
+      }
+
+      return;
+    }
+
+    state.profile = data;
+
+    profileSaveBtn.disabled = false;
+    profileSaveBtn.textContent =
+      '✓ Профиль сохранён';
+
+    if (profileStatus) {
+      profileStatus.textContent =
+        '✓ Данные сохранены в облаке';
+    }
+
+    setTimeout(() => {
+      profileSaveBtn.textContent =
+        'Сохранить профиль';
+    }, 1500);
+  };
+}
+
+const profileBackBtn =
+  document.getElementById('profileBackBtn');
+
+if (profileBackBtn) {
+  profileBackBtn.onclick = async () => {
+    await loadPatients();
+    await renderPatients();
+  };
+}
+
 }
 
 async function loadPatients() {
