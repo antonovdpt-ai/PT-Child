@@ -3532,6 +3532,39 @@ if (state.tab === 'overview') {
                     )}
                   </div>
 
+                  ${
+  report.therapist_name
+    ? `
+      <div class="item-sub">
+        Специалист: ${esc(report.therapist_name)}
+      </div>
+    `
+    : ''
+}
+
+${
+  report.updated_at
+    ? `
+      <div class="item-sub">
+        Последнее сохранение:
+        ${esc(
+          new Date(report.updated_at)
+            .toLocaleString(
+              'ru-RU',
+              {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              }
+            )
+        )}
+      </div>
+    `
+    : ''
+}
+
 <button
   type="button"
   class="link"
