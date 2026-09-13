@@ -3606,6 +3606,14 @@ if (state.tab === 'overview') {
 </div>
 
 <div class="item-sub">
+  ${esc(
+    report.therapist_profession ||
+    state.profile?.profession ||
+    ''
+  )}
+</div>
+
+<div class="item-sub">
   Последнее сохранение:
   ${esc(
     new Date(
