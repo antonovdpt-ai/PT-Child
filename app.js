@@ -3461,11 +3461,12 @@ if (state.tab === 'overview') {
   id="reportTherapistName"
   type="text"
   value="${esc(
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    user.email ||
-    ''
-  )}"
+  state.profile?.full_name ||
+  user.user_metadata?.full_name ||
+  user.user_metadata?.name ||
+  user.email ||
+  ''
+)}"
   placeholder="Имя специалиста"
 />
 
@@ -3689,10 +3690,11 @@ if (state.tab === 'overview') {
 
 if (reportTherapistName) {
   reportTherapistName.value =
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    user.email ||
-    '';
+  state.profile?.full_name ||
+  user.user_metadata?.full_name ||
+  user.user_metadata?.name ||
+  user.email ||
+  '';
 
   reportTherapistName.readOnly = false;
 }
