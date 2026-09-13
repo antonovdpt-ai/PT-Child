@@ -1371,6 +1371,83 @@ if (profileForm) {
 
     const fd = new FormData(profileForm);
 
+    const logoFile =
+  document.getElementById('profileLogoFile')
+    ?.files?.[0] || null;
+
+let logoPath =
+  state.profile?.logo_path || null;
+
+if (logoFile) {
+  const allowedTypes = [
+    'image/png',
+    'image/jpeg',
+    'image/webp'
+  ];
+
+  if (!allowedTypes.includes(logoFile.type)) {
+    profileSaveBtn.disabled = false;
+    profileSaveBtn.textContent =
+      'Сохранить профиль';
+
+    if (profileStatus) {
+      profileStatus.textContent =
+        'Ошибка: выберите PNG, JPEG или WebP.';
+    }
+
+    return;
+  }
+
+  if (logoFile.size > 5 * 1024 * 1024) {
+    profileSaveBtn.disabled = false;
+    profileSaveBtn.textContent =
+      'Сохранить профиль';
+
+    if (profileStatus) {
+      profileStatus.textContent =
+        'Ошибка: логотип должен быть не больше 5 МБ.';
+    }
+
+    return;
+  }
+
+  const storagePath =
+    `${user.id}/logo`;
+
+  const { error: logoError } = await sb.storage
+    .from('specialist-logos')
+    .upload(
+      storagePath,
+      logoFile,
+      {
+        upsert: true,
+        contentType: logoFile.type,
+        cacheControl: '3600'
+      }
+    );
+
+  if (logoError) {
+    console.error(
+      'Ошибка загрузки логотипа:',
+      logoError
+    );
+
+    profileSaveBtn.disabled = false;
+    profileSaveBtn.textContent =
+      'Сохранить профиль';
+
+    if (profileStatus) {
+      profileStatus.textContent =
+        'Ошибка загрузки логотипа: ' +
+        logoError.message;
+    }
+
+    return;
+  }
+
+  logoPath = storagePath;
+}
+
     const profilePayload = {
       id: user.id,
       full_name:
@@ -1381,6 +1458,7 @@ if (profileForm) {
         String(fd.get('organization') || '').trim() || null,
       phone:
         String(fd.get('phone') || '').trim() || null,
+        logo_path: logoPath,
       updated_at: new Date().toISOString()
     };
 
