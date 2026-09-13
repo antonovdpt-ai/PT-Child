@@ -3431,7 +3431,14 @@ if (state.tab === 'overview') {
         >
           ✨ Подготовить черновик ИИ
         </button>
-
+<button
+  type="button"
+  class="btn full"
+  id="editParentReportBtn"
+  style="display:none"
+>
+  ✏️ Редактировать
+</button>
         <button
   type="button"
   class="btn full"
@@ -3530,9 +3537,39 @@ if (state.tab === 'overview') {
   const saveParentReportPdfBtn =
   document.getElementById('saveParentReportPdfBtn');
 
+  const editParentReportBtn =
+  document.getElementById('editParentReportBtn');
+
   if (parentReportBtn && parentReportEditor) {
     parentReportBtn.onclick = () => {
       editingParentReportId = null;
+
+[
+  'reportComplaint',
+  'reportStrengths',
+  'reportObservations',
+  'reportGoals',
+  'reportProgress',
+  'reportRecommendations'
+].forEach(id => {
+  const field = document.getElementById(id);
+
+  if (field) {
+    field.value = '';
+    field.readOnly = false;
+  }
+});
+
+if (editParentReportBtn) {
+  editParentReportBtn.style.display = 'none';
+}
+
+if (generateParentReportBtn) {
+  generateParentReportBtn.style.display = 'block';
+  generateParentReportBtn.textContent =
+    '✨ Подготовить черновик ИИ';
+}
+
       parentReportEditor.style.display = 'block';
 
       parentReportEditor.scrollIntoView({
@@ -3739,6 +3776,73 @@ document
 
       document.getElementById('reportRecommendations').value =
         report.recommendations || '';
+
+        [
+  'reportComplaint',
+  'reportStrengths',
+  'reportObservations',
+  'reportGoals',
+  'reportProgress',
+  'reportRecommendations'
+].forEach(id => {
+  const field = document.getElementById(id);
+
+  if (field) {
+    field.readOnly = true;
+  }
+});
+
+if (editParentReportBtn) {
+  editParentReportBtn.onclick = () => {
+    [
+      'reportComplaint',
+      'reportStrengths',
+      'reportObservations',
+      'reportGoals',
+      'reportProgress',
+      'reportRecommendations'
+    ].forEach(id => {
+      const field = document.getElementById(id);
+
+      if (field) {
+        field.readOnly = false;
+      }
+    });
+
+    editParentReportBtn.style.display = 'none';
+  };
+}
+
+if (editParentReportBtn) {
+  editParentReportBtn.style.display = 'block';
+}
+
+if (generateParentReportBtn) {
+  generateParentReportBtn.style.display = 'none';
+}
+
+[
+  'reportComplaint',
+  'reportStrengths',
+  'reportObservations',
+  'reportGoals',
+  'reportProgress',
+  'reportRecommendations'
+].forEach(id => {
+  const field = document.getElementById(id);
+
+  if (field) {
+    field.readOnly = true;
+  }
+});
+
+if (editParentReportBtn) {
+  editParentReportBtn.style.display = 'block';
+}
+
+if (generateParentReportBtn) {
+  generateParentReportBtn.style.display = 'none';
+}
 
       parentReportEditor.style.display = 'block';
 
