@@ -3872,27 +3872,7 @@ if (reportTherapistName) {
   }
 });
 
-document
-  .querySelectorAll('[data-pdf-parent-report]')
-  .forEach(pdfBtn => {
-    pdfBtn.onclick = () => {
-      const report = (state.parentReports || []).find(
-        item =>
-          String(item.id) ===
-          String(pdfBtn.dataset.pdfParentReport)
-      );
 
-      if (!report) {
-        return;
-      }
-
-      openParentReportPrintView(
-        p,
-        report,
-        report.therapist_name || ''
-      );
-    };
-  });
 
 if (editParentReportBtn) {
   editParentReportBtn.onclick = () => {
@@ -3954,6 +3934,28 @@ if (generateParentReportBtn) {
         behavior: 'smooth',
         block: 'start'
       });
+    };
+  });
+
+  document
+  .querySelectorAll('[data-pdf-parent-report]')
+  .forEach(pdfBtn => {
+    pdfBtn.onclick = () => {
+      const report = (state.parentReports || []).find(
+        item =>
+          String(item.id) ===
+          String(pdfBtn.dataset.pdfParentReport)
+      );
+
+      if (!report) {
+        return;
+      }
+
+      openParentReportPrintView(
+        p,
+        report,
+        report.therapist_name || ''
+      );
     };
   });
 
