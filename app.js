@@ -479,6 +479,19 @@ function openParentReportPrintView(
   const reportDate =
     new Date().toLocaleDateString('ru-RU');
 
+    const fileDate =
+  new Date().toISOString().slice(0, 10);
+
+const safeChildName = String(
+  p.display_name || 'Ребёнок'
+)
+  .trim()
+  .replace(/[\\/:*?"<>|]+/g, '')
+  .replace(/\s+/g, '_');
+
+const pdfFileName =
+  `${safeChildName}_отчет_${fileDate}`;
+
   const childAge =
     ageFromDob(p.date_of_birth);
 
@@ -488,9 +501,7 @@ function openParentReportPrintView(
       <head>
         <meta charset="UTF-8">
 
-        <title>
-          Отчёт для родителя — ${esc(p.display_name || '')}
-        </title>
+        <title>${esc(pdfFileName)}</title>
 
         <style>
           @page {
