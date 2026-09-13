@@ -451,7 +451,8 @@ ${JSON.stringify(context)}
 function openParentReportPrintView(
   p,
   report,
-  therapistName = ''
+  therapistName = '',
+  therapistProfession = ''
 ) {
   const printWindow = window.open('', '_blank');
 
@@ -606,10 +607,16 @@ const pdfFileName =
   Дата отчёта: ${esc(reportDate)}
 
   ${
-    therapistName
-      ? `<br>Специалист: ${esc(therapistName)}`
-      : ''
-  }
+  therapistName
+    ? `<br>Специалист: ${esc(therapistName)}`
+    : ''
+}
+
+${
+  therapistProfession
+    ? `<br>${esc(therapistProfession)}`
+    : ''
+}
 </div>
         </div>
 
@@ -3843,6 +3850,8 @@ const therapistName =
   patient_id: p.id,
   therapist_id: user.id,
   therapist_name: therapistName || null,
+  therapist_profession:
+  state.profile?.profession || null,
   complaint: report.complaint || null,
   strengths: report.strengths || null,
   observations: report.observations || null,
@@ -3896,10 +3905,11 @@ const { error } = saveResult;
     saveParentReportPdfBtn.textContent =
       '✓ Отчёт сохранён';
 
-    openParentReportPrintView(
+   openParentReportPrintView(
   p,
   report,
-  therapistName
+  therapistName,
+  state.profile?.profession || ''
 );
 
     setTimeout(() => {
@@ -4051,10 +4061,15 @@ if (generateParentReportBtn) {
       }
 
       openParentReportPrintView(
-        p,
-        report,
-        report.therapist_name || ''
-      );
+  p,
+  report,
+  report.therapist_name ||
+    state.profile?.full_name ||
+    '',
+  report.therapist_profession ||
+    state.profile?.profession ||
+    ''
+);
     };
   });
 
