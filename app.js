@@ -1573,7 +1573,7 @@ const currentPatient = () => state.patients.find(p => p.id === state.patientId);
 async function loadPatientData() {
   const pid = state.patientId;
 
-  const [g, s, a, c] = await Promise.all([
+  const [g, s, a, c, r] = await Promise.all([
     sb
       .from('goals')
       .select('*')
@@ -1599,14 +1599,21 @@ async function loadPatientData() {
       .select('*')
       .eq('patient_id', pid)
       .order('is_primary', { ascending: false })
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: true }),
+
+    sb
+  .from('parent_reports')
+  .select('*')
+  .eq('patient_id', pid)
+  .order('created_at', { ascending: false })
   ]);
 
-  const loadError =
-    g.error ||
-    s.error ||
-    a.error ||
-    c.error;
+ const loadError =
+  g.error ||
+  s.error ||
+  a.error ||
+  c.error ||
+  r.error;
 
   if (loadError) {
     throw new Error(loadError.message);
@@ -1616,6 +1623,7 @@ async function loadPatientData() {
   state.sessions = s.data || [];
   state.assessment = (a.data || [])[0] || null;
   state.contacts = c.data || [];
+  state.parentReports = r.data || [];
 }
 
 function goalsHtml(goals, deletable = false) {
@@ -3440,6 +3448,60 @@ if (state.tab === 'overview') {
         </button>
       </div>
     </div>
+
+<div
+  class="card"
+  style="margin-top:12px"
+>
+  <details>
+    <summary style="cursor:pointer; font-weight:600">
+      История отчётов
+      ${
+        (state.parentReports || []).length
+          ? `(${state.parentReports.length})`
+          : ''
+      }
+    </summary>
+
+    <div style="margin-top:12px">
+      ${
+        (state.parentReports || []).length
+          ? (state.parentReports || [])
+              .map(report => `
+                <div class="item">
+                  <div class="item-title">
+                    Отчёт от
+                    ${esc(
+                      new Date(report.created_at)
+                        .toLocaleDateString('ru-RU')
+                    )}
+                  </div>
+
+                  <div class="item-sub">
+                    ${esc(
+                      new Date(report.created_at)
+                        .toLocaleTimeString(
+                          'ru-RU',
+                          {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }
+                        )
+                    )}
+                  </div>
+                </div>
+              `)
+              .join('')
+          : `
+              <div class="empty">
+                Сохранённых отчётов пока нет.
+              </div>
+            `
+      }
+    </div>
+  </details>
+</div>
+
   `);
 
   const parentReportBtn =
