@@ -1356,8 +1356,93 @@ function renderProfile() {
     </div>
   `;
 
+const profileLogoPreview =
+  document.getElementById('profileLogoPreview');
+
+async function showSavedProfileLogo() {
+  if (
+    !profileLogoPreview ||
+    !state.profile?.logo_path
+  ) {
+    return;
+  }
+
+  const { data, error } = await sb.storage
+    .from('specialist-logos')
+    .createSignedUrl(
+      state.profile.logo_path,
+      3600
+    );
+
+  if (error || !data?.signedUrl) {
+    console.error(
+      'Ошибка загрузки логотипа:',
+      error
+    );
+    return;
+  }
+
+  profileLogoPreview.innerHTML = `
+    <img
+      src="${esc(data.signedUrl)}"
+      alt="Логотип специалиста"
+      style="
+        max-width:180px;
+        max-height:100px;
+        object-fit:contain;
+        border-radius:8px;
+      "
+    >
+  `;
+}
+
+showSavedProfileLogo();
+
   const profileForm =
   document.getElementById('profileForm');
+
+  const markProfileDirty = () => {
+  const profileSaveBtn =
+    document.getElementById('profileSaveBtn');
+
+  const profileStatus =
+    document.getElementById('profileStatus');
+
+  if (profileSaveBtn) {
+    profileSaveBtn.disabled = false;
+    profileSaveBtn.textContent =
+      'Сохранить изменения';
+  }
+
+  if (profileStatus) {
+    profileStatus.textContent =
+      'Есть несохранённые изменения';
+  }
+};
+
+profileForm
+  ?.querySelectorAll(
+    'input[name="full_name"], ' +
+    'input[name="profession"], ' +
+    'input[name="organization"], ' +
+    'input[name="phone"]'
+  )
+  .forEach(input => {
+    input.addEventListener(
+      'input',
+      markProfileDirty
+    );
+  });
+
+const profileLogoFile =
+  document.getElementById('profileLogoFile');
+
+if (profileLogoFile) {
+  profileLogoFile.addEventListener(
+    'change',
+    markProfileDirty
+  );
+}
 
 if (profileForm) {
   profileForm.onsubmit = async e => {
@@ -1508,19 +1593,16 @@ if (logoFile) {
 
     state.profile = data;
 
-    profileSaveBtn.disabled = false;
-    profileSaveBtn.textContent =
-      '✓ Профиль сохранён';
+    profileSaveBtn.disabled = true;
+profileSaveBtn.textContent =
+  '✓ Профиль сохранён';
 
     if (profileStatus) {
       profileStatus.textContent =
         '✓ Данные сохранены в облаке';
     }
 
-    setTimeout(() => {
-      profileSaveBtn.textContent =
-        'Сохранить профиль';
-    }, 1500);
+    
   };
 }
 
