@@ -3060,7 +3060,110 @@ if (state.tab === 'overview') {
         по результатам работы с ребёнком
       </div>
     </div>
+
+    <div
+      id="parentReportEditor"
+      class="card"
+      style="
+        margin-top:12px;
+        display:none;
+      "
+    >
+      <h3 style="margin-top:0">
+        📄 Отчёт для родителя
+      </h3>
+
+      <div class="muted tiny" style="margin-bottom:16px">
+        Проверь и отредактируй текст перед созданием PDF.
+      </div>
+
+      <label>1. С чем обратились</label>
+      <textarea
+        id="reportComplaint"
+        rows="3"
+        placeholder="Кратко опиши причину обращения"
+      ></textarea>
+
+      <label>2. Что ребёнок сейчас умеет</label>
+      <textarea
+        id="reportStrengths"
+        rows="4"
+        placeholder="Сильные стороны и двигательные возможности ребёнка"
+      ></textarea>
+
+      <label>3. На что мы обратили внимание</label>
+      <textarea
+        id="reportObservations"
+        rows="4"
+        placeholder="Основные наблюдения специалиста"
+      ></textarea>
+
+      <label>4. Над чем будем работать</label>
+      <textarea
+        id="reportGoals"
+        rows="4"
+        placeholder="Основные цели работы"
+      ></textarea>
+
+      <label>5. Динамика</label>
+      <textarea
+        id="reportProgress"
+        rows="4"
+        placeholder="Что изменилось и что стало получаться лучше"
+      ></textarea>
+
+      <label>6. Рекомендации домой</label>
+      <textarea
+        id="reportRecommendations"
+        rows="5"
+        placeholder="Практические рекомендации для родителей"
+      ></textarea>
+
+      <div class="actions" style="margin-top:16px">
+        <button
+          type="button"
+          class="btn primary full"
+          id="generateParentReportBtn"
+        >
+          ✨ Подготовить черновик ИИ
+        </button>
+
+        <button
+          type="button"
+          class="btn full"
+          id="closeParentReportBtn"
+        >
+          Закрыть
+        </button>
+      </div>
+    </div>
   `);
+
+  const parentReportBtn =
+    document.getElementById('parentReportBtn');
+
+  const parentReportEditor =
+    document.getElementById('parentReportEditor');
+
+  const closeParentReportBtn =
+    document.getElementById('closeParentReportBtn');
+
+  if (parentReportBtn && parentReportEditor) {
+    parentReportBtn.onclick = () => {
+      parentReportEditor.style.display = 'block';
+
+      parentReportEditor.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    };
+  }
+
+  if (closeParentReportBtn && parentReportEditor) {
+    closeParentReportBtn.onclick = () => {
+      parentReportEditor.style.display = 'none';
+    };
+  }
 }
 
  box.insertAdjacentHTML('beforeend', `
