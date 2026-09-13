@@ -347,6 +347,106 @@ function buildNextSessionContext(p) {
   };
 }
 
+function buildParentReportContext(p) {
+  const goals = (state.goals || []).map(goal => ({
+    title: goal.title || null,
+    baseline: goal.baseline || null,
+    criterion: goal.criterion || null,
+    progress: Number(goal.progress ?? 0),
+    status: goal.status || null
+  }));
+
+  const recentSessions = (state.sessions || [])
+    .slice(0, 5)
+    .map(session => ({
+      date: session.session_date || null,
+      note: session.note || null,
+      tolerance: session.tolerance || null,
+      dynamics_status: session.dynamics_status || null,
+      function_changes: session.function_changes || null
+    }));
+
+  const assessment = state.assessment
+    ? {
+        motor_development:
+          state.assessment.motor_development || null,
+
+        observation:
+          state.assessment.observation || null,
+
+        neuro_observations:
+          state.assessment.neuro_observations || null,
+
+        conclusion:
+          state.assessment.conclusion || null
+      }
+    : null;
+
+  return {
+    child_name: p.display_name || null,
+    age: ageFromDob(p.date_of_birth),
+    primary_complaint: p.primary_complaint || null,
+    assessment,
+    goals,
+    recent_sessions: recentSessions
+  };
+}
+
+async function prepareParentReportDraft(context = {}) {
+  const prompt = `
+Ты помогаешь физическому терапевту подготовить
+понятную обратную связь для родителей ребёнка.
+
+ВАЖНЫЕ ПРАВИЛА:
+- Используй только данные из переданного контекста.
+- Ничего не выдумывай и не добавляй фактов от себя.
+- Не ставь медицинские диагнозы.
+- Не назначай лечение и лекарства.
+- Не придумывай упражнения, которых нет в данных.
+- Пиши спокойным, профессиональным и понятным
+  родителю языком.
+- Избегай сложного медицинского жаргона.
+- Сначала отмечай возможности и сильные стороны ребёнка,
+  затем трудности.
+- Если для какого-либо раздела данных недостаточно,
+  верни для него пустую строку.
+- Не используй markdown.
+- Верни только JSON без пояснений.
+
+Данные ребёнка:
+
+${JSON.stringify(context)}
+
+Верни JSON строго такого вида:
+
+{
+  "complaint": "с чем обратились",
+  "strengths": "что ребёнок сейчас умеет и его сильные стороны",
+  "observations": "на что специалист обратил внимание",
+  "goals": "над чем планируется работать",
+  "progress": "какая динамика отмечается",
+  "recommendations": "рекомендации родителям, только если они следуют из имеющихся данных"
+}
+`;
+
+  const text = await callAI(prompt);
+
+  const cleaned = String(text)
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  const result = JSON.parse(cleaned);
+
+  if (!result || typeof result !== 'object') {
+    throw new Error(
+      'ИИ вернул некорректный черновик отчёта'
+    );
+  }
+
+  return result;
+}
+
 // Временно для проверки из консоли браузера
 window.callAI = callAI;
 
@@ -3148,6 +3248,9 @@ if (state.tab === 'overview') {
   const closeParentReportBtn =
     document.getElementById('closeParentReportBtn');
 
+    const generateParentReportBtn =
+  document.getElementById('generateParentReportBtn');
+
   if (parentReportBtn && parentReportEditor) {
     parentReportBtn.onclick = () => {
       parentReportEditor.style.display = 'block';
@@ -3164,6 +3267,60 @@ if (state.tab === 'overview') {
       parentReportEditor.style.display = 'none';
     };
   }
+}
+
+if (generateParentReportBtn) {
+  generateParentReportBtn.onclick = async () => {
+    const oldText = generateParentReportBtn.textContent;
+
+    generateParentReportBtn.disabled = true;
+    generateParentReportBtn.textContent =
+      'Подготавливаю черновик...';
+
+    try {
+      const context =
+        buildParentReportContext(p);
+
+      const draft =
+        await prepareParentReportDraft(context);
+
+      document.getElementById('reportComplaint').value =
+        draft.complaint || '';
+
+      document.getElementById('reportStrengths').value =
+        draft.strengths || '';
+
+      document.getElementById('reportObservations').value =
+        draft.observations || '';
+
+      document.getElementById('reportGoals').value =
+        draft.goals || '';
+
+      document.getElementById('reportProgress').value =
+        draft.progress || '';
+
+      document.getElementById('reportRecommendations').value =
+        draft.recommendations || '';
+
+      generateParentReportBtn.textContent =
+        '✓ Черновик подготовлен';
+    } catch (error) {
+      console.error(
+        'Ошибка подготовки отчёта:',
+        error
+      );
+
+      alert(
+        'Не удалось подготовить черновик отчёта: ' +
+        error.message
+      );
+
+      generateParentReportBtn.textContent =
+        oldText;
+    } finally {
+      generateParentReportBtn.disabled = false;
+    }
+  };
 }
 
  box.insertAdjacentHTML('beforeend', `
