@@ -448,15 +448,24 @@ ${JSON.stringify(context)}
   return result;
 }
 
-function openParentReportPrintView(
+async function openParentReportPrintView(
   p,
   report,
   therapistName = '',
-  therapistProfession = ''
+  therapistProfession = '',
+  therapistOrganization = '',
+  therapistPhone = '',
+  therapistLogoPath = ''
 ) {
   const printWindow = window.open('', '_blank');
 
   if (!printWindow) {
+
+const therapistLogoUrl =
+  await getSpecialistLogoUrl(
+    therapistLogoPath
+  );
+
     alert(
       'Браузер заблокировал окно отчёта. Разреши всплывающие окна для PT Child.'
     );
@@ -607,6 +616,24 @@ const pdfFileName =
   Дата отчёта: ${esc(reportDate)}
 
   ${
+  therapistLogoUrl
+    ? `
+      <div style="margin-bottom:12px">
+        <img
+          src="${esc(therapistLogoUrl)}"
+          alt="Логотип"
+          style="
+            max-width:160px;
+            max-height:80px;
+            object-fit:contain;
+          "
+        >
+      </div>
+    `
+    : ''
+}
+
+${
   therapistName
     ? `<br>Специалист: ${esc(therapistName)}`
     : ''
@@ -617,6 +644,19 @@ ${
     ? `<br>${esc(therapistProfession)}`
     : ''
 }
+
+${
+  therapistOrganization
+    ? `<br>${esc(therapistOrganization)}`
+    : ''
+}
+
+${
+  therapistPhone
+    ? `<br>Телефон: ${esc(therapistPhone)}`
+    : ''
+}
+
 </div>
         </div>
 
@@ -1222,6 +1262,30 @@ async function loadProfile() {
   }
 
   state.profile = data || null;
+}
+
+async function getSpecialistLogoUrl(logoPath) {
+  if (!logoPath) {
+    return '';
+  }
+
+  const { data, error } = await sb.storage
+    .from('specialist-logos')
+    .createSignedUrl(
+      logoPath,
+      3600
+    );
+
+  if (error || !data?.signedUrl) {
+    console.error(
+      'Ошибка получения логотипа:',
+      error
+    );
+
+    return '';
+  }
+
+  return data.signedUrl;
 }
 
 async function init() {
@@ -4258,6 +4322,16 @@ const therapistName =
   therapist_name: therapistName || null,
   therapist_profession:
   state.profile?.profession || null,
+
+therapist_organization:
+  state.profile?.organization || null,
+
+therapist_phone:
+  state.profile?.phone || null,
+
+therapist_logo_path:
+  state.profile?.logo_path || null,
+
   complaint: report.complaint || null,
   strengths: report.strengths || null,
   observations: report.observations || null,
@@ -4315,7 +4389,10 @@ const { error } = saveResult;
   p,
   report,
   therapistName,
-  state.profile?.profession || ''
+  state.profile?.profession || '',
+  state.profile?.organization || '',
+  state.profile?.phone || '',
+  state.profile?.logo_path || ''
 );
 
     setTimeout(() => {
@@ -4469,11 +4546,25 @@ if (generateParentReportBtn) {
       openParentReportPrintView(
   p,
   report,
+
   report.therapist_name ||
     state.profile?.full_name ||
     '',
+
   report.therapist_profession ||
     state.profile?.profession ||
+    '',
+
+  report.therapist_organization ||
+    state.profile?.organization ||
+    '',
+
+  report.therapist_phone ||
+    state.profile?.phone ||
+    '',
+
+  report.therapist_logo_path ||
+    state.profile?.logo_path ||
     ''
 );
     };
