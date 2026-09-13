@@ -3531,28 +3531,83 @@ if (generateParentReportBtn) {
 
 
 if (saveParentReportPdfBtn) {
-  saveParentReportPdfBtn.onclick = () => {
+  saveParentReportPdfBtn.onclick = async () => {
     const report = {
       complaint:
-        document.getElementById('reportComplaint')?.value || '',
+        document.getElementById('reportComplaint')?.value.trim() || '',
 
       strengths:
-        document.getElementById('reportStrengths')?.value || '',
+        document.getElementById('reportStrengths')?.value.trim() || '',
 
       observations:
-        document.getElementById('reportObservations')?.value || '',
+        document.getElementById('reportObservations')?.value.trim() || '',
 
       goals:
-        document.getElementById('reportGoals')?.value || '',
+        document.getElementById('reportGoals')?.value.trim() || '',
 
       progress:
-        document.getElementById('reportProgress')?.value || '',
+        document.getElementById('reportProgress')?.value.trim() || '',
 
       recommendations:
-        document.getElementById('reportRecommendations')?.value || ''
+        document.getElementById('reportRecommendations')?.value.trim() || ''
     };
 
+    const hasContent = Object.values(report)
+      .some(value => value);
+
+    if (!hasContent) {
+      alert('Отчёт пустой. Сначала подготовь или заполни текст.');
+      return;
+    }
+
+    const oldText =
+      saveParentReportPdfBtn.textContent;
+
+    saveParentReportPdfBtn.disabled = true;
+    saveParentReportPdfBtn.textContent =
+      'Сохраняю отчёт...';
+
+    const { error } = await sb
+      .from('parent_reports')
+      .insert({
+        patient_id: p.id,
+        therapist_id: user.id,
+        complaint: report.complaint || null,
+        strengths: report.strengths || null,
+        observations: report.observations || null,
+        goals: report.goals || null,
+        progress: report.progress || null,
+        recommendations: report.recommendations || null
+      });
+
+    if (error) {
+      console.error(
+        'Ошибка сохранения отчёта:',
+        error
+      );
+
+      alert(
+        'Не удалось сохранить отчёт: ' +
+        error.message
+      );
+
+      saveParentReportPdfBtn.disabled = false;
+      saveParentReportPdfBtn.textContent =
+        oldText;
+
+      return;
+    }
+
+    saveParentReportPdfBtn.textContent =
+      '✓ Отчёт сохранён';
+
     openParentReportPrintView(p, report);
+
+    setTimeout(() => {
+      saveParentReportPdfBtn.disabled = false;
+      saveParentReportPdfBtn.textContent =
+        oldText;
+    }, 1000);
   };
 }
 
