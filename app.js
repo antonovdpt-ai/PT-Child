@@ -3334,6 +3334,7 @@ function structuredFromAssessmentForm(fd) {
 function renderTab(p) {
   const box = document.getElementById('tabContent');
 let editingContactId = null;
+let editingParentReportId = null;
 
 if (state.tab === 'overview') {
   box.insertAdjacentHTML('beforeend', `
@@ -3531,6 +3532,7 @@ if (state.tab === 'overview') {
 
   if (parentReportBtn && parentReportEditor) {
     parentReportBtn.onclick = () => {
+      editingParentReportId = null;
       parentReportEditor.style.display = 'block';
 
       parentReportEditor.scrollIntoView({
@@ -3639,18 +3641,40 @@ if (saveParentReportPdfBtn) {
     saveParentReportPdfBtn.textContent =
       'Сохраняю отчёт...';
 
-    const { error } = await sb
-      .from('parent_reports')
-      .insert({
-        patient_id: p.id,
-        therapist_id: user.id,
-        complaint: report.complaint || null,
-        strengths: report.strengths || null,
-        observations: report.observations || null,
-        goals: report.goals || null,
-        progress: report.progress || null,
-        recommendations: report.recommendations || null
-      });
+   const reportPayload = {
+  patient_id: p.id,
+  therapist_id: user.id,
+  complaint: report.complaint || null,
+  strengths: report.strengths || null,
+  observations: report.observations || null,
+  goals: report.goals || null,
+  progress: report.progress || null,
+  recommendations: report.recommendations || null,
+  updated_at: new Date().toISOString()
+};
+
+let saveResult;
+
+if (editingParentReportId) {
+  saveResult = await sb
+    .from('parent_reports')
+    .update(reportPayload)
+    .eq('id', editingParentReportId)
+    .eq('patient_id', p.id)
+    .eq('therapist_id', user.id);
+} else {
+  saveResult = await sb
+    .from('parent_reports')
+    .insert(reportPayload)
+    .select('id')
+    .single();
+
+  if (!saveResult.error && saveResult.data?.id) {
+    editingParentReportId = saveResult.data.id;
+  }
+}
+
+const { error } = saveResult;
 
     if (error) {
       console.error(
@@ -3696,6 +3720,7 @@ document
       if (!report || !parentReportEditor) {
         return;
       }
+      editingParentReportId = report.id;
 
       document.getElementById('reportComplaint').value =
         report.complaint || '';
