@@ -447,7 +447,11 @@ ${JSON.stringify(context)}
   return result;
 }
 
-function openParentReportPrintView(p, report) {
+function openParentReportPrintView(
+  p,
+  report,
+  therapistName = ''
+) {
   const printWindow = window.open('', '_blank');
 
   if (!printWindow) {
@@ -582,13 +586,19 @@ function openParentReportPrintView(p, report) {
           </h1>
 
           <div class="meta">
-            ${
-              childAge
-                ? `Возраст: ${esc(childAge)} · `
-                : ''
-            }
-            Дата отчёта: ${esc(reportDate)}
-          </div>
+  ${
+    childAge
+      ? `Возраст: ${esc(childAge)} · `
+      : ''
+  }
+  Дата отчёта: ${esc(reportDate)}
+
+  ${
+    therapistName
+      ? `<br>Специалист: ${esc(therapistName)}`
+      : ''
+  }
+</div>
         </div>
 
         ${sectionHtml(
@@ -3381,6 +3391,19 @@ if (state.tab === 'overview') {
         Проверь и отредактируй текст перед созданием PDF.
       </div>
 
+      <label>Специалист</label>
+<input
+  id="reportTherapistName"
+  type="text"
+  value="${esc(
+    user.user_metadata?.full_name ||
+    user.user_metadata?.name ||
+    user.email ||
+    ''
+  )}"
+  placeholder="Имя специалиста"
+/>
+
       <label>1. С чем обратились</label>
       <textarea
         id="reportComplaint"
@@ -3544,7 +3567,21 @@ if (state.tab === 'overview') {
     parentReportBtn.onclick = () => {
       editingParentReportId = null;
 
-[
+      const reportTherapistName =
+  document.getElementById('reportTherapistName');
+
+if (reportTherapistName) {
+  reportTherapistName.value =
+    user.user_metadata?.full_name ||
+    user.user_metadata?.name ||
+    user.email ||
+    '';
+
+  reportTherapistName.readOnly = false;
+}
+
+[ 
+
   'reportComplaint',
   'reportStrengths',
   'reportObservations',
@@ -3643,6 +3680,11 @@ if (generateParentReportBtn) {
 
 if (saveParentReportPdfBtn) {
   saveParentReportPdfBtn.onclick = async () => {
+
+const therapistName =
+  document.getElementById('reportTherapistName')
+    ?.value.trim() || '';
+
     const report = {
       complaint:
         document.getElementById('reportComplaint')?.value.trim() || '',
@@ -3681,6 +3723,7 @@ if (saveParentReportPdfBtn) {
    const reportPayload = {
   patient_id: p.id,
   therapist_id: user.id,
+  therapist_name: therapistName || null,
   complaint: report.complaint || null,
   strengths: report.strengths || null,
   observations: report.observations || null,
@@ -3734,7 +3777,11 @@ const { error } = saveResult;
     saveParentReportPdfBtn.textContent =
       '✓ Отчёт сохранён';
 
-    openParentReportPrintView(p, report);
+    openParentReportPrintView(
+  p,
+  report,
+  therapistName
+);
 
     setTimeout(() => {
       saveParentReportPdfBtn.disabled = false;
@@ -3759,6 +3806,18 @@ document
       }
       editingParentReportId = report.id;
 
+      const reportTherapistName =
+  document.getElementById('reportTherapistName');
+
+if (reportTherapistName) {
+  reportTherapistName.value =
+    report.therapist_name ||
+    user.user_metadata?.full_name ||
+    user.user_metadata?.name ||
+    user.email ||
+    '';
+}
+
       document.getElementById('reportComplaint').value =
         report.complaint || '';
 
@@ -3778,6 +3837,7 @@ document
         report.recommendations || '';
 
         [
+  'reportTherapistName',
   'reportComplaint',
   'reportStrengths',
   'reportObservations',
@@ -3795,6 +3855,7 @@ document
 if (editParentReportBtn) {
   editParentReportBtn.onclick = () => {
     [
+      'reportTherapistName',
       'reportComplaint',
       'reportStrengths',
       'reportObservations',
@@ -3822,6 +3883,7 @@ if (generateParentReportBtn) {
 }
 
 [
+  'reportTherapistName',
   'reportComplaint',
   'reportStrengths',
   'reportObservations',
