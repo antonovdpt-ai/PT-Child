@@ -461,16 +461,15 @@ async function openParentReportPrintView(
 
   if (!printWindow) {
 
-const therapistLogoUrl =
-  await getSpecialistLogoUrl(
-    therapistLogoPath
-  );
-
     alert(
       'Браузер заблокировал окно отчёта. Разреши всплывающие окна для PT Child.'
     );
     return;
   }
+  const therapistLogoUrl =
+  await getSpecialistLogoUrl(
+    therapistLogoPath
+  );
 
   const sectionHtml = (title, text) => {
     const value = String(text || '').trim();
