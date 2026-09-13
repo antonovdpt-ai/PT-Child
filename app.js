@@ -1295,6 +1295,13 @@ async function getSpecialistLogoUrl(logoPath) {
   return data.signedUrl;
 }
 
+function isSpecialistProfileComplete(profile) {
+  return Boolean(
+    profile?.full_name?.trim() &&
+    profile?.profession?.trim()
+  );
+}
+
 async function init() {
   const { data } = await sb.auth.getSession();
 
@@ -1309,29 +1316,281 @@ async function init() {
 
     renderHeader();
 
-    if (user) {
-      await loadProfile();
-      await loadPatients();
-      await renderPatients();
-    } else {
+   if (user) {
+  await loadProfile();
+
+  if (!isSpecialistProfileComplete(state.profile)) {
+    renderProfile();
+    return;
+  }
+
+  await loadPatients();
+  await renderPatients();
+}
+    else {
       state.profile = null;
       renderLogin();
     }
   });
 
-  if (user) {
-    await loadProfile();
-    await loadPatients();
-    await renderPatients();
-  } else {
+if (user) {
+  await loadProfile();
+
+  if (!isSpecialistProfileComplete(state.profile)) {
+    renderProfile();
+    return;
+  }
+
+  await loadPatients();
+  await renderPatients();
+}
+
+  else {
     state.profile = null;
     renderLogin();
   }
 }
 
 function renderLogin() {
-  app.innerHTML = `<div class="auth-wrap"><div class="card"><h2>Вход специалиста</h2><div id="flash"></div><form id="loginForm"><label>Email</label><input type="email" name="email" required autocomplete="email"><label>Пароль PT Child</label><input type="password" name="password" required autocomplete="current-password"><div class="actions"><button class="btn primary full" type="submit">Войти</button></div></form></div><div class="note">Используйте тестовую учётную запись, созданную в Supabase Authentication.</div></div>`;
-  document.getElementById('loginForm').onsubmit = async e => { e.preventDefault(); const btn = e.submitter; setButtonSaving(btn, 'Вхожу…'); const fd = new FormData(e.target); const { error } = await sb.auth.signInWithPassword({ email: fd.get('email').trim(), password: fd.get('password') }); if (error) { setButtonError(btn, 'Войти'); flash('error', 'Не удалось войти: ' + error.message) } };
+  app.innerHTML = `
+    <div class="auth-wrap">
+      <div class="card">
+        <h2>Вход специалиста</h2>
+
+        <div id="flash"></div>
+
+        <form id="loginForm">
+          <label>Email</label>
+          <input
+            type="email"
+            name="email"
+            required
+            autocomplete="email"
+          >
+
+          <label>Пароль PT Child</label>
+          <input
+            type="password"
+            name="password"
+            required
+            autocomplete="current-password"
+          >
+
+          <div class="actions">
+            <button
+              class="btn primary full"
+              type="submit"
+            >
+              Войти
+            </button>
+
+            <button
+              class="btn full"
+              type="button"
+              id="showRegisterBtn"
+            >
+              Создать аккаунт
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document
+    .getElementById('loginForm')
+    .onsubmit = async e => {
+      e.preventDefault();
+
+      const btn = e.submitter;
+
+      setButtonSaving(
+        btn,
+        'Вхожу...'
+      );
+
+      const fd =
+        new FormData(e.target);
+
+      const { error } =
+        await sb.auth.signInWithPassword({
+          email:
+            fd.get('email').trim(),
+          password:
+            fd.get('password')
+        });
+
+      if (error) {
+        setButtonError(
+          btn,
+          'Войти'
+        );
+
+        flash(
+          'error',
+          'Не удалось войти: ' +
+            error.message
+        );
+      }
+    };
+
+  document
+    .getElementById('showRegisterBtn')
+    .onclick = () => {
+      renderRegister();
+    };
+}
+
+function renderRegister() {
+  app.innerHTML = `
+    <div class="auth-wrap">
+      <div class="card">
+        <h2>Создать аккаунт</h2>
+
+        <div class="muted tiny">
+          Регистрация специалиста PT Child
+        </div>
+
+        <div id="flash"></div>
+
+        <form id="registerForm">
+          <label>Email</label>
+          <input
+            type="email"
+            name="email"
+            required
+            autocomplete="email"
+          >
+
+          <label>Пароль</label>
+          <input
+            type="password"
+            name="password"
+            required
+            minlength="8"
+            autocomplete="new-password"
+          >
+
+          <label>Повторите пароль</label>
+          <input
+            type="password"
+            name="password_confirm"
+            required
+            minlength="8"
+            autocomplete="new-password"
+          >
+
+          <div class="actions">
+            <button
+              class="btn primary full"
+              type="submit"
+              id="registerBtn"
+            >
+              Создать аккаунт
+            </button>
+
+            <button
+              class="btn full"
+              type="button"
+              id="backToLoginBtn"
+            >
+              ← Уже есть аккаунт
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+const registerForm =
+  document.getElementById('registerForm');
+
+registerForm.onsubmit = async e => {
+  e.preventDefault();
+
+  const btn = e.submitter;
+  const fd = new FormData(registerForm);
+
+  const email =
+    String(fd.get('email') || '')
+      .trim()
+      .toLowerCase();
+
+  const password =
+    String(fd.get('password') || '');
+
+  const passwordConfirm =
+    String(fd.get('password_confirm') || '');
+
+  if (password !== passwordConfirm) {
+    flash(
+      'error',
+      'Пароли не совпадают.'
+    );
+    return;
+  }
+
+  setButtonSaving(
+    btn,
+    'Создаю аккаунт...'
+  );
+
+  const { data, error } =
+    await sb.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo:
+          window.location.origin +
+          window.location.pathname
+      }
+    });
+
+  if (error) {
+    setButtonError(
+      btn,
+      'Создать аккаунт'
+    );
+
+    flash(
+      'error',
+      'Не удалось создать аккаунт: ' +
+        error.message
+    );
+
+    return;
+  }
+
+  if (data.session) {
+    setButtonSaved(
+      btn,
+      '✓ Аккаунт создан'
+    );
+
+    flash(
+      'success',
+      'Аккаунт создан. Сейчас откроется профиль специалиста.'
+    );
+
+    return;
+  }
+
+  setButtonSaved(
+    btn,
+    '✓ Проверьте почту'
+  );
+
+  flash(
+    'success',
+    'Мы отправили письмо для подтверждения email. Перейдите по ссылке из письма, затем войдите в PT Child.'
+  );
+};
+
+  document
+    .getElementById('backToLoginBtn')
+    .onclick = () => {
+      renderLogin();
+    };
 }
 
 function renderProfile() {
@@ -1682,6 +1941,18 @@ const profileBackBtn =
 
 if (profileBackBtn) {
   profileBackBtn.onclick = async () => {
+    const profileStatus =
+      document.getElementById('profileStatus');
+
+    if (!isSpecialistProfileComplete(state.profile)) {
+      if (profileStatus) {
+        profileStatus.textContent =
+          'Сначала заполните ФИО и профессию и сохраните профиль.';
+      }
+
+      return;
+    }
+
     await loadPatients();
     await renderPatients();
   };
