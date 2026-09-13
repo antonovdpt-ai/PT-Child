@@ -17,6 +17,7 @@ let state = {
   goals: [],
   sessions: [],
   assessment: null,
+  profile: null,
   aiDocumentIdsByPatient: {}
 };
 
@@ -1148,10 +1149,63 @@ function enableAssessmentFloatingSave(form, btn, status) {
   form.style.paddingBottom = '100px';
 }
 
+async function loadProfile() {
+  if (!user) {
+    state.profile = null;
+    return;
+  }
+
+  const { data, error } = await sb
+    .from('profiles')
+    .select('id, full_name, profession')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      'Ошибка загрузки профиля:',
+      error
+    );
+
+    state.profile = null;
+    return;
+  }
+
+  state.profile = data || null;
+}
+
 async function init() {
-  const { data } = await sb.auth.getSession(); session = data.session; user = session?.user || null; renderHeader();
-  sb.auth.onAuthStateChange(async (_e, s) => { session = s; user = s?.user || null; renderHeader(); if (user) { await loadPatients(); await renderPatients() } else renderLogin() });
-  if (user) { await loadPatients(); await renderPatients() } else renderLogin();
+  const { data } = await sb.auth.getSession();
+
+  session = data.session;
+  user = session?.user || null;
+
+  renderHeader();
+
+  sb.auth.onAuthStateChange(async (_e, s) => {
+    session = s;
+    user = s?.user || null;
+
+    renderHeader();
+
+    if (user) {
+      await loadProfile();
+      await loadPatients();
+      await renderPatients();
+    } else {
+      state.profile = null;
+      renderLogin();
+    }
+  });
+
+  if (user) {
+    await loadProfile();
+    await loadPatients();
+    await renderPatients();
+  } else {
+    state.profile = null;
+    renderLogin();
+  }
 }
 
 function renderLogin() {
