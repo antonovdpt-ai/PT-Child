@@ -617,14 +617,22 @@ const pdfFileName =
   ${
   therapistLogoUrl
     ? `
-      <div style="margin-bottom:12px">
+      <div
+        style="
+          float:right;
+          margin-left:20px;
+          margin-bottom:8px;
+          text-align:right;
+        "
+      >
         <img
           src="${esc(therapistLogoUrl)}"
           alt="Логотип"
           style="
-            max-width:160px;
-            max-height:80px;
+            max-width:100px;
+            max-height:55px;
             object-fit:contain;
+            display:block;
           "
         >
       </div>
