@@ -783,10 +783,16 @@ function renderHeader() {
       display:flex;
       flex-direction:column;
       align-items:flex-end;
-      gap:6px;
+      gap:5px;
     "
   >
-    <div class="muted tiny">
+    <div
+      style="
+        font-size:12px;
+        color:#7a8493;
+        line-height:1.2;
+      "
+    >
       ${esc(user.email || '')}
     </div>
 
@@ -794,7 +800,7 @@ function renderHeader() {
       style="
         display:flex;
         align-items:center;
-        gap:8px;
+        gap:14px;
       "
     >
       <button
@@ -802,23 +808,24 @@ function renderHeader() {
         type="button"
         class="btn"
         style="
-          padding:7px 12px;
-          border-radius:999px;
+          padding:6px 14px;
+          min-height:34px;
+          border-radius:10px;
           font-size:14px;
+          font-weight:600;
         "
       >
-        👤 Профиль
+        Профиль
       </button>
 
       <button
         id="logoutBtn"
         type="button"
-        class="btn"
+        class="link"
         style="
-          padding:7px 12px;
-          border-radius:999px;
+          padding:4px 0;
           font-size:14px;
-          opacity:.75;
+          color:#697386;
         "
       >
         Выйти
