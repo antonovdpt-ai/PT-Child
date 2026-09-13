@@ -3489,6 +3489,16 @@ if (state.tab === 'overview') {
                         )
                     )}
                   </div>
+
+<button
+  type="button"
+  class="link"
+  data-open-parent-report="${report.id}"
+  style="margin-top:6px"
+>
+  Открыть
+</button>
+
                 </div>
               `)
               .join('')
@@ -3672,6 +3682,47 @@ if (saveParentReportPdfBtn) {
     }, 1000);
   };
 }
+
+document
+  .querySelectorAll('[data-open-parent-report]')
+  .forEach(openBtn => {
+    openBtn.onclick = () => {
+      const report = (state.parentReports || []).find(
+        item =>
+          String(item.id) ===
+          String(openBtn.dataset.openParentReport)
+      );
+
+      if (!report || !parentReportEditor) {
+        return;
+      }
+
+      document.getElementById('reportComplaint').value =
+        report.complaint || '';
+
+      document.getElementById('reportStrengths').value =
+        report.strengths || '';
+
+      document.getElementById('reportObservations').value =
+        report.observations || '';
+
+      document.getElementById('reportGoals').value =
+        report.goals || '';
+
+      document.getElementById('reportProgress').value =
+        report.progress || '';
+
+      document.getElementById('reportRecommendations').value =
+        report.recommendations || '';
+
+      parentReportEditor.style.display = 'block';
+
+      parentReportEditor.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    };
+  });
 
  box.insertAdjacentHTML('beforeend', `
   <div class="card" style="margin-top:12px">
