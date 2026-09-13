@@ -3580,6 +3580,19 @@ if (state.tab === 'overview') {
   📄 PDF
 </button>
 
+<button
+  type="button"
+  class="link"
+  data-delete-parent-report="${report.id}"
+  style="
+    margin-top:6px;
+    margin-left:12px;
+    color:#c62828;
+  "
+>
+  Удалить
+</button>
+
                 </div>
               `)
               .join('')
@@ -3986,6 +3999,62 @@ if (generateParentReportBtn) {
         report,
         report.therapist_name || ''
       );
+    };
+  });
+
+  document
+  .querySelectorAll('[data-delete-parent-report]')
+  .forEach(deleteBtn => {
+    deleteBtn.onclick = async () => {
+      const report = (state.parentReports || []).find(
+        item =>
+          String(item.id) ===
+          String(deleteBtn.dataset.deleteParentReport)
+      );
+
+      if (!report) {
+        return;
+      }
+
+      const confirmed = window.confirm(
+        'Удалить этот отчёт? Это действие нельзя отменить.'
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      const oldText = deleteBtn.textContent;
+
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Удаляю...';
+
+      const { error } = await sb
+        .from('parent_reports')
+        .delete()
+        .eq('id', report.id)
+        .eq('patient_id', p.id)
+        .eq('therapist_id', user.id);
+
+      if (error) {
+        console.error(
+          'Ошибка удаления отчёта:',
+          error
+        );
+
+        alert(
+          'Не удалось удалить отчёт: ' +
+          error.message
+        );
+
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = oldText;
+
+        return;
+      }
+
+      await loadPatientData();
+      renderPatient();
     };
   });
 
