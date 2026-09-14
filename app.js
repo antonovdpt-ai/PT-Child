@@ -1776,6 +1776,122 @@ async function ensureUserConsentRecord() {
   }
 }
 
+function showLegalDocument(type) {
+  const isTerms = type === 'terms';
+
+  const title = isTerms
+    ? 'Условия использования'
+    : 'Политика конфиденциальности';
+
+  const content = isTerms
+    ? `
+      <p>
+        PT Child предназначен для использования специалистами
+        в области физической терапии и реабилитации.
+      </p>
+
+      <p>
+        Пользователь самостоятельно отвечает за корректность
+        внесённых данных и профессиональные решения,
+        принимаемые на основании информации в приложении.
+      </p>
+
+      <p>
+        Функции искусственного интеллекта PT Child являются
+        вспомогательным инструментом и не заменяют
+        профессиональное клиническое решение специалиста.
+      </p>
+
+      <p>
+        Предрелизная версия документа:
+        ${LEGAL_TERMS_VERSION}.
+      </p>
+    `
+    : `
+      <p>
+        PT Child обрабатывает данные, которые специалист
+        вносит в приложение для ведения своей профессиональной работы.
+      </p>
+
+      <p>
+        Доступ к данным пациентов ограничивается учётной записью
+        специалиста и защищается механизмами авторизации
+        и разграничения доступа.
+      </p>
+
+      <p>
+        Пользователь обязан иметь законные основания
+        для внесения и обработки персональных данных пациентов.
+      </p>
+
+      <p>
+        Предрелизная версия документа:
+        ${PRIVACY_POLICY_VERSION}.
+      </p>
+    `;
+
+  const overlay = document.createElement('div');
+
+  overlay.style.cssText = `
+    position:fixed;
+    inset:0;
+    background:rgba(15,23,42,.45);
+    z-index:9999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  `;
+
+  overlay.innerHTML = `
+    <div
+      class="card"
+      style="
+        width:min(640px, 100%);
+        max-height:80vh;
+        overflow:auto;
+        padding:22px;
+      "
+    >
+      <h2 style="margin-top:0">
+        ${title}
+      </h2>
+
+      <div
+        style="
+          line-height:1.6;
+          font-size:15px;
+        "
+      >
+        ${content}
+      </div>
+
+      <button
+        type="button"
+        class="btn primary full"
+        id="closeLegalDocumentBtn"
+        style="margin-top:18px"
+      >
+        Понятно
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  document
+    .getElementById('closeLegalDocumentBtn')
+    .onclick = () => {
+      overlay.remove();
+    };
+
+  overlay.onclick = e => {
+    if (e.target === overlay) {
+      overlay.remove();
+    }
+  };
+}
+
 function renderRegister() {
   app.innerHTML = `
     <div class="auth-wrap">
@@ -1844,6 +1960,32 @@ function renderRegister() {
     и Политику конфиденциальности PT Child
   </span>
 </label>
+
+<div
+  style="
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-top:8px;
+    margin-bottom:14px;
+  "
+>
+  <button
+    type="button"
+    class="link"
+    id="showTermsBtn"
+  >
+    Условия использования
+  </button>
+
+  <button
+    type="button"
+    class="link"
+    id="showPrivacyBtn"
+  >
+    Политика конфиденциальности
+  </button>
+</div>
 
           <div class="actions">
             <button
@@ -1964,6 +2106,18 @@ const { data, error } =
     'Мы отправили письмо для подтверждения email. Перейдите по ссылке из письма, затем войдите в PT Child.'
   );
 };
+
+document
+  .getElementById('showTermsBtn')
+  .onclick = () => {
+    showLegalDocument('terms');
+  };
+
+document
+  .getElementById('showPrivacyBtn')
+  .onclick = () => {
+    showLegalDocument('privacy');
+  };
 
   document
     .getElementById('backToLoginBtn')
