@@ -2211,6 +2211,45 @@ function renderProfile() {
           </button>
         </div>
 
+<div
+  style="
+    margin-top:28px;
+    padding-top:20px;
+    border-top:1px solid #e5e7eb;
+  "
+>
+  <div
+    style="
+      font-weight:700;
+      color:#b42318;
+      margin-bottom:6px;
+    "
+  >
+    Удаление аккаунта
+  </div>
+
+  <div
+    class="muted tiny"
+    style="margin-bottom:12px"
+  >
+    Аккаунт, пациенты, занятия, оценки, документы,
+    фотографии и другие связанные данные будут удалены безвозвратно.
+  </div>
+
+  <button
+    type="button"
+    class="btn full"
+    id="deleteAccountBtn"
+    style="
+      color:#b42318;
+      border-color:#f0b4ae;
+      background:#fff;
+    "
+  >
+    Удалить аккаунт
+  </button>
+</div>
+
         <div
           id="profileStatus"
           class="save-status"
@@ -2488,6 +2527,95 @@ if (profileBackBtn) {
 
     await loadPatients();
     await renderPatients();
+  };
+}
+
+const deleteAccountBtn =
+  document.getElementById('deleteAccountBtn');
+
+if (deleteAccountBtn) {
+  deleteAccountBtn.onclick = async () => {
+    const firstConfirmed = window.confirm(
+      'Удалить аккаунт PT Child?\n\n' +
+      'Будут безвозвратно удалены все пациенты, занятия, оценки, ' +
+      'документы, фотографии и другие связанные данные.'
+    );
+
+    if (!firstConfirmed) {
+      return;
+    }
+
+    const confirmation = window.prompt(
+      'Это действие нельзя отменить.\n\n' +
+      'Для подтверждения напишите: УДАЛИТЬ'
+    );
+
+    if (confirmation !== 'УДАЛИТЬ') {
+      if (confirmation !== null) {
+        window.alert(
+          'Удаление отменено: контрольное слово введено неверно.'
+        );
+      }
+
+      return;
+    }
+
+    const profileStatus =
+      document.getElementById('profileStatus');
+
+    deleteAccountBtn.disabled = true;
+    deleteAccountBtn.textContent =
+      'Удаляю аккаунт...';
+
+    if (profileStatus) {
+      profileStatus.textContent =
+        'Удаляем аккаунт и связанные данные...';
+    }
+
+    const { data, error } =
+      await sb.functions.invoke(
+        'delete-account',
+        {
+          body: {}
+        }
+      );
+
+    if (error || !data?.success) {
+      console.error(
+        'Ошибка удаления аккаунта:',
+        error,
+        data
+      );
+
+      deleteAccountBtn.disabled = false;
+      deleteAccountBtn.textContent =
+        'Удалить аккаунт';
+
+      if (profileStatus) {
+        profileStatus.textContent =
+          'Не удалось удалить аккаунт: ' +
+          (
+            data?.error ||
+            error?.message ||
+            'неизвестная ошибка'
+          );
+      }
+
+      return;
+    }
+
+    try {
+      await sb.auth.signOut({
+        scope: 'local'
+      });
+    } catch (signOutError) {
+      console.warn(
+        'Локальный выход после удаления:',
+        signOutError
+      );
+    }
+
+    window.location.reload();
   };
 }
 
