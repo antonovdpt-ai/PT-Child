@@ -4815,6 +4815,7 @@ function structuredFromAssessmentForm(fd) {
 }
 
 function renderTab(p) {
+  let generateParentReportBtn = null;
   const box = document.getElementById('tabContent');
 let editingContactId = null;
 let editingParentReportId = null;
