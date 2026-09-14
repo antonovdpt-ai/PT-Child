@@ -4815,7 +4815,12 @@ function structuredFromAssessmentForm(fd) {
 }
 
 function renderTab(p) {
-  let generateParentReportBtn = null;
+  let parentReportBtn = null;
+let parentReportEditor = null;
+let closeParentReportBtn = null;
+let generateParentReportBtn = null;
+let saveParentReportPdfBtn = null;
+let editParentReportBtn = null;
   const box = document.getElementById('tabContent');
 let editingContactId = null;
 let editingParentReportId = null;
@@ -5080,22 +5085,22 @@ if (state.tab === 'overview') {
 
   `);
 
-  const parentReportBtn =
-    document.getElementById('parentReportBtn');
+  parentReportBtn =
+  document.getElementById('parentReportBtn');
 
-  const parentReportEditor =
-    document.getElementById('parentReportEditor');
+parentReportEditor =
+  document.getElementById('parentReportEditor');
 
-  const closeParentReportBtn =
-    document.getElementById('closeParentReportBtn');
+closeParentReportBtn =
+  document.getElementById('closeParentReportBtn');
 
-    const generateParentReportBtn =
+generateParentReportBtn =
   document.getElementById('generateParentReportBtn');
 
-  const saveParentReportPdfBtn =
+saveParentReportPdfBtn =
   document.getElementById('saveParentReportPdfBtn');
 
-  const editParentReportBtn =
+editParentReportBtn =
   document.getElementById('editParentReportBtn');
 
   if (parentReportBtn && parentReportEditor) {
