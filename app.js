@@ -1351,6 +1351,11 @@ async function init() {
 
     renderHeader();
 
+    if (_e === 'PASSWORD_RECOVERY') {
+  renderUpdatePassword();
+  return;
+}
+
    if (user) {
   await loadProfile();
 
@@ -1410,7 +1415,21 @@ function renderLogin() {
             required
             autocomplete="current-password"
           >
-
+<div
+  style="
+    text-align:right;
+    margin-top:6px;
+    margin-bottom:12px;
+  "
+>
+  <button
+    type="button"
+    id="forgotPasswordBtn"
+    class="link"
+  >
+    Забыли пароль?
+  </button>
+</div>
           <div class="actions">
             <button
               class="btn primary full"
@@ -1474,6 +1493,225 @@ function renderLogin() {
     .onclick = () => {
       renderRegister();
     };
+
+    document
+  .getElementById('forgotPasswordBtn')
+  .onclick = () => {
+    renderForgotPassword();
+  };
+}
+
+function renderForgotPassword() {
+  app.innerHTML = `
+    <div class="auth-wrap">
+      <div class="card">
+        <h2>Восстановление пароля</h2>
+
+        <div class="muted tiny">
+          Укажите email, который использовали при регистрации.
+        </div>
+
+        <div id="flash"></div>
+
+        <form id="forgotPasswordForm">
+          <label>Email</label>
+
+          <input
+            type="email"
+            name="email"
+            required
+            autocomplete="email"
+          >
+
+          <div class="actions">
+            <button
+              type="submit"
+              class="btn primary full"
+              id="resetPasswordBtn"
+            >
+              Восстановить пароль
+            </button>
+
+            <button
+              type="button"
+              class="btn full"
+              id="backFromResetBtn"
+            >
+              ← Назад ко входу
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  const forgotPasswordForm =
+  document.getElementById('forgotPasswordForm');
+
+forgotPasswordForm.onsubmit = async e => {
+  e.preventDefault();
+
+  const btn = e.submitter;
+  const fd = new FormData(forgotPasswordForm);
+
+  const email =
+    String(fd.get('email') || '')
+      .trim()
+      .toLowerCase();
+
+  setButtonSaving(
+    btn,
+    'Отправляю...'
+  );
+
+  const { error } =
+    await sb.auth.resetPasswordForEmail(
+      email,
+      {
+        redirectTo:
+          window.location.origin +
+          window.location.pathname
+      }
+    );
+
+  if (error) {
+    setButtonError(
+      btn,
+      'Восстановить пароль'
+    );
+
+    flash(
+      'error',
+      'Не удалось отправить письмо: ' +
+        error.message
+    );
+
+    return;
+  }
+
+  setButtonSaved(
+    btn,
+    '✓ Письмо отправлено'
+  );
+
+  flash(
+    'success',
+    'Если аккаунт с таким email существует, ссылка для восстановления пароля отправлена на почту.'
+  );
+};
+
+  document
+    .getElementById('backFromResetBtn')
+    .onclick = () => {
+      renderLogin();
+    };
+}
+
+function renderUpdatePassword() {
+  app.innerHTML = `
+    <div class="auth-wrap">
+      <div class="card">
+        <h2>Новый пароль</h2>
+
+        <div class="muted tiny">
+          Придумайте новый пароль для входа в PT Child.
+        </div>
+
+        <div id="flash"></div>
+
+        <form id="updatePasswordForm">
+          <label>Новый пароль</label>
+
+          <input
+            type="password"
+            name="password"
+            required
+            minlength="8"
+            autocomplete="new-password"
+          >
+
+          <label>Повторите пароль</label>
+
+          <input
+            type="password"
+            name="password_confirm"
+            required
+            minlength="8"
+            autocomplete="new-password"
+          >
+
+          <div class="actions">
+            <button
+              type="submit"
+              class="btn primary full"
+              id="updatePasswordBtn"
+            >
+              Сохранить новый пароль
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  const updatePasswordForm =
+    document.getElementById('updatePasswordForm');
+
+  updatePasswordForm.onsubmit = async e => {
+    e.preventDefault();
+
+    const btn = e.submitter;
+    const fd = new FormData(updatePasswordForm);
+
+    const password =
+      String(fd.get('password') || '');
+
+    const passwordConfirm =
+      String(fd.get('password_confirm') || '');
+
+    if (password !== passwordConfirm) {
+      flash(
+        'error',
+        'Пароли не совпадают.'
+      );
+      return;
+    }
+
+    setButtonSaving(
+      btn,
+      'Сохраняю...'
+    );
+
+    const { error } =
+      await sb.auth.updateUser({
+        password
+      });
+
+    if (error) {
+      setButtonError(
+        btn,
+        'Сохранить новый пароль'
+      );
+
+      flash(
+        'error',
+        'Не удалось изменить пароль: ' +
+          error.message
+      );
+
+      return;
+    }
+
+    setButtonSaved(
+      btn,
+      '✓ Пароль изменён'
+    );
+
+    flash(
+      'success',
+      'Пароль успешно изменён. Теперь можно пользоваться PT Child.'
+    );
+  };
 }
 
 function renderRegister() {
