@@ -1357,6 +1357,7 @@ async function init() {
 }
 
    if (user) {
+    await ensureUserConsentRecord();
   await loadProfile();
 
   if (!isSpecialistProfileComplete(state.profile)) {
@@ -1374,6 +1375,7 @@ async function init() {
   });
 
 if (user) {
+  await ensureUserConsentRecord();
   await loadProfile();
 
   if (!isSpecialistProfileComplete(state.profile)) {
@@ -1714,6 +1716,66 @@ function renderUpdatePassword() {
   };
 }
 
+const LEGAL_TERMS_VERSION = 'pre-release-v1';
+const PRIVACY_POLICY_VERSION = 'pre-release-v1';
+
+async function ensureUserConsentRecord() {
+  if (!user) {
+    return;
+  }
+
+  const termsVersion =
+    user.user_metadata?.terms_version;
+
+  const privacyVersion =
+    user.user_metadata?.privacy_version;
+
+  const acceptedAt =
+    user.user_metadata?.legal_accepted_at;
+
+  if (!termsVersion || !privacyVersion) {
+    return;
+  }
+
+  const { data: existing, error: selectError } =
+    await sb
+      .from('user_consents')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('terms_version', termsVersion)
+      .eq('privacy_version', privacyVersion)
+      .maybeSingle();
+
+  if (selectError) {
+    console.error(
+      'Ошибка проверки согласия:',
+      selectError
+    );
+    return;
+  }
+
+  if (existing) {
+    return;
+  }
+
+  const { error: insertError } = await sb
+    .from('user_consents')
+    .insert({
+      user_id: user.id,
+      terms_version: termsVersion,
+      privacy_version: privacyVersion,
+      accepted_at:
+        acceptedAt || new Date().toISOString()
+    });
+
+  if (insertError) {
+    console.error(
+      'Ошибка сохранения согласия:',
+      insertError
+    );
+  }
+}
+
 function renderRegister() {
   app.innerHTML = `
     <div class="auth-wrap">
@@ -1752,6 +1814,36 @@ function renderRegister() {
             minlength="8"
             autocomplete="new-password"
           >
+
+          <label
+  style="
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    margin-top:16px;
+    cursor:pointer;
+  "
+>
+  <input
+    type="checkbox"
+    name="legal_consent"
+    required
+    style="
+      width:auto;
+      margin-top:3px;
+    "
+  >
+
+  <span
+    style="
+      font-size:14px;
+      line-height:1.4;
+    "
+  >
+    Я принимаю Условия использования
+    и Политику конфиденциальности PT Child
+  </span>
+</label>
 
           <div class="actions">
             <button
@@ -1808,16 +1900,30 @@ registerForm.onsubmit = async e => {
     'Создаю аккаунт...'
   );
 
-  const { data, error } =
-    await sb.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo:
-          window.location.origin +
-          window.location.pathname
-      }
-    });
+  const legalAcceptedAt =
+  new Date().toISOString();
+
+const { data, error } =
+  await sb.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        terms_version:
+          LEGAL_TERMS_VERSION,
+
+        privacy_version:
+          PRIVACY_POLICY_VERSION,
+
+        legal_accepted_at:
+          legalAcceptedAt
+      },
+
+      emailRedirectTo:
+        window.location.origin +
+        window.location.pathname
+    }
+  });
 
   if (error) {
     setButtonError(
