@@ -3,6 +3,36 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const SUPABASE_URL = "https://bpacboofedxhdjhiizpy.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Mo3Tk3_hyPGlBl_V48u82Q_7DQkXL9g";
+
+// Сохраняем режим восстановления до обработки ссылки Supabase.
+const RECOVERY_STORAGE_KEY = 'ptchild-password-recovery';
+
+let passwordRecoveryActive =
+  new URLSearchParams(window.location.hash.slice(1))
+    .get('type') === 'recovery';
+
+try {
+  passwordRecoveryActive =
+    passwordRecoveryActive ||
+    sessionStorage.getItem(RECOVERY_STORAGE_KEY) === '1';
+} catch (_) {}
+
+function setPasswordRecovery(active) {
+  passwordRecoveryActive = active;
+
+  try {
+    if (active) {
+      sessionStorage.setItem(RECOVERY_STORAGE_KEY, '1');
+    } else {
+      sessionStorage.removeItem(RECOVERY_STORAGE_KEY);
+    }
+  } catch (_) {}
+}
+
+if (passwordRecoveryActive) {
+  setPasswordRecovery(true);
+}
+
 const sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
 });
@@ -772,7 +802,7 @@ function formatAIResult(text) {
 }
 
 function renderHeader() {
-  if (!user) {
+  if (passwordRecoveryActive || !user) {
     headerActions.innerHTML = '';
     return;
   }
@@ -1337,59 +1367,98 @@ function isSpecialistProfileComplete(profile) {
   );
 }
 
-async function init() {
-  const { data } = await sb.auth.getSession();
+let authViewRevision = 0;
 
-  session = data.session;
-  user = session?.user || null;
+async function renderAuthView(revision) {
+  const stale = () =>
+    revision !== authViewRevision || passwordRecoveryActive;
+
+  if (revision !== authViewRevision) return;
 
   renderHeader();
 
-  sb.auth.onAuthStateChange(async (_e, s) => {
-    session = s;
-    user = s?.user || null;
-
-    renderHeader();
-
-    if (_e === 'PASSWORD_RECOVERY') {
-  renderUpdatePassword();
-  return;
-}
-
-   if (user) {
-    await ensureUserConsentRecord();
-  await loadProfile();
-
-  if (!isSpecialistProfileComplete(state.profile)) {
-    renderProfile();
-    return;
-  }
-
-  await loadPatients();
-  await renderPatients();
-}
-    else {
-      state.profile = null;
-      renderLogin();
+  if (passwordRecoveryActive) {
+    // Не пересоздаём форму при повторных событиях авторизации.
+    if (!document.getElementById('updatePasswordForm')) {
+      renderUpdatePassword();
     }
-  });
 
-if (user) {
-  await ensureUserConsentRecord();
-  await loadProfile();
-
-  if (!isSpecialistProfileComplete(state.profile)) {
-    renderProfile();
     return;
   }
 
-  await loadPatients();
-  await renderPatients();
-}
-
-  else {
+  if (!user) {
     state.profile = null;
     renderLogin();
+    return;
+  }
+
+  await ensureUserConsentRecord();
+  if (stale()) return;
+
+  await loadProfile();
+  if (stale()) return;
+
+  if (!isSpecialistProfileComplete(state.profile)) {
+    renderProfile();
+    return;
+  }
+
+  await loadPatients();
+  if (stale()) return;
+
+  await renderPatients();
+}
+
+function scheduleAuthView() {
+  const revision = ++authViewRevision;
+
+  // Запросы выполняются после завершения обработчика Supabase.
+  setTimeout(() => {
+    renderAuthView(revision).catch(error => {
+      console.error(
+        'Ошибка обновления экрана авторизации:',
+        error
+      );
+
+      if (revision === authViewRevision) {
+        flash(
+          'error',
+          'Не удалось загрузить экран. Обновите страницу.'
+        );
+      }
+    });
+  }, 0);
+}
+
+async function init() {
+  let receivedAuthEvent = false;
+
+  sb.auth.onAuthStateChange((event, nextSession) => {
+    receivedAuthEvent = true;
+
+    session = nextSession;
+    user = nextSession?.user || null;
+
+    if (event === 'PASSWORD_RECOVERY') {
+      setPasswordRecovery(true);
+    }
+
+    if (event === 'SIGNED_OUT') {
+      setPasswordRecovery(false);
+    }
+
+    scheduleAuthView();
+  });
+
+  const { data, error } = await sb.auth.getSession();
+
+  if (error) throw error;
+
+  if (!receivedAuthEvent) {
+    session = data.session;
+    user = session?.user || null;
+
+    scheduleAuthView();
   }
 }
 
@@ -1616,14 +1685,13 @@ function renderUpdatePassword() {
         <h2>Новый пароль</h2>
 
         <div class="muted tiny">
-          Придумайте новый пароль для входа в PT Child.
+          Придумайте новый пароль для входа.
         </div>
 
         <div id="flash"></div>
 
         <form id="updatePasswordForm">
           <label>Новый пароль</label>
-
           <input
             type="password"
             name="password"
@@ -1633,7 +1701,6 @@ function renderUpdatePassword() {
           >
 
           <label>Повторите пароль</label>
-
           <input
             type="password"
             name="password_confirm"
@@ -1656,66 +1723,61 @@ function renderUpdatePassword() {
     </div>
   `;
 
-  const updatePasswordForm =
-    document.getElementById('updatePasswordForm');
+  const form = document.getElementById('updatePasswordForm');
 
-  updatePasswordForm.onsubmit = async e => {
-    e.preventDefault();
+  form.onsubmit = async event => {
+    event.preventDefault();
 
-    const btn = e.submitter;
-    const fd = new FormData(updatePasswordForm);
+    const btn = document.getElementById('updatePasswordBtn');
+    const fd = new FormData(form);
 
-    const password =
-      String(fd.get('password') || '');
+    const password = String(fd.get('password') || '');
+    const confirmation = String(fd.get('password_confirm') || '');
 
-    const passwordConfirm =
-      String(fd.get('password_confirm') || '');
-
-    if (password !== passwordConfirm) {
-      flash(
-        'error',
-        'Пароли не совпадают.'
-      );
+    if (password !== confirmation) {
+      flash('error', 'Пароли не совпадают.');
       return;
     }
 
-    setButtonSaving(
-      btn,
-      'Сохраняю...'
-    );
+    setButtonSaving(btn, 'Сохраняю...');
 
-    const { error } =
-      await sb.auth.updateUser({
-        password
-      });
+    let error;
+
+    try {
+      ({ error } = await sb.auth.updateUser({ password }));
+    } catch (requestError) {
+      error = requestError;
+    }
 
     if (error) {
-      setButtonError(
-        btn,
-        'Сохранить новый пароль'
-      );
+      setButtonError(btn, 'Сохранить новый пароль');
 
       flash(
         'error',
-        'Не удалось изменить пароль: ' +
-          error.message
+        'Не удалось изменить пароль: ' + error.message
       );
 
       return;
     }
 
-    setButtonSaved(
-      btn,
-      '✓ Пароль изменён'
-    );
+    flash('success', 'Пароль успешно изменён.');
 
-    flash(
-      'success',
-      'Пароль успешно изменён. Теперь можно пользоваться PT Child.'
-    );
+    form.innerHTML = `
+      <button
+        type="button"
+        class="btn primary full"
+        id="continueAfterPassword"
+      >
+        Перейти в приложение
+      </button>
+    `;
+
+    document.getElementById('continueAfterPassword').onclick = () => {
+      setPasswordRecovery(false);
+      scheduleAuthView();
+    };
   };
 }
-
 const LEGAL_TERMS_VERSION = 'pre-release-v1';
 const PRIVACY_POLICY_VERSION = 'pre-release-v1';
 
@@ -2742,6 +2804,7 @@ async function renderPatients() {
   const counts = await countsForPatients();
 
 const activity = await activityForPatients();
+if (passwordRecoveryActive) return;
 
 const sortedPatients = [...state.patients].sort((a, b) => {
   const dateA = activity[a.id]
