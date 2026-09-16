@@ -1680,36 +1680,146 @@ forgotPasswordForm.onsubmit = async e => {
 
 function renderUpdatePassword() {
   app.innerHTML = `
-    <div class="auth-wrap">
-      <div class="card">
-        <h2>Новый пароль</h2>
+    <style>
+      #passwordRecoveryScreen {
+        padding: 32px 0 56px;
+      }
 
-        <div class="muted tiny">
-          Придумайте новый пароль для входа.
-        </div>
+      #passwordRecoveryCard {
+        width: 100%;
+        max-width: 500px;
+        box-sizing: border-box;
+        padding: 36px;
+        border-radius: 20px;
+        box-shadow: 0 16px 44px rgba(15, 23, 42, 0.08);
+      }
+
+      .recovery-brand {
+        margin-bottom: 12px;
+        color: #2563eb;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      #passwordRecoveryCard h2 {
+        margin: 0 0 10px;
+        font-size: 28px;
+        line-height: 1.2;
+      }
+
+      .recovery-description {
+        margin: 0;
+        color: #667085;
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      #updatePasswordForm {
+        margin-top: 28px;
+      }
+
+      .recovery-field + .recovery-field {
+        margin-top: 20px;
+      }
+
+      .recovery-field label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      .recovery-field input {
+        width: 100%;
+        min-height: 48px;
+        box-sizing: border-box;
+      }
+
+      .recovery-actions {
+        margin-top: 28px;
+      }
+
+      .recovery-success {
+        margin-top: 0 !important;
+        text-align: center;
+      }
+
+      .recovery-success-icon {
+        display: grid;
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 22px;
+        place-items: center;
+        border-radius: 50%;
+        background: #e9f9ef;
+        color: #16803d;
+        font-size: 32px;
+        font-weight: 800;
+      }
+
+      .recovery-success .recovery-description {
+        max-width: 350px;
+        margin: 0 auto;
+      }
+
+      .recovery-success .btn {
+        margin-top: 28px;
+      }
+
+      @media (max-width: 600px) {
+        #passwordRecoveryScreen {
+          padding: 18px 0 36px;
+        }
+
+        #passwordRecoveryCard {
+          padding: 28px 22px;
+          border-radius: 16px;
+        }
+
+        #passwordRecoveryCard h2 {
+          font-size: 24px;
+        }
+      }
+    </style>
+
+    <div class="auth-wrap" id="passwordRecoveryScreen">
+      <div class="card" id="passwordRecoveryCard">
+        <div class="recovery-brand">Fizira</div>
+        <h2>Создайте новый пароль</h2>
+
+        <p class="recovery-description">
+          Придумайте новый пароль длиной не менее 8 символов.
+        </p>
 
         <div id="flash"></div>
 
         <form id="updatePasswordForm">
-          <label>Новый пароль</label>
-          <input
-            type="password"
-            name="password"
-            required
-            minlength="8"
-            autocomplete="new-password"
-          >
+          <div class="recovery-field">
+            <label for="newPassword">Новый пароль</label>
+            <input
+              id="newPassword"
+              type="password"
+              name="password"
+              required
+              minlength="8"
+              autocomplete="new-password"
+            >
+          </div>
 
-          <label>Повторите пароль</label>
-          <input
-            type="password"
-            name="password_confirm"
-            required
-            minlength="8"
-            autocomplete="new-password"
-          >
+          <div class="recovery-field">
+            <label for="newPasswordConfirm">Повторите пароль</label>
+            <input
+              id="newPasswordConfirm"
+              type="password"
+              name="password_confirm"
+              required
+              minlength="8"
+              autocomplete="new-password"
+            >
+          </div>
 
-          <div class="actions">
+          <div class="recovery-actions">
             <button
               type="submit"
               class="btn primary full"
@@ -1723,18 +1833,22 @@ function renderUpdatePassword() {
     </div>
   `;
 
-  const form = document.getElementById('updatePasswordForm');
+  const updatePasswordForm =
+    document.getElementById('updatePasswordForm');
 
-  form.onsubmit = async event => {
-    event.preventDefault();
+  updatePasswordForm.onsubmit = async e => {
+    e.preventDefault();
 
-    const btn = document.getElementById('updatePasswordBtn');
-    const fd = new FormData(form);
+    const btn = e.submitter;
+    const fd = new FormData(updatePasswordForm);
 
-    const password = String(fd.get('password') || '');
-    const confirmation = String(fd.get('password_confirm') || '');
+    const password =
+      String(fd.get('password') || '');
 
-    if (password !== confirmation) {
+    const passwordConfirm =
+      String(fd.get('password_confirm') || '');
+
+    if (password !== passwordConfirm) {
       flash('error', 'Пароли не совпадают.');
       return;
     }
@@ -1760,16 +1874,33 @@ function renderUpdatePassword() {
       return;
     }
 
-    flash('success', 'Пароль успешно изменён.');
+    const recoveryCard =
+      document.getElementById('passwordRecoveryCard');
 
-    form.innerHTML = `
-      <button
-        type="button"
-        class="btn primary full"
-        id="continueAfterPassword"
+    recoveryCard.innerHTML = `
+      <div
+        id="updatePasswordForm"
+        class="recovery-success"
+        role="status"
+        aria-live="polite"
       >
-        Перейти в приложение
-      </button>
+        <div class="recovery-success-icon" aria-hidden="true">✓</div>
+        <div class="recovery-brand">Fizira</div>
+
+        <h2>Пароль изменён</h2>
+
+        <p class="recovery-description">
+          Новый пароль успешно сохранён. Теперь вы можете продолжить работу в приложении.
+        </p>
+
+        <button
+          type="button"
+          class="btn primary full"
+          id="continueAfterPassword"
+        >
+          Перейти в Fizira
+        </button>
+      </div>
     `;
 
     document.getElementById('continueAfterPassword').onclick = () => {
