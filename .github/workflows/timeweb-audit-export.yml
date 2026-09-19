@@ -1,0 +1,48 @@
+name: Timeweb audit export
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Export safe server audit
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          ssh \
+            -p "${PORT:-22}" \
+            -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            "$USER@$HOST" \
+            "sudo /usr/local/sbin/fizira-audit-export" \
+            > fizira-server-audit.txt
+
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fizira-server-audit
+          path: fizira-server-audit.txt
+          if-no-files-found: error
+          retention-days: 7
