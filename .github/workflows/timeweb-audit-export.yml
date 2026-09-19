@@ -24,7 +24,7 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Export safe server audit
+      - name: Export server audit
         env:
           HOST: ${{ secrets.TIMEWEB_HOST }}
           PORT: ${{ secrets.TIMEWEB_PORT }}
@@ -37,7 +37,24 @@ jobs:
             -o BatchMode=yes \
             "$USER@$HOST" \
             "sudo /usr/local/sbin/fizira-audit-export" \
-            > fizira-server-audit.txt
+            > fizira-server-audit.raw.txt
+
+      - name: Redact sensitive configuration
+        run: |
+          set -euo pipefail
+          awk '
+            /^=== FILE: volumes\/proxy\/caddy\/Caddyfile ===$/ {
+              skip=1
+              print
+              print "[REDACTED: Caddyfile contents omitted from artifact]"
+              next
+            }
+            /^=== FUNCTIONS \/ EDGE RUNTIME COMPOSE REFERENCES ===$/ {
+              skip=0
+            }
+            !skip { print }
+          ' fizira-server-audit.raw.txt > fizira-server-audit.txt
+          rm -f fizira-server-audit.raw.txt
 
       - name: Upload audit artifact
         uses: actions/upload-artifact@v4
