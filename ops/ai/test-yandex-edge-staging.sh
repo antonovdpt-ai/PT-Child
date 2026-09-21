@@ -24,10 +24,31 @@ trap cleanup EXIT
 [[ "$(id -u)" == "0" ]] || { echo "ERROR: run as root" >&2; exit 1; }
 [[ -f "${PROJECT_ROOT}/.env" ]] || { echo "ERROR: .env not found" >&2; exit 1; }
 
-set -a
-# shellcheck disable=SC1091
-source "${PROJECT_ROOT}/.env"
-set +a
+mapfile -t env_values < <(python3 - "${PROJECT_ROOT}/.env" <<'PY'
+from pathlib import Path
+import sys
+
+wanted = ("ANON_KEY", "SERVICE_ROLE_KEY")
+values = {}
+for raw_line in Path(sys.argv[1]).read_text().splitlines():
+    line = raw_line.strip()
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    key = key.strip()
+    if key not in wanted:
+        continue
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        value = value[1:-1]
+    values[key] = value
+
+for key in wanted:
+    print(values.get(key, ""))
+PY
+)
+ANON_KEY="${env_values[0]:-}"
+SERVICE_ROLE_KEY="${env_values[1]:-}"
 
 : "${ANON_KEY:?ANON_KEY is missing}"
 : "${SERVICE_ROLE_KEY:?SERVICE_ROLE_KEY is missing}"
