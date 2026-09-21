@@ -18,9 +18,9 @@ export function buildRequest(testCase, env) {
     options: {
       method: 'POST', redirect: 'error', signal: AbortSignal.timeout(60000),
       headers: {
-        Authorization: `Bearer ${env.YANDEX_AI_API_KEY}`,
+        Authorization: `Api-Key ${env.YANDEX_AI_API_KEY}`,
         'Content-Type': 'application/json',
-        'OpenAI-Project': env.YANDEX_FOLDER_ID,
+        'x-folder-id': env.YANDEX_FOLDER_ID,
         'x-data-logging-enabled': 'false',
       },
       body: JSON.stringify({
