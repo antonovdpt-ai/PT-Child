@@ -94,6 +94,14 @@ FIZIRA_PULL_USER=ftransfer
 FIZIRA_LOCAL_RETENTION_DAYS=14
 ```
 
+Для сервера с уже созданным пользователем `ftransfer` предусмотрена установка
+одной командой из root-консоли. Она запросит пароль шифрования дважды, выполнит
+первую полную копию и тест восстановления и включит таймер только при успехе:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/antonovdpt-ai/PT-Child/main/ops/backup/install-pull-mode.sh | bash
+```
+
 На Windows оба PowerShell-скрипта должны находиться в одной папке. Установка:
 
 ```powershell
