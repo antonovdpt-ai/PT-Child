@@ -9,7 +9,8 @@ test('privacy settings and fixed endpoint', () => {
   assert.equal(options.headers['x-data-logging-enabled'], 'false');
   assert.equal(JSON.parse(options.body).store, false);
   assert.equal(options.redirect, 'error');
-  assert.equal(options.headers['OpenAI-Project'], 'test-folder');
+  assert.equal(options.headers.Authorization, 'Api-Key test-not-a-key');
+  assert.equal(options.headers['x-folder-id'], 'test-folder');
 });
 test('reject arbitrary inputs', () => assert.throws(() => buildRequest({ input: 'external' }, env)));
 test('require configuration', () => assert.throws(() => buildRequest(cases[0], {})));
