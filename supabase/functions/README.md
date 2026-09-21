@@ -26,7 +26,8 @@ Required server-only environment variables:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY` (or `ANON_KEY`)
-- `YANDEX_AI_API_KEY`
+- `YANDEX_AI_API_KEY`, or `YANDEX_AI_API_KEY_FILE` pointing to a read-only
+  mounted secret file
 - `YANDEX_FOLDER_ID`
 - `FIZIRA_ALLOWED_ORIGINS`, comma-separated; defaults to
   `https://app.fizira.com`
