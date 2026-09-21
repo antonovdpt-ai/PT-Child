@@ -338,7 +338,6 @@ function buildNextSessionContext(p) {
   const activeGoals = state.goals
     .filter(goal => goal.status === 'active')
     .map(goal => ({
-      id: goal.id,
       title: goal.title,
       baseline: goal.baseline || null,
       criterion: goal.criterion || null,
@@ -419,6 +418,64 @@ function buildParentReportContext(p) {
     assessment,
     goals,
     recent_sessions: recentSessions
+  };
+}
+
+function buildGeneralAnalysisContext(
+  p,
+  documents = []
+) {
+  const assessment = state.assessment
+    ? {
+        assessment_type:
+          state.assessment.assessment_type || null,
+        assessment_date:
+          state.assessment.assessment_date || null,
+        complaint:
+          state.assessment.complaint || null,
+        pregnancy_history:
+          state.assessment.pregnancy_history || null,
+        birth_history:
+          state.assessment.birth_history || null,
+        motor_development:
+          state.assessment.motor_development || null,
+        observation:
+          state.assessment.observation || null,
+        neuro_observations:
+          state.assessment.neuro_observations || null,
+        conclusion:
+          state.assessment.conclusion || null,
+        structured_data:
+          state.assessment.structured_data || {}
+      }
+    : null;
+
+  const goals = (state.goals || []).map(goal => ({
+    title: goal.title || null,
+    baseline: goal.baseline || null,
+    criterion: goal.criterion || null,
+    deadline: goal.deadline || null,
+    progress: Number(goal.progress ?? 0),
+    status: goal.status || null
+  }));
+
+  const sessions = (state.sessions || []).map(session => ({
+    date: session.session_date || null,
+    note: session.note || null,
+    tolerance: session.tolerance || null,
+    dynamics_status: session.dynamics_status || null,
+    function_changes: session.function_changes || null,
+    planned_session: session.planned_session || null
+  }));
+
+  return {
+    age: ageFromDob(p.date_of_birth),
+    sex: sexLabel(p.sex),
+    complaint: p.primary_complaint || '',
+    assessment,
+    goals,
+    sessions,
+    documents
   };
 }
 
@@ -4064,15 +4121,11 @@ const aiFiles = selectedDocumentRows
   })
   .filter(Boolean);
 
-  const patientData = {
-    age: ageFromDob(p.date_of_birth),
-    sex: sexLabel(p.sex),
-    complaint: p.primary_complaint || "",
-    assessment: state.assessment || null,
-    goals: state.goals || [],
-    sessions: state.sessions || [],
-    documents: documentsForAI
-  };
+  const patientData =
+    buildGeneralAnalysisContext(
+      p,
+      documentsForAI
+    );
 
       const prompt = `
 Ты — клинический помощник детского физического терапевта.
