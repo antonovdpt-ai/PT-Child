@@ -65,8 +65,10 @@ if ! docker exec "$DB_CONTAINER" pg_restore \
   --no-privileges \
   --exit-on-error \
   "$CONTAINER_DUMP" >"$RESTORE_LOG" 2>&1; then
-  echo "ERROR: restore failed; last log lines:" >&2
-  tail -n 40 "$RESTORE_LOG" >&2
+  echo "ERROR: restore failed; first database error:" >&2
+  if ! grep -n -m 1 -B 2 -A 12 -E "pg_restore: error|ERROR:" "$RESTORE_LOG" >&2; then
+    sed -n '1,80p' "$RESTORE_LOG" >&2
+  fi
   exit 1
 fi
 
