@@ -1,0 +1,18 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Database and Storage backups must never enter this public repository
+backups/
+*.backup
+*.dump
+*.tar
+*.tar.gz
+
+# Local tooling
+.DS_Store
+Thumbs.db
+node_modules/
