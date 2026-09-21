@@ -99,4 +99,34 @@ openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
   -pass "file:${TEST_ROOT}/passphrase" -in "$REMOTE_ARCHIVE" \
   | tar -tf - | grep -Fq '20260921T120000Z/postgres.dump'
 
+mkdir -p "$TEST_ROOT/pull-backups" "$TEST_ROOT/pull-encrypted"
+cat > "$TEST_ROOT/pull.env" <<EOF
+FIZIRA_CREATE_BACKUP_SCRIPT=$TEST_ROOT/create-backup
+FIZIRA_RESTORE_TEST_SCRIPT=$TEST_ROOT/restore-test
+FIZIRA_BACKUP_ROOT=$TEST_ROOT/pull-backups
+FIZIRA_ENCRYPTED_ROOT=$TEST_ROOT/pull-encrypted
+FIZIRA_BACKUP_PASSPHRASE_FILE=$TEST_ROOT/passphrase
+FIZIRA_BACKUP_LOCK_FILE=$TEST_ROOT/pull.lock
+FIZIRA_DELIVERY_MODE=pull
+FIZIRA_PULL_USER=root
+FIZIRA_LOCAL_RETENTION_DAYS=14
+FIZIRA_VERIFY_RESTORE=1
+FIZIRA_DELETE_RAW_AFTER_UPLOAD=1
+FIZIRA_PBKDF2_ITERATIONS=100000
+EOF
+chmod 600 "$TEST_ROOT/pull.env"
+
+PULL_OUTPUT="$(
+  PATH="$TEST_ROOT/bin:$PATH" \
+  FIZIRA_BACKUP_CONFIG="$TEST_ROOT/pull.env" \
+  "$(dirname -- "${BASH_SOURCE[0]}")/../automated-backup.sh"
+)"
+PULL_ARCHIVE="$TEST_ROOT/pull-encrypted/$ARCHIVE_NAME"
+grep -Fq AUTOMATED_BACKUP_OK <<< "$PULL_OUTPUT"
+grep -Fq "pull_ready=$PULL_ARCHIVE" <<< "$PULL_OUTPUT"
+[[ -f "$PULL_ARCHIVE" && -f "${PULL_ARCHIVE}.sha256" ]]
+[[ "$(stat -c '%a' "$PULL_ARCHIVE")" == 640 ]]
+[[ ! -e "$TEST_ROOT/pull-backups/20260921T120000Z" ]]
+(cd "$TEST_ROOT/pull-encrypted" && sha256sum --check "${ARCHIVE_NAME}.sha256" >/dev/null)
+
 echo TEST_AUTOMATED_BACKUP_OK

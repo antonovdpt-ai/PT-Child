@@ -43,4 +43,4 @@ systemctl daemon-reload
 
 echo "INSTALL_OK"
 echo "The timer was installed but not enabled."
-echo "Configure rclone and the passphrase file, run a manual backup, then enable the timer."
+echo "Configure the delivery mode and passphrase file, run a manual backup, then enable the timer."
