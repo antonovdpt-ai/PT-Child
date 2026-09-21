@@ -9,6 +9,7 @@ BACKUP_DIR="${1:-}"
 TEST_DB="fizira_restore_test_$(date -u +%Y%m%d%H%M%S)"
 CONTAINER_DUMP="/tmp/${TEST_DB}.dump"
 RESTORE_LOG=""
+RESTORE_USER=""
 
 cleanup() {
   docker exec "$DB_CONTAINER" rm -f -- "$CONTAINER_DUMP" >/dev/null 2>&1 || true
@@ -41,6 +42,18 @@ if [[ "$(docker inspect -f '{{.State.Running}}' "$DB_CONTAINER" 2>/dev/null)" !=
   exit 1
 fi
 
+RESTORE_USER="$(docker exec "$DB_CONTAINER" psql \
+  --username=postgres \
+  --dbname=postgres \
+  --tuples-only \
+  --no-align \
+  --command="select rolname from pg_roles where rolsuper and rolcanlogin order by (rolname = 'supabase_admin') desc, rolname limit 1;")"
+
+if [[ -z "$RESTORE_USER" ]]; then
+  echo "ERROR: no login-enabled PostgreSQL superuser was found for the restore test" >&2
+  exit 1
+fi
+
 echo "[1/6] Checking backup checksums..."
 (
   cd "$BACKUP_DIR"
@@ -56,10 +69,10 @@ docker exec "$DB_CONTAINER" createdb \
 echo "[3/6] Copying the dump into the database container..."
 docker cp "${BACKUP_DIR}/postgres.dump" "${DB_CONTAINER}:${CONTAINER_DUMP}" >/dev/null
 
-echo "[4/6] Restoring the dump (the live database is not modified)..."
+echo "[4/6] Restoring the dump as ${RESTORE_USER} (the live database is not modified)..."
 RESTORE_LOG="$(mktemp)"
 if ! docker exec "$DB_CONTAINER" pg_restore \
-  --username=postgres \
+  --username="$RESTORE_USER" \
   --dbname="$TEST_DB" \
   --no-owner \
   --no-privileges \
