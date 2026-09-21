@@ -15,6 +15,16 @@ test('privacy settings and fixed endpoint', () => {
 test('reject arbitrary inputs', () => assert.throws(() => buildRequest({ input: 'external' }, env)));
 test('require configuration', () => assert.throws(() => buildRequest(cases[0], {})));
 test('accept required schema', () => assert.equal(parseResponse(valid).needs_review, true));
+test('accept one fenced JSON document', () => {
+  const fenced = structuredClone(valid);
+  fenced.output[0].content[0].text = '```json\n{"facts":[],"uncertainty":["Недостаточно данных"],"needs_review":true}\n```';
+  assert.equal(parseResponse(fenced).needs_review, true);
+});
+test('reject prose around JSON', () => {
+  const prose = structuredClone(valid);
+  prose.output[0].content[0].text = 'Ответ: {"facts":[],"uncertainty":[],"needs_review":true}';
+  assert.throws(() => parseResponse(prose));
+});
 test('reject incomplete output', () => assert.throws(() => parseResponse({ ...valid, status: 'incomplete' })));
 test('reject malformed output', () => assert.throws(() => parseResponse({ status: 'completed', output: [] })));
 test('reject false review flag', () => assert.throws(() => parseResponse({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: '{"facts":[],"uncertainty":[],"needs_review":false}' }] }] })));
