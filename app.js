@@ -414,7 +414,6 @@ function buildParentReportContext(p) {
     : null;
 
   return {
-    child_name: p.display_name || null,
     age: ageFromDob(p.date_of_birth),
     primary_complaint: p.primary_complaint || null,
     assessment,
@@ -4042,53 +4041,28 @@ const documentsForAI =
     note: item.note || null
   }));
 
-const aiFiles = (
-  await Promise.all(
-    selectedDocumentRows.map(async item => {
-      if (!item.storage_path) return null;
+const aiFiles = selectedDocumentRows
+  .map(item => {
+    if (!item.storage_path) return null;
 
-      const { data: signedData, error: signedError } =
-        await sb.storage
-          .from('patient-media')
-          .createSignedUrl(
-            item.storage_path,
-            600
-          );
+    const lowerPath =
+      item.storage_path.toLowerCase();
 
-      if (
-        signedError ||
-        !signedData?.signedUrl
-      ) {
-        console.error(
-          'Не удалось подготовить документ для ИИ:',
-          signedError
-        );
-
-        return null;
-      }
-
-      const lowerPath =
-        item.storage_path.toLowerCase();
-
-      return {
-  kind: lowerPath.endsWith('.pdf')
-    ? 'pdf'
-    : 'image',
-
-  url: signedData.signedUrl,
-
-  label:
-    aiDocumentTypeLabels[item.document_type] ||
-    'Документ',
-
-  date:
-    item.captured_at ||
-    item.created_at ||
-    null
-};
-    })
-  )
-).filter(Boolean);
+    return {
+      storage_path: item.storage_path,
+      kind: lowerPath.endsWith('.pdf')
+        ? 'pdf'
+        : 'image',
+      label:
+        aiDocumentTypeLabels[item.document_type] ||
+        'Документ',
+      date:
+        item.captured_at ||
+        item.created_at ||
+        null
+    };
+  })
+  .filter(Boolean);
 
   const patientData = {
     age: ageFromDob(p.date_of_birth),
