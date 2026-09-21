@@ -60,7 +60,7 @@ race. The UI confirmation word is also not reauthentication.
 ## Local checks
 
 ```sh
-node --test supabase/functions/_shared/ai-helpers.test.mjs
+node --test supabase/functions/_shared/*.test.mjs
 node --check app.js
 node --experimental-strip-types --check supabase/functions/ptchild-ai/index.ts
 node --experimental-strip-types --check supabase/functions/delete-account/index.ts
