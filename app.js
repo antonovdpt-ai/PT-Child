@@ -3247,6 +3247,108 @@ function renderNewPatient() {
 
 const currentPatient = () => state.patients.find(p => p.id === state.patientId);
 
+function renderEditPatient() {
+  const p = currentPatient();
+
+  if (!p) return renderPatients();
+
+  app.innerHTML = `
+    <div class="topline">
+      <h2 style="margin:0">Редактирование карточки</h2>
+      <button class="link" id="cancelPatientEdit" type="button">Отмена</button>
+    </div>
+
+    <div id="flash"></div>
+
+    <form class="card" id="patientEditForm">
+      <label>Имя / псевдоним для теста</label>
+      <input
+        name="display_name"
+        value="${esc(p.display_name)}"
+        required
+      >
+
+      <div class="row">
+        <div>
+          <label>Дата рождения</label>
+          <input
+            type="date"
+            name="date_of_birth"
+            value="${esc(p.date_of_birth || '')}"
+          >
+        </div>
+
+        <div>
+          <label>Пол</label>
+          <select name="sex">
+            <option value="unspecified" ${!p.sex || p.sex === 'unspecified' ? 'selected' : ''}>Не указано</option>
+            <option value="male" ${p.sex === 'male' ? 'selected' : ''}>Мальчик</option>
+            <option value="female" ${p.sex === 'female' ? 'selected' : ''}>Девочка</option>
+          </select>
+        </div>
+      </div>
+
+      <label>Основная причина обращения</label>
+      <textarea name="primary_complaint">${esc(p.primary_complaint || '')}</textarea>
+
+      <div class="actions">
+        <button
+          id="patientEditSaveBtn"
+          class="btn primary full"
+          type="submit"
+        >
+          Сохранить изменения
+        </button>
+      </div>
+    </form>
+  `;
+
+  document.getElementById('cancelPatientEdit').onclick = renderPatient;
+
+  const form = document.getElementById('patientEditForm');
+  const btn = document.getElementById('patientEditSaveBtn');
+
+  watchFormDirty(form, btn, 'Сохранить изменения');
+
+  form.onsubmit = async e => {
+    e.preventDefault();
+
+    const fd = new FormData(form);
+    const displayName = String(fd.get('display_name') || '').trim();
+
+    if (!displayName) {
+      return flash('error', 'Укажите имя или псевдоним пациента.');
+    }
+
+    const payload = {
+      display_name: displayName,
+      date_of_birth: fd.get('date_of_birth') || null,
+      sex: fd.get('sex') || 'unspecified',
+      primary_complaint: String(fd.get('primary_complaint') || '').trim() || null
+    };
+
+    setButtonSaving(btn);
+
+    const { data, error } = await sb
+      .from('patients')
+      .update(payload)
+      .eq('id', p.id)
+      .select()
+      .single();
+
+    if (error) {
+      setButtonError(btn);
+      return flash('error', `Не удалось сохранить карточку: ${error.message}`);
+    }
+
+    setButtonSaved(btn);
+    await sleep(500);
+    await loadPatients();
+    state.patientId = data.id;
+    renderPatient();
+  };
+}
+
 async function loadPatientData() {
   const pid = state.patientId;
 
@@ -3339,8 +3441,8 @@ function renderPatient() {
 </div>
 <div class="muted tiny" style="margin-top:4px">
   Дата рождения: ${p.date_of_birth ? esc(fmtDate(p.date_of_birth)) : "Не указана"}
-</div></div><span class="badge">облако</span></div><div class="sep"></div><div class="item-title">${esc(p.primary_complaint || 'Причина обращения пока не заполнена')}</div><div class="actions"><button class="btn full" id="backPatients">← К пациентам</button></div></div><div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('')}</div><div id="flash"></div><div id="tabContent"></div>`;
-  document.getElementById('backPatients').onclick = renderPatients; document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderPatient() }); renderTab(p);
+</div></div><span class="badge">облако</span></div><div class="sep"></div><div class="item-title">${esc(p.primary_complaint || 'Причина обращения пока не заполнена')}</div><div class="actions"><button class="btn full" id="editPatient" type="button">✏️ Редактировать карточку</button><button class="btn full" id="backPatients" type="button">← К пациентам</button></div></div><div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('')}</div><div id="flash"></div><div id="tabContent"></div>`;
+  document.getElementById('editPatient').onclick = renderEditPatient; document.getElementById('backPatients').onclick = renderPatients; document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderPatient() }); renderTab(p);
   const actions = app.querySelector(".actions");
   
   const deletePatientWrap = document.createElement("div");
