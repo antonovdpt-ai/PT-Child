@@ -54,22 +54,22 @@ if [[ -z "$RESTORE_USER" ]]; then
   exit 1
 fi
 
-echo "[1/6] Checking backup checksums..."
+echo "[1/7] Checking backup checksums..."
 (
   cd "$BACKUP_DIR"
   sha256sum --check SHA256SUMS
 )
 
-echo "[2/6] Creating isolated temporary database ${TEST_DB}..."
+echo "[2/7] Creating isolated temporary database ${TEST_DB}..."
 docker exec "$DB_CONTAINER" createdb \
   --username=postgres \
   --template=template0 \
   "$TEST_DB"
 
-echo "[3/6] Copying the dump into the database container..."
+echo "[3/7] Copying the dump into the database container..."
 docker cp "${BACKUP_DIR}/postgres.dump" "${DB_CONTAINER}:${CONTAINER_DUMP}" >/dev/null
 
-echo "[4/6] Restoring the dump as ${RESTORE_USER} (the live database is not modified)..."
+echo "[4/7] Restoring the dump as ${RESTORE_USER} (the live database is not modified)..."
 RESTORE_LOG="$(mktemp)"
 if ! docker exec "$DB_CONTAINER" pg_restore \
   --username="$RESTORE_USER" \
@@ -102,13 +102,20 @@ union all select 'storage.buckets', count(*) from storage.buckets
 union all select 'storage.objects', count(*) from storage.objects
 order by 1;"
 
-echo "[5/6] Reading critical tables from the restored database..."
+echo "[5/7] Reading critical tables from the restored database..."
 RESTORED_COUNTS="$(docker exec "$DB_CONTAINER" psql --username=postgres --dbname="$TEST_DB" \
   --tuples-only --no-align --field-separator='|' --command="$COUNT_SQL")"
 
-echo "[6/6] Checking Storage and Functions archives..."
+echo "[6/7] Checking Storage and Functions archives..."
 tar -tzf "${BACKUP_DIR}/storage.tar.gz" >/dev/null
 tar -tzf "${BACKUP_DIR}/functions.tar.gz" >/dev/null
+
+echo "[7/7] Checking disaster-recovery configuration archive..."
+if [[ -f "${BACKUP_DIR}/config.tar.gz" ]]; then
+  tar -tzf "${BACKUP_DIR}/config.tar.gz" >/dev/null
+else
+  echo "WARNING: legacy backup has no config.tar.gz; it cannot rebuild the server by itself." >&2
+fi
 
 printf '%s\n' "$RESTORED_COUNTS"
 echo

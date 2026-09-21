@@ -11,6 +11,8 @@ backups/
 *.dump
 *.tar
 *.tar.gz
+*.tar.enc
+*.sha256
 
 # Local tooling
 .DS_Store

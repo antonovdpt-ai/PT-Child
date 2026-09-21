@@ -1,0 +1,22 @@
+[Unit]
+Description=Create, verify, encrypt and upload a Fizira backup
+Documentation=https://github.com/antonovdpt-ai/PT-Child/tree/main/ops/backup
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+Environment=FIZIRA_BACKUP_CONFIG=/etc/fizira/backup.env
+ExecStart=/usr/local/lib/fizira-backup/automated-backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+NoNewPrivileges=true
+UMask=0077
+TimeoutStartSec=2h
+
+[Install]
+WantedBy=multi-user.target

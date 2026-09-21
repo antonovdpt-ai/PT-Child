@@ -57,7 +57,7 @@ fi
 
 mkdir -- "$WORK_DIR"
 
-echo "[1/5] Dumping PostgreSQL (includes Auth and application data)..."
+echo "[1/6] Dumping PostgreSQL (includes Auth and application data)..."
 docker exec "$DB_CONTAINER" pg_dump \
   --username=postgres \
   --dbname=postgres \
@@ -67,13 +67,21 @@ docker exec "$DB_CONTAINER" pg_dump \
   --no-privileges \
   > "${WORK_DIR}/postgres.dump"
 
-echo "[2/5] Archiving Storage objects..."
+echo "[2/6] Archiving Storage objects..."
 tar -C "${PROJECT_ROOT}/volumes" -czf "${WORK_DIR}/storage.tar.gz" storage
 
-echo "[3/5] Archiving Edge Functions source..."
+echo "[3/6] Archiving Edge Functions source..."
 tar -C "${PROJECT_ROOT}/volumes" -czf "${WORK_DIR}/functions.tar.gz" functions
 
-echo "[4/5] Recording non-secret metadata and checksums..."
+echo "[4/6] Archiving disaster-recovery configuration (includes secrets)..."
+tar -C "$PROJECT_ROOT" --one-file-system -czf "${WORK_DIR}/config.tar.gz" \
+  --exclude='./.git' \
+  --exclude='./volumes/db/data' \
+  --exclude='./volumes/storage' \
+  --exclude='./volumes/functions' \
+  .
+
+echo "[5/6] Recording metadata and checksums..."
 {
   echo "created_at_utc=${STAMP}"
   echo "hostname=$(hostname)"
@@ -86,15 +94,16 @@ echo "[4/5] Recording non-secret metadata and checksums..."
 
 (
   cd "$WORK_DIR"
-  sha256sum postgres.dump storage.tar.gz functions.tar.gz metadata.txt \
+  sha256sum postgres.dump storage.tar.gz functions.tar.gz config.tar.gz metadata.txt \
     > SHA256SUMS
 )
 
-echo "[5/5] Verifying archive readability..."
+echo "[6/6] Verifying archive readability..."
 docker exec -i "$DB_CONTAINER" pg_restore --list \
   < "${WORK_DIR}/postgres.dump" >/dev/null
 tar -tzf "${WORK_DIR}/storage.tar.gz" >/dev/null
 tar -tzf "${WORK_DIR}/functions.tar.gz" >/dev/null
+tar -tzf "${WORK_DIR}/config.tar.gz" >/dev/null
 (
   cd "$WORK_DIR"
   sha256sum --check SHA256SUMS >/dev/null

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Fizira backup every night
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 Europe/Moscow
+RandomizedDelaySec=15m
+Persistent=true
+Unit=fizira-backup.service
+
+[Install]
+WantedBy=timers.target
