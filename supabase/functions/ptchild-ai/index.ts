@@ -42,6 +42,19 @@ function requiredEnv(name: string, fallback?: string): string {
   return value;
 }
 
+function requiredSecret(name: string, fileEnvName: string): string {
+  const direct = Deno.env.get(name)?.trim();
+  if (direct) return direct;
+
+  const filePath = Deno.env.get(fileEnvName)?.trim();
+  if (filePath) {
+    const value = Deno.readTextFileSync(filePath).trim();
+    if (value) return value;
+  }
+
+  throw new Error(`Missing server configuration: ${name}`);
+}
+
 async function recognizePdf(bytes: Uint8Array, apiKey: string, folderId: string): Promise<string> {
   const headers = {
     "Authorization": `Api-Key ${apiKey}`,
@@ -106,7 +119,10 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = requiredEnv("SUPABASE_URL");
     const anonKey = requiredEnv("SUPABASE_ANON_KEY", "ANON_KEY");
-    const apiKey = requiredEnv("YANDEX_AI_API_KEY");
+    const apiKey = requiredSecret(
+      "YANDEX_AI_API_KEY",
+      "YANDEX_AI_API_KEY_FILE",
+    );
     const folderId = requiredEnv("YANDEX_FOLDER_ID");
     const supabase = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
