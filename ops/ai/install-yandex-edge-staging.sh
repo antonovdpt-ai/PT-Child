@@ -6,8 +6,7 @@ SOURCE_COMMIT="949badc7f9abc540318a72d98ae9b1cd10a7421f"
 RAW_BASE="https://raw.githubusercontent.com/antonovdpt-ai/PT-Child/${SOURCE_COMMIT}"
 FOLDER_ID="b1g9eenholug08hjppmp"
 KEY_FILE="/etc/fizira/yandex-ai-api-key"
-RUNTIME_SECRET_DIR="/etc/fizira/runtime"
-RUNTIME_KEY_FILE="${RUNTIME_SECRET_DIR}/yandex-ai-api-key"
+CONTAINER_ENV_FILE="/etc/fizira/yandex-ai.env"
 OVERRIDE_NAME="docker-compose.yandex-ai.yml"
 BACKUP_ROOT="/root/fizira-deploy-backups"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -45,11 +44,10 @@ rollback() {
     rm -rf -- "${PROJECT_ROOT}/volumes/functions/_shared"
   fi
 
-  if [[ -f "${BACKUP_DIR}/runtime-key" ]]; then
-    install -d -o root -g root -m 700 "${RUNTIME_SECRET_DIR}"
-    cp -a -- "${BACKUP_DIR}/runtime-key" "${RUNTIME_KEY_FILE}"
+  if [[ -f "${BACKUP_DIR}/container-env" ]]; then
+    cp -a -- "${BACKUP_DIR}/container-env" "${CONTAINER_ENV_FILE}"
   else
-    rm -f -- "${RUNTIME_KEY_FILE}"
+    rm -f -- "${CONTAINER_ENV_FILE}"
   fi
 
   (cd "${PROJECT_ROOT}" && docker compose up -d --no-deps functions) || true
@@ -71,18 +69,22 @@ cp -a -- "${PROJECT_ROOT}/.env" "${BACKUP_DIR}/.env"
 [[ ! -f "${PROJECT_ROOT}/${OVERRIDE_NAME}" ]] || cp -a -- "${PROJECT_ROOT}/${OVERRIDE_NAME}" "${BACKUP_DIR}/${OVERRIDE_NAME}"
 [[ ! -d "${PROJECT_ROOT}/volumes/functions/ptchild-ai" ]] || cp -a -- "${PROJECT_ROOT}/volumes/functions/ptchild-ai" "${BACKUP_DIR}/ptchild-ai"
 [[ ! -d "${PROJECT_ROOT}/volumes/functions/_shared" ]] || cp -a -- "${PROJECT_ROOT}/volumes/functions/_shared" "${BACKUP_DIR}/_shared"
-[[ ! -f "${RUNTIME_KEY_FILE}" ]] || cp -a -- "${RUNTIME_KEY_FILE}" "${BACKUP_DIR}/runtime-key"
+[[ ! -f "${CONTAINER_ENV_FILE}" ]] || cp -a -- "${CONTAINER_ENV_FILE}" "${BACKUP_DIR}/container-env"
 
-cd "${PROJECT_ROOT}"
-current_container_id="$(docker compose ps -q functions)"
-[[ -n "${current_container_id}" ]] || { echo "ERROR: running functions container not found" >&2; exit 1; }
-runtime_uid="$(docker exec "${current_container_id}" id -u)"
-runtime_gid="$(docker exec "${current_container_id}" id -g)"
-[[ "${runtime_uid}" =~ ^[0-9]+$ && "${runtime_gid}" =~ ^[0-9]+$ ]] || { echo "ERROR: invalid functions runtime uid/gid" >&2; exit 1; }
-[[ "${runtime_uid}" != "0" ]] || { echo "ERROR: refusing to deploy with a root-running functions container" >&2; exit 1; }
+python3 - "${KEY_FILE}" "${CONTAINER_ENV_FILE}" <<'PY'
+from pathlib import Path
+import os
+import sys
 
-install -d -o root -g root -m 700 "${RUNTIME_SECRET_DIR}"
-install -o "${runtime_uid}" -g "${runtime_gid}" -m 400 "${KEY_FILE}" "${RUNTIME_KEY_FILE}"
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+value = source.read_text().strip()
+if not value or "\n" in value or "\r" in value:
+    raise SystemExit("invalid Yandex API key file")
+target.write_text(f"YANDEX_AI_API_KEY={value}\n")
+os.chmod(target, 0o600)
+PY
+chown root:root "${CONTAINER_ENV_FILE}"
 
 mkdir -p -- "${TMP_DIR}/_shared" "${TMP_DIR}/ptchild-ai"
 curl -fsSL "${RAW_BASE}/supabase/functions/_shared/ai-helpers.ts" -o "${TMP_DIR}/_shared/ai-helpers.ts"
@@ -100,13 +102,12 @@ install -m 644 "${TMP_DIR}/ptchild-ai/index.ts" "${PROJECT_ROOT}/volumes/functio
 printf '%s\n' \
   'services:' \
   '  functions:' \
+  '    env_file:' \
+  "      - ${CONTAINER_ENV_FILE}" \
   '    environment:' \
-  '      YANDEX_AI_API_KEY_FILE: /run/secrets/yandex_ai_api_key' \
   "      YANDEX_FOLDER_ID: ${FOLDER_ID}" \
   '      FIZIRA_ALLOWED_ORIGINS: https://app.fizira.com' \
   '      FIZIRA_ALLOW_PDF_OCR: "no"' \
-  '    volumes:' \
-  "      - ${RUNTIME_KEY_FILE}:/run/secrets/yandex_ai_api_key:ro" \
   > "${PROJECT_ROOT}/${OVERRIDE_NAME}"
 chmod 600 "${PROJECT_ROOT}/${OVERRIDE_NAME}"
 
@@ -148,9 +149,8 @@ for _ in $(seq 1 30); do
 done
 [[ "${status}" == "healthy" ]] || { docker compose logs --tail 80 functions >&2; echo "ERROR: functions status is ${status}" >&2; exit 1; }
 
-mount_ok="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/run/secrets/yandex_ai_api_key"}}{{.RW}}{{end}}{{end}}' "${container_id}")"
-[[ "${mount_ok}" == "false" ]] || { echo "ERROR: read-only Yandex secret mount was not verified" >&2; exit 1; }
-docker exec "${container_id}" test -r /run/secrets/yandex_ai_api_key
+docker exec "${container_id}" /bin/sh -c 'test -n "$YANDEX_AI_API_KEY"'
+[[ "$(stat -c '%a:%U:%G' "${CONTAINER_ENV_FILE}")" == "600:root:root" ]] || { echo "ERROR: generated environment file permissions are unsafe" >&2; exit 1; }
 
 http_code="$(curl -sS -o "${TMP_DIR}/preflight.body" -w '%{http_code}' \
   -X OPTIONS \
