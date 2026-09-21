@@ -37,8 +37,11 @@ export function parseResponse(body) {
   const text = (body.output || []).filter(x => x.type === 'message')
     .flatMap(x => x.content || []).filter(x => x.type === 'output_text')
     .map(x => x.text).join('');
+  // Some compatible models wrap otherwise valid JSON in a Markdown code fence.
+  // Accept only a single fenced JSON document; arbitrary surrounding prose stays invalid.
+  const jsonText = text.trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1');
   let parsed;
-  try { parsed = JSON.parse(text); } catch { throw new Error('Invalid JSON response'); }
+  try { parsed = JSON.parse(jsonText); } catch { throw new Error('Invalid JSON response'); }
   if (!parsed || !Array.isArray(parsed.facts) || !Array.isArray(parsed.uncertainty)
       || ![...parsed.facts, ...parsed.uncertainty].every(x => typeof x === 'string')
       || parsed.needs_review !== true) throw new Error('Invalid response schema');
