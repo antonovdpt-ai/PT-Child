@@ -9,8 +9,8 @@ fi
 PROJECT_ROOT="${FIZIRA_PROJECT_ROOT:-/root/supabase-project}"
 DB_SERVICE="${FIZIRA_DB_SERVICE:-db}"
 OUTPUT_ROOT="${FIZIRA_CUTOVER_EVIDENCE_ROOT:-/root/fizira-cutover-evidence}"
-PREFLIGHT_COMMIT="ca3bcb742b7e1ab4335a22cd0c86dae8e237f9f7"
-PREFLIGHT_SHA256="382c825287546b0bf73f7b750b5fa153da744c4187ac151af996e292938d8100"
+PREFLIGHT_COMMIT="0760d96336e7df09868a07a70e4fd814cef563c5"
+PREFLIGHT_SHA256="0bbfaf8a5438ebcbb9f3beaabd49a5daff3139dd0df45a771fe8774f5dc25ad7"
 PREFLIGHT_URL="https://raw.githubusercontent.com/antonovdpt-ai/PT-Child/${PREFLIGHT_COMMIT}/ops/cutover/preflight.sh"
 
 command -v docker >/dev/null 2>&1 || {
