@@ -104,16 +104,20 @@ try {
   assert.equal(insertedPatient.response.status, 201, JSON.stringify(insertedPatient.body));
   patientId = insertedPatient.body[0].id;
 
-  storagePath = `${userId}/${patientId}/synthetic.txt`;
+  storagePath = `${userId}/${patientId}/synthetic.png`;
+  const onePixelPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  );
   const uploaded = await request(`/storage/v1/object/patient-media/${storagePath}`, {
     method: 'POST',
     headers: {
       apikey: anonKey,
       Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'text/plain',
+      'Content-Type': 'image/png',
       'x-upsert': 'false',
     },
-    body: 'synthetic deletion test only',
+    body: onePixelPng,
   });
   assert.ok([200, 201].includes(uploaded.response.status), JSON.stringify(uploaded.body));
 
@@ -124,8 +128,8 @@ try {
       patient_id: patientId,
       therapist_id: userId,
       storage_path: storagePath,
-      media_type: 'document',
-      category: 'other',
+      media_type: 'image',
+      category: 'posture',
     }),
   });
   assert.equal(insertedMedia.response.status, 201, JSON.stringify(insertedMedia.body));
