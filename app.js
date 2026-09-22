@@ -2782,10 +2782,73 @@ if (profileBackBtn) {
 const deleteAccountBtn =
   document.getElementById('deleteAccountBtn');
 
+function requestAccountDeletionPassword() {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'deletePasswordTitle');
+    overlay.style.cssText = [
+      'position:fixed',
+      'inset:0',
+      'z-index:10000',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'padding:20px',
+      'background:rgba(15,23,42,.55)'
+    ].join(';');
+
+    overlay.innerHTML = `
+      <form class="card" style="width:min(420px,100%);margin:0">
+        <h3 id="deletePasswordTitle" style="margin-top:0">
+          Подтвердите удаление аккаунта
+        </h3>
+        <p class="muted">
+          Введите текущий пароль. Он будет проверен сервером Fizira и не
+          сохраняется в приложении.
+        </p>
+        <label for="deleteAccountPassword">Текущий пароль</label>
+        <input
+          id="deleteAccountPassword"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required
+        >
+        <div style="display:flex;gap:10px;margin-top:18px">
+          <button type="button" data-action="cancel" style="flex:1">
+            Отмена
+          </button>
+          <button type="submit" class="danger" style="flex:1">
+            Удалить аккаунт
+          </button>
+        </div>
+      </form>
+    `;
+
+    const finish = value => {
+      overlay.remove();
+      resolve(value);
+    };
+    overlay.querySelector('[data-action="cancel"]').onclick = () => finish(null);
+    overlay.onclick = event => {
+      if (event.target === overlay) finish(null);
+    };
+    overlay.querySelector('form').onsubmit = event => {
+      event.preventDefault();
+      const password = overlay.querySelector('[name="password"]').value;
+      finish(password || null);
+    };
+    document.body.appendChild(overlay);
+    overlay.querySelector('[name="password"]').focus();
+  });
+}
+
 if (deleteAccountBtn) {
   deleteAccountBtn.onclick = async () => {
     const firstConfirmed = window.confirm(
-      'Удалить аккаунт PT Child?\n\n' +
+      'Удалить аккаунт Fizira?\n\n' +
       'Будут безвозвратно удалены все пациенты, занятия, оценки, ' +
       'документы, фотографии и другие связанные данные.'
     );
@@ -2793,6 +2856,9 @@ if (deleteAccountBtn) {
     if (!firstConfirmed) {
       return;
     }
+
+    const password = await requestAccountDeletionPassword();
+    if (!password) return;
 
     const confirmation = window.prompt(
       'Это действие нельзя отменить.\n\n' +
@@ -2825,7 +2891,7 @@ if (deleteAccountBtn) {
       await sb.functions.invoke(
         'delete-account',
         {
-          body: {}
+          body: { password }
         }
       );
 

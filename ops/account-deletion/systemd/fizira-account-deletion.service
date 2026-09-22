@@ -1,0 +1,11 @@
+[Unit]
+Description=Fizira account deletion retry worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/fizira-account-deletion-worker
+PrivateTmp=true
+NoNewPrivileges=true
