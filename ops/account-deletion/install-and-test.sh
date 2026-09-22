@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 PROJECT_ROOT="${FIZIRA_PROJECT_ROOT:-/root/supabase-project}"
 PUBLIC_URL="${FIZIRA_PUBLIC_URL:-https://auth.fizira.com}"
-SOURCE_COMMIT="1f23dca6bae2dd7e3b09a0e459670a0019f3f262"
+SOURCE_COMMIT="5628638daaa24a76deb7d968e99f4afc5ea5e0dd"
 RAW_BASE="https://raw.githubusercontent.com/antonovdpt-ai/PT-Child/${SOURCE_COMMIT}"
 OVERRIDE_NAME="docker-compose.account-deletion.yml"
 SECRET_FILE="/etc/fizira/account-deletion-worker-secret"
@@ -127,7 +127,7 @@ printf '%s  %s\n' \
   '41296c901875bb32fbe4b5414aa394d749aaa11c200a19151c20d668b61fd8ce' "${TMP_DIR}/migration.sql" \
   'a6337aefa15da3fdddf8728ad0bfed0843115f85d2ece3bff1d4edae869658b1' "${TMP_DIR}/rollback.sql" \
   '9a01a049a1b8b5d652fe07a10407bc262d612d6207ce9345297b97538e310ed2' "${TMP_DIR}/run-worker.sh" \
-  'c4f567d143b5fc24225de5ca7c447ecfd4355deeedc8fa50f0173494a5a63cfd' "${TMP_DIR}/test-synthetic-deletion.mjs" \
+  'cb6972e1bacc55bdcb5200a2e960a8af98ca8f26935896ece6d38cdfbe97491c' "${TMP_DIR}/test-synthetic-deletion.mjs" \
   '02c095c764e7e37826656bc985438072173a01d489a9887dbd0090ad0933729b' "${TMP_DIR}/systemd/service" \
   '2ae6f647200a053c27694fabff35aea6254fc8711b778e268e47a62618a55d42' "${TMP_DIR}/systemd/timer" \
   | sha256sum --check --status
