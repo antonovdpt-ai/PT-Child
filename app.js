@@ -1,5 +1,6 @@
 
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/+esm';
+import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
 
 const SUPABASE_URL = "https://bpacboofedxhdjhiizpy.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Mo3Tk3_hyPGlBl_V48u82Q_7DQkXL9g";
@@ -40,7 +41,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 const app = document.getElementById('app');
 const headerActions = document.getElementById('headerActions');
 let session = null, user = null;
-let state = {
+const createEmptyState = () => ({
   patientId: null,
   tab: 'overview',
   patients: [],
@@ -48,10 +49,15 @@ let state = {
   sessions: [],
   assessment: null,
   profile: null,
+  contacts: [],
+  parentReports: [],
   aiDocumentIdsByPatient: {}
-};
+});
+let state = createEmptyState();
 
-const esc = (v = '') => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+const esc = escapeHtml;
+const safeStorageUrl = value =>
+  safeSameOriginHttpsUrl(value, SUPABASE_URL);
 const fmtDate = v => { if (!v) return 'дата не указана'; const d = new Date(v + 'T12:00:00'); return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) };
 const ageFromDob = dob => {
   if (!dob) return 'Возраст не указан';
@@ -828,7 +834,7 @@ function formatAIAnalysisBlock(text, updatedAt, label = "Последний ан
 
   const dateHtml = dateText
     ? `<div class="muted tiny" style="margin-bottom:10px">
-        ${label}: ${dateText}
+        ${esc(label)}: ${esc(dateText)}
       </div>`
     : "";
 
@@ -924,8 +930,19 @@ document.getElementById('profileBtn').onclick = () => {
   renderProfile();
 };
 
-  document.getElementById('logoutBtn').onclick = () =>
-    sb.auth.signOut();
+  document.getElementById('logoutBtn').onclick = async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = 'Выхожу...';
+
+    const { error } = await sb.auth.signOut();
+
+    if (error) {
+      button.disabled = false;
+      button.textContent = 'Выйти';
+      flash('error', `Не удалось выйти: ${error.message}`);
+    }
+  };
 }
 
 function setButtonSaving(btn, text = 'Сохраняю…') { btn.disabled = true; btn.classList.remove('saved'); btn.classList.add('saving'); btn.textContent = text }
@@ -1413,7 +1430,7 @@ async function getSpecialistLogoUrl(logoPath) {
     return '';
   }
 
-  return data.signedUrl;
+  return safeStorageUrl(data.signedUrl);
 }
 
 function isSpecialistProfileComplete(profile) {
@@ -1492,6 +1509,9 @@ async function init() {
   sb.auth.onAuthStateChange((event, nextSession) => {
     receivedAuthEvent = true;
 
+    const nextUserId = nextSession?.user?.id || null;
+    const userChanged = Boolean(user?.id && nextUserId && user.id !== nextUserId);
+
     session = nextSession;
     user = nextSession?.user || null;
 
@@ -1501,6 +1521,9 @@ async function init() {
 
     if (event === 'SIGNED_OUT') {
       setPasswordRecovery(false);
+      state = createEmptyState();
+    } else if (userChanged) {
+      state = createEmptyState();
     }
 
     scheduleAuthView();
@@ -2533,9 +2556,16 @@ async function showSavedProfileLogo() {
     return;
   }
 
+  const safeLogoUrl = safeStorageUrl(data.signedUrl);
+
+  if (!safeLogoUrl) {
+    console.error('Получен недопустимый URL логотипа');
+    return;
+  }
+
   profileLogoPreview.innerHTML = `
     <img
-      src="${esc(data.signedUrl)}"
+      src="${esc(safeLogoUrl)}"
       alt="Логотип специалиста"
       style="
         max-width:180px;
@@ -6589,9 +6619,16 @@ async function loadPatientDocuments() {
           return null;
         }
 
+        const safeUrl = safeStorageUrl(signedData?.signedUrl);
+
+        if (!safeUrl) {
+          console.error('Получен недопустимый URL документа');
+          return null;
+        }
+
         return {
           ...item,
-          url: signedData.signedUrl
+          url: safeUrl
         };
       })
     );
@@ -6684,7 +6721,7 @@ documentList.innerHTML = `
             <div class="actions" style="margin-top:10px">
               <a
                 class="btn"
-                href="${item.url}"
+                href="${esc(item.url)}"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -9389,9 +9426,16 @@ async function loadPatientMedia() {
       return null;
     }
 
+    const safeUrl = safeStorageUrl(signedData?.signedUrl);
+
+    if (!safeUrl) {
+      console.error('Получен недопустимый URL фотографии');
+      return null;
+    }
+
     return {
       ...item,
-      url: signedData.signedUrl
+      url: safeUrl
     };
   })
 );
@@ -9493,8 +9537,8 @@ mediaList.innerHTML = `
             "
           >
             <img
-              src="${item.url}"
-              data-media-preview="${item.url}"
+              src="${esc(item.url)}"
+              data-media-preview="${esc(item.url)}"
               alt="Фото пациента"
               style="
                 width:100%;
@@ -9611,7 +9655,7 @@ mediaList.querySelectorAll('[data-media-preview]').forEach(img => {
 
     overlay.innerHTML = `
       <img
-        src="${img.dataset.mediaPreview}"
+        src="${esc(safeStorageUrl(img.dataset.mediaPreview))}"
         alt="Фото пациента"
         style="
           max-width:100%;
