@@ -50,6 +50,42 @@ sql_for_relation() {
       ;;
   esac
 
+  # Auth writes legitimate runtime fields independently on each backend
+  # (for example last_sign_in_at and updated_at). Comparing the whole row
+  # makes parity impossible after smoke tests even when identities and password
+  # hashes are preserved. Compare the migration-critical identity fields only.
+  if [[ "${relation}" == "auth.users" ]]; then
+    printf '%s' "
+      SELECT
+        count(*)::text,
+        COALESCE(
+          md5(string_agg(row_hash, '' ORDER BY row_hash)),
+          md5('')
+        )
+      FROM (
+        SELECT md5(jsonb_build_object(
+          'id', id,
+          'instance_id', instance_id,
+          'aud', aud,
+          'role', role,
+          'email', email,
+          'phone', phone,
+          'encrypted_password', encrypted_password,
+          'raw_app_meta_data', raw_app_meta_data,
+          'raw_user_meta_data', raw_user_meta_data,
+          'created_at', created_at,
+          'email_confirmed_at', email_confirmed_at,
+          'phone_confirmed_at', phone_confirmed_at,
+          'is_sso_user', is_sso_user,
+          'is_anonymous', is_anonymous,
+          'deleted_at', deleted_at
+        )::text) AS row_hash
+        FROM auth.users
+      ) AS rows;
+    "
+    return
+  fi
+
   printf '%s' "
     SELECT
       count(*)::text,
