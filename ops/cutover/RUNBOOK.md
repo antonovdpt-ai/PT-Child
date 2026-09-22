@@ -51,6 +51,27 @@ backend, иначе открытая ранее вкладка продолжи�
 
 ## 3. Финальная синхронизация
 
+Перед окном обслуживания запустить на self-hosted сервере интерактивную
+read-only обёртку от `root`:
+
+```bash
+./ops/cutover/run-readonly-preflight.sh
+```
+
+Она скрыто запрашивает пароль исходной managed Supabase, держит его только в
+окружении процесса, проверяет оба подключения и запускает сверку. Если прямой
+адрес БД недоступен, нужно взять Session pooler host, port и user из Supabase
+Dashboard → Connect. Пароль нельзя вставлять в команду или историю shell.
+
+Успешный предварительный результат содержит оба маркера:
+
+```text
+CUTOVER_DATABASE_PARITY_OK
+READONLY_PRODUCTION_PREFLIGHT_OK evidence=...
+```
+
+Обёртка и базовый preflight выполняют только `SELECT`.
+
 1. Повторно перенести Auth с сохранением UUID и password hashes.
 2. Перенести все прикладные таблицы с PK/FK и sequence state.
 3. Синхронизировать оба Storage bucket и физические объекты.
