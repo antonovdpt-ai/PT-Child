@@ -77,4 +77,7 @@ textarea{min-height:84px;resize:vertical}
 .save-status{font-size:11px;color:var(--green);margin-top:8px;min-height:16px}
 details{border-top:1px solid #edf0f3;padding-top:10px;margin-top:10px}
 summary{font-size:13px;font-weight:800;cursor:pointer}
+.site-footer{display:flex;justify-content:center;gap:13px;flex-wrap:wrap;padding:4px 14px 20px;color:var(--muted)}
+.site-footer a{color:var(--muted);font-size:11px;text-decoration:none}
+.site-footer a:hover,.site-footer a:focus{color:var(--blue);text-decoration:underline}
 @media(max-width:360px){.row,.actions{grid-template-columns:1fr}.milestone{grid-template-columns:1.2fr .8fr 1fr}}
