@@ -548,7 +548,7 @@ async function openParentReportPrintView(
   if (!printWindow) {
 
     alert(
-      'Браузер заблокировал окно отчёта. Разреши всплывающие окна для PT Child.'
+      'Браузер заблокировал окно отчёта. Разреши всплывающие окна для Fizira.'
     );
     return;
   }
@@ -1535,7 +1535,7 @@ function renderLogin() {
             autocomplete="email"
           >
 
-          <label>Пароль PT Child</label>
+          <label>Пароль Fizira</label>
           <input
             type="password"
             name="password"
@@ -2026,119 +2026,11 @@ async function ensureUserConsentRecord() {
 }
 
 function showLegalDocument(type) {
-  const isTerms = type === 'terms';
+  const url = type === 'terms'
+    ? 'terms.html'
+    : 'privacy.html';
 
-  const title = isTerms
-    ? 'Условия использования'
-    : 'Политика конфиденциальности';
-
-  const content = isTerms
-    ? `
-      <p>
-        PT Child предназначен для использования специалистами
-        в области физической терапии и реабилитации.
-      </p>
-
-      <p>
-        Пользователь самостоятельно отвечает за корректность
-        внесённых данных и профессиональные решения,
-        принимаемые на основании информации в приложении.
-      </p>
-
-      <p>
-        Функции искусственного интеллекта PT Child являются
-        вспомогательным инструментом и не заменяют
-        профессиональное клиническое решение специалиста.
-      </p>
-
-      <p>
-        Предрелизная версия документа:
-        ${LEGAL_TERMS_VERSION}.
-      </p>
-    `
-    : `
-      <p>
-        PT Child обрабатывает данные, которые специалист
-        вносит в приложение для ведения своей профессиональной работы.
-      </p>
-
-      <p>
-        Доступ к данным пациентов ограничивается учётной записью
-        специалиста и защищается механизмами авторизации
-        и разграничения доступа.
-      </p>
-
-      <p>
-        Пользователь обязан иметь законные основания
-        для внесения и обработки персональных данных пациентов.
-      </p>
-
-      <p>
-        Предрелизная версия документа:
-        ${PRIVACY_POLICY_VERSION}.
-      </p>
-    `;
-
-  const overlay = document.createElement('div');
-
-  overlay.style.cssText = `
-    position:fixed;
-    inset:0;
-    background:rgba(15,23,42,.45);
-    z-index:9999;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:20px;
-  `;
-
-  overlay.innerHTML = `
-    <div
-      class="card"
-      style="
-        width:min(640px, 100%);
-        max-height:80vh;
-        overflow:auto;
-        padding:22px;
-      "
-    >
-      <h2 style="margin-top:0">
-        ${title}
-      </h2>
-
-      <div
-        style="
-          line-height:1.6;
-          font-size:15px;
-        "
-      >
-        ${content}
-      </div>
-
-      <button
-        type="button"
-        class="btn primary full"
-        id="closeLegalDocumentBtn"
-        style="margin-top:18px"
-      >
-        Понятно
-      </button>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  document
-    .getElementById('closeLegalDocumentBtn')
-    .onclick = () => {
-      overlay.remove();
-    };
-
-  overlay.onclick = e => {
-    if (e.target === overlay) {
-      overlay.remove();
-    }
-  };
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function renderRegister() {
@@ -2148,7 +2040,7 @@ function renderRegister() {
         <h2>Создать аккаунт</h2>
 
         <div class="muted tiny">
-          Регистрация специалиста PT Child
+          Регистрация специалиста Fizira
         </div>
 
         <div id="flash"></div>
@@ -2206,7 +2098,7 @@ function renderRegister() {
     "
   >
     Я принимаю Условия использования
-    и Политику конфиденциальности PT Child
+    и Политику конфиденциальности Fizira
   </span>
 </label>
 
@@ -2352,7 +2244,7 @@ const { data, error } =
 
   flash(
     'success',
-    'Мы отправили письмо для подтверждения email. Перейдите по ссылке из письма, затем войдите в PT Child.'
+    'Мы отправили письмо для подтверждения email. Перейдите по ссылке из письма, затем войдите в Fizira.'
   );
 };
 
@@ -2387,7 +2279,7 @@ function renderProfile() {
           </h2>
 
           <div class="muted tiny">
-            Эти данные будут использоваться в документах PT Child.
+            Эти данные будут использоваться в документах Fizira.
           </div>
         </div>
       </div>
@@ -7916,7 +7808,7 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
   <h3>✨ Следующее занятие</h3>
 
   <div class="muted" style="margin-bottom:12px">
-    PT Child может подготовить следующий шаг с учётом целей,
+    Fizira может подготовить следующий шаг с учётом целей,
     последних занятий и оценки ребёнка.
   </div>
 
@@ -8012,7 +7904,7 @@ analyzeSessionBtn.onclick = async () => {
   analyzeSessionBtn.disabled = true;
   analyzeSessionBtn.textContent = '✨ Анализирую...';
   sessionAiStatus.textContent =
-    'PT Child разбирает запись занятия...';
+    'Fizira разбирает запись занятия...';
 
   try {
     const activeGoals = state.goals
@@ -8344,7 +8236,7 @@ if (prepareNextSessionBtn) {
       '✨ Готовлю план...';
 
     nextSessionPlanStatus.textContent =
-      'PT Child анализирует цели и последние занятия...';
+      'Fizira анализирует цели и последние занятия...';
 
     nextSessionPlan.innerHTML = '';
 
