@@ -53,10 +53,19 @@ deletes objects under that authenticated user's prefix in `patient-media` and
 - `SUPABASE_SERVICE_ROLE_KEY` (or `SERVICE_ROLE_KEY`)
 - `FIZIRA_ALLOWED_ORIGINS`
 
-Do not approve this function for production yet. A concurrent upload between
-the final Storage listing and Auth deletion can leave an orphan object. A
-durable deletion job/tombstone plus retry worker is required to close that
-race. The UI confirmation word is also not reauthentication.
+Production approval requires migration
+`20260922_004_account_deletion_jobs.sql`, a strong
+`FIZIRA_DELETION_WORKER_SECRET`, and the systemd retry worker in
+`ops/account-deletion/`. The durable tombstone is intentionally not linked to
+`auth.users`: it survives Auth deletion and backup restoration, while
+restrictive RLS policies immediately block the user's database and Storage
+access. The browser sends the current password over TLS to this Russian Edge
+Function for server-side reauthentication; the password is not stored.
+
+The function removes both Storage prefixes, hard-deletes the Auth user (which
+cascades application rows), then checks Storage again. Failures are retained as
+retry jobs. The worker claims jobs atomically with `FOR UPDATE SKIP LOCKED` and
+also recovers claims left in `processing` for more than 15 minutes.
 
 ## Local checks
 
@@ -71,3 +80,15 @@ Before any production cutover, test with two synthetic specialist accounts and
 an anonymous client. Confirm cross-account paths fail, unsupported and oversized
 files fail, browser origins are restricted, no clinical request bodies reach
 application logs, and all existing text/image/report workflows still work.
+
+For the destructive account-deletion gate, deploy only to an isolated target,
+load the server credentials into the shell, and run:
+
+```sh
+node ops/account-deletion/test-synthetic-deletion.mjs
+```
+
+The script creates its own synthetic specialist, patient and Storage object. It
+checks wrong-password rejection, hard Auth deletion, database and Storage
+cleanup, the completed durable tombstone, and rejection of a stale-token write.
+Its `finally` block removes only the UUID and object path that it created.
