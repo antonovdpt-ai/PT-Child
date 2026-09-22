@@ -92,3 +92,8 @@ The script creates its own synthetic specialist, patient and Storage object. It
 checks wrong-password rejection, hard Auth deletion, database and Storage
 cleanup, the completed durable tombstone, and rejection of a stale-token write.
 Its `finally` block removes only the UUID and object path that it created.
+
+On the self-hosted Fizira server, `ops/account-deletion/install-and-test.sh`
+performs the complete pinned install, synthetic gate and timer activation. It
+backs up every replaced file and automatically runs the rollback SQL and
+restores the previous function/configuration if any step fails.
