@@ -196,7 +196,13 @@ try {
   const fileLookup = await request(`/storage/v1/object/info/patient-media/${storagePath}`, {
     headers: serviceHeaders(),
   });
-  assert.equal(fileLookup.response.status, 404, JSON.stringify(fileLookup.body));
+  assert.ok(
+    [400, 404].includes(fileLookup.response.status) &&
+      ['not_found', 'NoSuchKey'].includes(
+        fileLookup.body?.error || fileLookup.body?.code,
+      ),
+    JSON.stringify(fileLookup.body),
+  );
 
   const staleWrite = await request('/rest/v1/patients', {
     method: 'POST',
