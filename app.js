@@ -2,8 +2,8 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/+esm';
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
 
-const SUPABASE_URL = "https://bpacboofedxhdjhiizpy.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_Mo3Tk3_hyPGlBl_V48u82Q_7DQkXL9g";
+const SUPABASE_URL = "https://auth.fizira.com";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5NjU2NzI5LCJleHAiOjE5NDczMzY3Mjl9.gWkGsKODazY419TdwTGoSL9InQK3Yzt5YYC7UGVFllo";
 
 // Сохраняем режим восстановления до обработки ссылки Supabase.
 const RECOVERY_STORAGE_KEY = 'ptchild-password-recovery';
