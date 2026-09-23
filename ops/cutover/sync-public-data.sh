@@ -25,12 +25,37 @@ if (( EUID != 0 )); then
   exit 1
 fi
 
-for command_name in docker pg_dump psql sha256sum; do
+for command_name in docker psql sha256sum; do
   command -v "${command_name}" >/dev/null 2>&1 || {
     echo "ERROR: required command not found: ${command_name}" >&2
     exit 1
   }
 done
+
+find_pg_dump() {
+  local candidate
+  local candidate_version
+  local selected=''
+  local selected_version=0
+
+  for candidate in "${FIZIRA_PG_DUMP:-}" /usr/lib/postgresql/*/bin/pg_dump "$(command -v pg_dump 2>/dev/null || true)"; do
+    [[ -n "${candidate}" && -x "${candidate}" ]] || continue
+    candidate_version="$(${candidate} --version | sed -n 's/.* \([0-9][0-9]*\)\..*/\1/p')"
+    [[ "${candidate_version}" =~ ^[0-9]+$ ]] || continue
+    if (( candidate_version > selected_version )); then
+      selected="${candidate}"
+      selected_version="${candidate_version}"
+    fi
+  done
+
+  [[ -n "${selected}" ]] || {
+    echo "ERROR: pg_dump was not found" >&2
+    exit 1
+  }
+  printf '%s\n' "${selected}"
+}
+
+PG_DUMP_BIN="$(find_pg_dump)"
 
 docker inspect "${DB_CONTAINER}" >/dev/null 2>&1 || {
   echo "ERROR: database container not found: ${DB_CONTAINER}" >&2
@@ -74,6 +99,14 @@ psql "${SOURCE_ARGS[@]}" -X --set=ON_ERROR_STOP=1 --tuples-only --no-align \
 docker exec "${DB_CONTAINER}" psql -U postgres -d postgres -X \
   --set=ON_ERROR_STOP=1 --tuples-only --no-align --command='select 1' | grep -Fxq '1'
 
+SOURCE_MAJOR="$(psql "${SOURCE_ARGS[@]}" -XAt --set=ON_ERROR_STOP=1 --command='show server_version_num' | cut -c1-2)"
+CLIENT_MAJOR="$(${PG_DUMP_BIN} --version | sed -n 's/.* \([0-9][0-9]*\)\..*/\1/p')"
+[[ "${CLIENT_MAJOR}" =~ ^[0-9]+$ && "${SOURCE_MAJOR}" =~ ^[0-9]+$ && ${CLIENT_MAJOR} -ge ${SOURCE_MAJOR} ]] || {
+  echo "ERROR: pg_dump ${CLIENT_MAJOR:-unknown} is too old for source PostgreSQL ${SOURCE_MAJOR:-unknown}" >&2
+  exit 1
+}
+printf 'Using pg_dump=%s (major %s) for source PostgreSQL %s\n' "${PG_DUMP_BIN}" "${CLIENT_MAJOR}" "${SOURCE_MAJOR}"
+
 mkdir -p -- "${BACKUP_ROOT}"
 BACKUP_FILE="${BACKUP_ROOT}/target-before-public-sync-${STAMP}.dump"
 
@@ -106,7 +139,7 @@ PG_DUMP_ARGS=(--data-only --column-inserts --no-owner --no-privileges)
 for table_name in "${TABLES[@]}"; do
   PG_DUMP_ARGS+=(--table="public.${table_name}")
 done
-pg_dump "${SOURCE_ARGS[@]}" "${PG_DUMP_ARGS[@]}" > "${DUMP_FILE}"
+"${PG_DUMP_BIN}" "${SOURCE_ARGS[@]}" "${PG_DUMP_ARGS[@]}" > "${DUMP_FILE}"
 
 echo "[5/6] Applying snapshot to target in one transaction..."
 {
