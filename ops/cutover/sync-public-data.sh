@@ -99,13 +99,28 @@ psql "${SOURCE_ARGS[@]}" -X --set=ON_ERROR_STOP=1 --tuples-only --no-align \
 docker exec "${DB_CONTAINER}" psql -U postgres -d postgres -X \
   --set=ON_ERROR_STOP=1 --tuples-only --no-align --command='select 1' | grep -Fxq '1'
 
-SOURCE_MAJOR="$(psql "${SOURCE_ARGS[@]}" -XAt --set=ON_ERROR_STOP=1 --command='show server_version_num' | cut -c1-2)"
-CLIENT_MAJOR="$(${PG_DUMP_BIN} --version | sed -n 's/.* \([0-9][0-9]*\)\..*/\1/p')"
-[[ "${CLIENT_MAJOR}" =~ ^[0-9]+$ && "${SOURCE_MAJOR}" =~ ^[0-9]+$ && ${CLIENT_MAJOR} -ge ${SOURCE_MAJOR} ]] || {
-  echo "ERROR: pg_dump ${CLIENT_MAJOR:-unknown} is too old for source PostgreSQL ${SOURCE_MAJOR:-unknown}" >&2
+SOURCE_MAJOR="$(psql "${SOURCE_ARGS[@]}" -XAt --set=ON_ERROR_STOP=1 --command='show server_version_num' | awk '{ print int($1 / 10000) }')"
+CLIENT_MAJOR="$("${PG_DUMP_BIN}" --version | sed -n 's/.* \([0-9][0-9]*\)\..*/\1/p')"
+[[ "${SOURCE_MAJOR}" =~ ^[0-9]+$ && "${CLIENT_MAJOR}" =~ ^[0-9]+$ ]] || {
+  echo "ERROR: could not determine PostgreSQL client/server major versions" >&2
   exit 1
 }
-printf 'Using pg_dump=%s (major %s) for source PostgreSQL %s\n' "${PG_DUMP_BIN}" "${CLIENT_MAJOR}" "${SOURCE_MAJOR}"
+
+if (( CLIENT_MAJOR >= SOURCE_MAJOR )); then
+  PG_DUMP_COMMAND=("${PG_DUMP_BIN}")
+  printf 'Using local pg_dump=%s (major %s) for source PostgreSQL %s\n' "${PG_DUMP_BIN}" "${CLIENT_MAJOR}" "${SOURCE_MAJOR}"
+else
+  PG_DUMP_IMAGE="postgres:${SOURCE_MAJOR}-alpine"
+  echo "Local pg_dump ${CLIENT_MAJOR} is too old; using Docker image ${PG_DUMP_IMAGE}..."
+  docker pull "${PG_DUMP_IMAGE}" >/dev/null
+  DOCKER_CLIENT_MAJOR="$(docker run --rm "${PG_DUMP_IMAGE}" pg_dump --version | sed -n 's/.* \([0-9][0-9]*\)\..*/\1/p')"
+  [[ "${DOCKER_CLIENT_MAJOR}" =~ ^[0-9]+$ && ${DOCKER_CLIENT_MAJOR} -ge ${SOURCE_MAJOR} ]] || {
+    echo "ERROR: Docker pg_dump ${DOCKER_CLIENT_MAJOR:-unknown} is too old for source PostgreSQL ${SOURCE_MAJOR}" >&2
+    exit 1
+  }
+  PG_DUMP_COMMAND=(docker run --rm --network host --env PGPASSWORD --env PGSSLMODE --env PGCONNECT_TIMEOUT "${PG_DUMP_IMAGE}" pg_dump)
+  printf 'Using Docker pg_dump image %s (major %s) for source PostgreSQL %s\n' "${PG_DUMP_IMAGE}" "${DOCKER_CLIENT_MAJOR}" "${SOURCE_MAJOR}"
+fi
 
 mkdir -p -- "${BACKUP_ROOT}"
 BACKUP_FILE="${BACKUP_ROOT}/target-before-public-sync-${STAMP}.dump"
@@ -139,7 +154,7 @@ PG_DUMP_ARGS=(--data-only --column-inserts --no-owner --no-privileges)
 for table_name in "${TABLES[@]}"; do
   PG_DUMP_ARGS+=(--table="public.${table_name}")
 done
-"${PG_DUMP_BIN}" "${SOURCE_ARGS[@]}" "${PG_DUMP_ARGS[@]}" > "${DUMP_FILE}"
+"${PG_DUMP_COMMAND[@]}" "${SOURCE_ARGS[@]}" "${PG_DUMP_ARGS[@]}" > "${DUMP_FILE}"
 
 echo "[5/6] Applying snapshot to target in one transaction..."
 {
