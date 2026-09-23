@@ -1,6 +1,7 @@
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/+esm';
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
+import { renderCabinet } from './cabinet.js';
 
 const SUPABASE_URL = "https://auth.fizira.com";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5NjU2NzI5LCJleHAiOjE5NDczMzY3Mjl9.gWkGsKODazY419TdwTGoSL9InQK3Yzt5YYC7UGVFllo";
@@ -896,7 +897,7 @@ function renderHeader() {
       "
     >
       <button
-        id="profileBtn"
+        id="cabinetBtn"
         type="button"
         class="btn"
         style="
@@ -907,7 +908,7 @@ function renderHeader() {
           font-weight:600;
         "
       >
-        Профиль
+        Личный кабинет
       </button>
 
       <button
@@ -926,8 +927,11 @@ function renderHeader() {
   </div>
 `;
 
-document.getElementById('profileBtn').onclick = () => {
-  renderProfile();
+document.getElementById('cabinetBtn').onclick = () => {
+  renderCabinet({ app, sb, state, user, esc, renderPatients, renderProfile }).catch(error => {
+    console.error('Ошибка личного кабинета:', error);
+    flash('error', error.message || 'Не удалось открыть личный кабинет.');
+  });
 };
 
   document.getElementById('logoutBtn').onclick = async event => {
