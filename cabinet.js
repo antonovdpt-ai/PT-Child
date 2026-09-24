@@ -41,15 +41,29 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
       if (data.length < 500) return rows;
     }
   }
+  const statusEntry = (row, status) => {
+    const entry = { ...row, status, expected_updated_at: row.updated_at };
+    delete entry.updated_at;
+    return entry;
+  };
+  async function completeDueAppointments(rows) {
+    const today = dayKey(new Date());
+    const due = rows.filter(row => row.kind === 'appointment' && row.status === 'planned' && dayKey(row.starts_at) <= today);
+    if (!due.length) return rows;
+    const { error } = await sb.rpc('save_schedule_entries', { entries: due.map(row => statusEntry(row, 'completed')), save_tariff: false });
+    if (error) throw error;
+    return allRows('appointments', 'id,patient_id,starts_at,ends_at,kind,status,price_kopecks,paid_kopecks,note,initial_name,updated_at');
+  }
   async function refresh() {
     if (loading) return;
     loading = true; const owner = page;
     if (page?.isConnected) page.querySelector('[data-refresh]')?.setAttribute('disabled', '');
     try {
-      const [a, p] = await Promise.all([
+      let [a, p] = await Promise.all([
         allRows('appointments', 'id,patient_id,starts_at,ends_at,kind,status,price_kopecks,paid_kopecks,note,initial_name,updated_at'),
         allRows('patients', 'id,display_name,schedule_price_kopecks')
       ]);
+      a = await completeDueAppointments(a);
       appointments = a.sort((x, y) => x.starts_at.localeCompare(y.starts_at)); patients = p; loaded = true; notice = '';
     } catch (error) { notice = scheduleError(error); }
     finally { loading = false; if (owner?.isConnected) draw(); }
@@ -77,13 +91,16 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
         const blocked = appointments.some(r => ['planned', 'completed'].includes(r.status) && new Date(r.starts_at) <= at && new Date(r.ends_at) > at);
         return `<div class="calendar-slot"><span class="calendar-time">${String(h).padStart(2, '0')}:00</span><div>${items.map(r => {
           const paid = r.price_kopecks > 0 && r.paid_kopecks >= r.price_kopecks;
-          return `<div class="calendar-entry ${safe(r.status)}"><button type="button" class="calendar-entry-open" data-edit="${r.id}"><span><strong>${safe(name(r))}</strong>${!r.patient_id && r.kind === 'appointment' ? '<small>Первичный приём</small>' : ''}<small>${statuses[r.status]}${r.kind === 'appointment' ? ` · ${rub(r.price_kopecks)}` : ''}${new Date(r.starts_at).getMinutes() ? ` · начало ${new Date(r.starts_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}` : ''}</small></span></button>${r.kind === 'appointment' ? `<button type="button" class="calendar-paid ${paid ? 'paid' : 'unpaid'}" data-payment="${r.id}" aria-pressed="${paid}" ${r.price_kopecks <= 0 ? 'disabled title="Сначала укажите стоимость занятия"' : ''}>${paid ? '✓ Оплачено' : 'Не оплачено'}</button>` : ''}</div>`;
+          const details = `${r.kind === 'appointment' ? rub(r.price_kopecks) : statuses[r.status]}${new Date(r.starts_at).getMinutes() ? ` · начало ${new Date(r.starts_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}` : ''}`;
+          const statusOptions = Object.entries(statuses).map(([value, label]) => `<option value="${value}" ${r.status === value ? 'selected' : ''}>${label}</option>`).join('');
+          return `<div class="calendar-entry ${safe(r.status)}"><button type="button" class="calendar-entry-open" data-edit="${r.id}"><span><strong>${safe(name(r))}</strong>${!r.patient_id && r.kind === 'appointment' ? '<small>Первичный приём</small>' : ''}<small>${details}</small></span></button>${r.kind === 'appointment' ? `<div class="calendar-entry-actions"><select class="calendar-status ${safe(r.status)}" data-status="${r.id}" aria-label="Статус занятия ${safe(name(r))}">${statusOptions}</select><button type="button" class="calendar-paid ${paid ? 'paid' : 'unpaid'}" data-payment="${r.id}" aria-pressed="${paid}" ${r.price_kopecks <= 0 ? 'disabled title="Сначала укажите стоимость занятия"' : ''}>${paid ? '✓ Оплачено' : 'Не оплачено'}</button></div>` : ''}</div>`;
         }).join('')}
           ${!blocked ? `<button class="calendar-empty" data-slot="${h}">+ Записать пациента <span>или первичный приём</span></button>` : !items.length ? '<span class="help">Занято предыдущей записью</span>' : ''}</div></div>`;
       }).join('')}</div><div class="calendar-total">${summary(rows)}</div>`;
     body.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => edit(null, key, Number(b.dataset.slot)));
     body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => edit(appointments.find(r => r.id === b.dataset.edit)));
     body.querySelectorAll('[data-payment]').forEach(b => b.onclick = () => togglePayment(appointments.find(r => r.id === b.dataset.payment), b));
+    body.querySelectorAll('[data-status]').forEach(select => select.onchange = () => changeStatus(appointments.find(r => r.id === select.dataset.status), select));
     const changeHours = () => {
       const from = Number(body.querySelector('[data-hour-from]').value), to = Number(body.querySelector('[data-hour-to]').value);
       if (from > to) { window.alert('Первый час должен быть раньше последнего.'); return fillDay(details); }
@@ -113,6 +130,21 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
       notice = scheduleError(error);
       button.disabled = false;
       button.textContent = wasPaid ? '✓ Оплачено' : 'Не оплачено';
+      draw();
+    }
+  }
+  async function changeStatus(row, select) {
+    if (!row || row.kind !== 'appointment' || !statuses[select.value] || select.value === row.status) return;
+    const previous = row.status;
+    select.disabled = true;
+    try {
+      const { error } = await sb.rpc('save_schedule_entries', { entries: [statusEntry(row, select.value)], save_tariff: false });
+      if (error) throw error;
+      await refresh();
+    } catch (error) {
+      notice = scheduleError(error);
+      select.disabled = false;
+      select.value = previous;
       draw();
     }
   }
