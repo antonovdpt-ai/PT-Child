@@ -54,7 +54,6 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
     }).join('');
   }
   function choose(id) {
-    if (row?.paid_kopecks > 0 && id !== row.patient_id) { showError(new Error('В этой записи уже есть оплата. Сначала разберись с оплатой, затем меняй пациента.')); return; }
     selected = id; initial = !id; markDirty();
     field('price').value = (selectedPatient()?.schedule_price_kopecks || 0) / 100;
     field('save_tariff').checked = !!selected && !hasTariff();
@@ -100,7 +99,13 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
   field('kind').onchange();
   field('price').oninput = updateBalance; field('paid').onchange = updateBalance; field('status').onchange = updateBalance;
   const search = dialog.querySelector('[data-search]');
-  search.oninput = renderPicker;
+  search.oninput = () => {
+    if (selected && search.value.trim() !== selectedName()) {
+      selected = ''; initial = false; contactVersion += 1;
+      updateSelection(); contacts(); updateBalance();
+    }
+    renderPicker();
+  };
   search.onfocus = () => { if (selected && search.value === selectedName()) search.select(); };
   if (!row) form.querySelectorAll('[name="weekday"],[name="weeks"],[name="date"],[name="hour"]').forEach(c => c.addEventListener('change', updateRepeat));
   form.onsubmit = event => {
