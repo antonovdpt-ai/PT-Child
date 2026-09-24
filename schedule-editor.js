@@ -9,7 +9,7 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
   dialog.innerHTML = `<form class="schedule-editor"><div class="calendar-title"><h2>${row ? 'Редактировать запись' : 'Запись на приём'}</h2><button type="button" class="link" data-close aria-label="Закрыть">✕</button></div>
     <div class="row"><label>Дата<input name="date" type="date" required value="${dayKey(start)}"></label><label>Начало<select name="hour">${Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${h === start.getHours() ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('')}</select></label></div>
     <label>Тип записи<select name="kind"><option value="appointment">Занятие</option><option value="break">Перерыв</option><option value="personal">Личное время</option></select></label>
-    <div data-visit><label>Найти пациента<input type="search" data-search placeholder="Имя пациента" autocomplete="off"></label><div class="patient-picker" data-results role="group" aria-label="Выбор пациента"></div>
+    <div data-visit><label>Найти пациента<input type="search" data-search placeholder="Имя пациента" autocomplete="off" value="${selected ? esc(selectedName()) : ''}"></label><div class="patient-picker" data-results role="group" aria-label="Выбор пациента"></div>
       <p class="calendar-selection" data-selection></p><label data-initial ${initial ? '' : 'hidden'}>Имя на первичном приёме<input name="initial_name" maxlength="120" value="${esc(row?.initial_name || '')}" placeholder="Можно заполнить позже"></label>
       <div class="calendar-contact" data-contact aria-live="polite"></div>
       <label>Стоимость занятия, ₽<input name="price" type="number" min="0" max="1000000" step="0.01" required value="${(row?.price_kopecks || 0) / 100}"></label>
@@ -54,7 +54,8 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
     if (row?.paid_kopecks > 0 && id !== row.patient_id) { showError(new Error('В этой записи уже есть оплата. Сначала разберись с оплатой, затем меняй пациента.')); return; }
     selected = id; initial = !id; dirty = true;
     field('price').value = (patients.find(p => p.id === selected)?.schedule_price_kopecks || 0) / 100;
-    dialog.querySelector('[data-search]').value = ''; renderPicker(); updateSelection(); contacts(); updateBalance();
+    dialog.querySelector('[data-search]').value = selected ? selectedName() : '';
+    renderPicker(); updateSelection(); contacts(); updateBalance();
   }
   function renderPicker() {
     const query = dialog.querySelector('[data-search]').value.trim().toLocaleLowerCase('ru');
@@ -94,7 +95,9 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
   field('kind').onchange = () => { dialog.querySelector('[data-visit]').hidden = field('kind').value !== 'appointment'; };
   field('kind').onchange();
   field('price').oninput = updateBalance; field('paid').onchange = updateBalance; field('status').onchange = updateBalance;
-  dialog.querySelector('[data-search]').oninput = renderPicker;
+  const search = dialog.querySelector('[data-search]');
+  search.oninput = renderPicker;
+  search.onfocus = () => { if (selected && search.value === selectedName()) search.select(); };
   if (!row) form.querySelectorAll('[name="weekday"],[name="weeks"],[name="date"],[name="hour"]').forEach(c => c.addEventListener('change', updateRepeat));
   form.onsubmit = event => {
     event.preventDefault();
@@ -125,5 +128,6 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
     });
   };
   renderPicker(); updateSelection(); contacts().catch(showError); updateBalance(); updateRepeat(); dialog.showModal();
-  dialog.querySelector('[data-search]').focus();
+  search.focus();
+  if (selected) search.select();
 }
