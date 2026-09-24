@@ -1,7 +1,8 @@
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/+esm';
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
-import { renderCabinet } from './cabinet.js?v=3';
+import { shouldRenderAuthEvent } from './auth-domain.mjs?v=1';
+import { renderCabinet } from './cabinet.js?v=4';
 
 const SUPABASE_URL = "https://auth.fizira.com";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5NjU2NzI5LCJleHAiOjE5NDczMzY3Mjl9.gWkGsKODazY419TdwTGoSL9InQK3Yzt5YYC7UGVFllo";
@@ -950,10 +951,18 @@ document.getElementById('cabinetBtn').onclick = () => {
 }
 
 function setButtonSaving(btn, text = 'Сохраняю…') { btn.disabled = true; btn.classList.remove('saved'); btn.classList.add('saving'); btn.textContent = text }
-function setButtonSaved(btn, text = '✓ Сохранено') { btn.disabled = true; btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = text }
+function setButtonSaved(btn, text = '✓ Сохранено') { if (btn.form) delete btn.form.dataset.dirty; btn.disabled = true; btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = text }
 function setButtonDirty(btn, text = 'Сохранить изменения') { btn.disabled = false; btn.classList.remove('saving', 'saved'); btn.classList.add('primary'); btn.textContent = text }
 function setButtonError(btn, text = 'Повторить сохранение') { btn.disabled = false; btn.classList.remove('saving', 'saved'); btn.classList.add('primary'); btn.textContent = text }
-function watchFormDirty(form, btn, dirtyText = 'Сохранить изменения') { form.addEventListener('input', () => setButtonDirty(btn, dirtyText)); form.addEventListener('change', () => setButtonDirty(btn, dirtyText)) }
+function watchFormDirty(form, btn, dirtyText = 'Сохранить изменения') {
+  const mark = () => { form.dataset.dirty = 'true'; setButtonDirty(btn, dirtyText); };
+  form.addEventListener('input', mark); form.addEventListener('change', mark);
+}
+window.addEventListener('beforeunload', event => {
+  if (!document.querySelector('form[data-dirty="true"]')) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function enableVoiceInput(root) {
@@ -1513,6 +1522,7 @@ async function init() {
   sb.auth.onAuthStateChange((event, nextSession) => {
     receivedAuthEvent = true;
 
+    const previousUserId = user?.id || null;
     const nextUserId = nextSession?.user?.id || null;
     const userChanged = Boolean(user?.id && nextUserId && user.id !== nextUserId);
 
@@ -1530,7 +1540,9 @@ async function init() {
       state = createEmptyState();
     }
 
-    scheduleAuthView();
+    // TOKEN_REFRESHED and a repeated SIGNED_IN on tab focus must not recreate
+    // the current screen because that discards unsaved form fields.
+    if (shouldRenderAuthEvent(event, previousUserId, nextUserId)) scheduleAuthView();
   });
 
   const { data, error } = await sb.auth.getSession();
