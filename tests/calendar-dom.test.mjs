@@ -21,7 +21,7 @@ test('calendar supports patient search, parent contacts, debt and profile naviga
     { id:'old', therapist_id:'u1', patient_id:'p1', starts_at:'2026-09-23T08:00:00.000Z', ends_at:'2026-09-23T09:00:00.000Z', kind:'appointment', status:'completed', price_kopecks:300000, paid_kopecks:0, note:null, initial_name:null, updated_at:'2026-09-23T08:00:00.000Z' },
     { id:'next', therapist_id:'u1', patient_id:'p1', starts_at:'2026-09-23T09:00:00.000Z', ends_at:'2026-09-23T10:00:00.000Z', kind:'appointment', status:'planned', price_kopecks:300000, paid_kopecks:0, note:null, initial_name:null, updated_at:'2026-09-23T08:00:00.000Z' }
   ];
-  const patients = [{ id:'p1', therapist_id:'u1', display_name:'Иван Тестов', schedule_price_kopecks:300000 }, { id:'p2', therapist_id:'u1', display_name:'Мария Пример', schedule_price_kopecks:250000 }];
+  const patients = [{ id:'p1', therapist_id:'u1', display_name:'Иван Тестов', schedule_price_kopecks:300000 }, { id:'p2', therapist_id:'u1', display_name:'Мария Пример', schedule_price_kopecks:250000 }, { id:'p3', therapist_id:'u1', display_name:'Новый Пациент', schedule_price_kopecks:null }];
   const contacts = [{ patient_id:'p1', therapist_id:'u1', full_name:'Елена Тестова', relation:'мама', phone:'+7 900 000-00-00', is_primary:true }];
   class Query {
     constructor(table){ this.table=table; this.filters=[]; this.action='select'; }
@@ -31,8 +31,20 @@ test('calendar supports patient search, parent contacts, debt and profile naviga
     then(resolve,reject){ return this.result().then(resolve,reject) }
     async result(){ let data=this.table==='appointments'?appointments:this.table==='patients'?patients:contacts; data=data.filter(r=>this.filters.every(([k,v])=>r[k]===v)); return {data,error:null}; }
   }
-  let lastRpc;
-  const sb = { from:t=>new Query(t), rpc:async(name,args)=>{ lastRpc={name,args}; return {data:1,error:null}; } };
+  let lastRpc, sequence = 0;
+  const sb = { from:t=>new Query(t), rpc:async(name,args)=>{
+    lastRpc={name,args};
+    if (name === 'save_schedule_entries') {
+      for (const entry of args.entries) {
+        const saved = entry.id ? appointments.find(row => row.id === entry.id) : null;
+        const next = { ...entry, id:entry.id || `created-${++sequence}`, updated_at:`2026-09-23T10:00:0${sequence}.000Z` };
+        delete next.expected_updated_at;
+        if (saved) Object.assign(saved, next); else appointments.push(next);
+        if (args.save_tariff && next.patient_id) patients.find(patient => patient.id === next.patient_id).schedule_price_kopecks = next.price_kopecks;
+      }
+    }
+    return {data:1,error:null};
+  } };
   const app = document.querySelector('#app');
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   await renderCabinet({ app, sb, state:{patients}, user:{id:'u1'}, esc, renderPatients:()=>{}, renderProfile:()=>app.innerHTML='<div>PROFILE FORM</div>' });
@@ -41,9 +53,17 @@ test('calendar supports patient search, parent contacts, debt and profile naviga
   const appointmentDay = app.querySelector('[data-day="2026-09-23"]');
   appointmentDay.open = true;
   appointmentDay.dispatchEvent(new Event('toggle'));
-  const nextEntry = await waitFor(() => app.querySelector('[data-edit="next"]'));
-  assert.ok(nextEntry, app.innerHTML);
-  nextEntry.click();
+  await waitFor(() => app.querySelector('[data-edit="next"]'));
+  const unpaid = app.querySelector('[data-payment="next"]');
+  assert.equal(unpaid.textContent, 'Не оплачено');
+  unpaid.click();
+  await waitFor(() => app.querySelector('[data-payment="next"]')?.textContent === '✓ Оплачено');
+  assert.equal(app.querySelector('dialog'), null, 'inline payment does not open the editor');
+  assert.equal(appointments.find(row => row.id === 'next').paid_kopecks, 300000);
+  app.querySelector('[data-payment="next"]').click();
+  await waitFor(() => app.querySelector('[data-payment="next"]')?.textContent === 'Не оплачено');
+  assert.equal(appointments.find(row => row.id === 'next').paid_kopecks, 0, 'payment can be reversed inline');
+  app.querySelector('[data-edit="next"]').click();
   const search = app.querySelector('[data-search]');
   assert.equal(search.value, 'Иван Тестов', 'existing appointment shows the selected patient in the field');
   search.value='Иван'; search.dispatchEvent(new Event('input'));
@@ -53,8 +73,19 @@ test('calendar supports patient search, parent contacts, debt and profile naviga
   assert.equal(app.querySelector('[name="price"]').value, '3000');
   assert.match(app.querySelector('[data-balance]').textContent, /3\s?000/);
   app.querySelector('[data-close]').click();
+  app.querySelector('[data-slot="10"]').click();
+  const newSearch = app.querySelector('[data-search]');
+  newSearch.value='Новый'; newSearch.dispatchEvent(new Event('input'));
+  [...app.querySelectorAll('[data-patient]')].find(b => b.textContent.includes('Новый')).click();
+  assert.equal(app.querySelector('[name="save_tariff"]').checked, true, 'first tariff is selected for saving automatically');
+  const price = app.querySelector('[name="price"]');
+  price.value = '2750'; price.dispatchEvent(new Event('input'));
+  app.querySelector('.schedule-editor').dispatchEvent(new Event('submit', { bubbles:true, cancelable:true }));
+  await waitFor(() => !app.querySelector('dialog'));
+  assert.equal(lastRpc.args.save_tariff, true);
+  assert.equal(patients.find(patient => patient.id === 'p3').schedule_price_kopecks, 275000, 'first price is attached to the patient');
   [...app.querySelectorAll('[data-nav]')].find(b => b.textContent === 'Профиль').click();
   assert.match(app.textContent, /PROFILE FORM/);
   assert.equal(app.querySelector('[aria-current="page"]').textContent, 'Профиль');
-  assert.equal(lastRpc, undefined);
+  assert.equal(lastRpc.name, 'save_schedule_entries');
 });

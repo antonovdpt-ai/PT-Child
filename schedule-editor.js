@@ -6,6 +6,8 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
   const originalPartial = row && row.paid_kopecks > 0 && row.paid_kopecks < row.price_kopecks ? row.paid_kopecks : 0;
   const start = row ? new Date(row.starts_at) : hourSlot(date, hour);
   const selectedName = () => patients.find(p => p.id === selected)?.display_name || 'Первичный приём';
+  const selectedPatient = () => patients.find(p => p.id === selected);
+  const hasTariff = () => Number(selectedPatient()?.schedule_price_kopecks || 0) > 0;
   dialog.innerHTML = `<form class="schedule-editor"><div class="calendar-title"><h2>${row ? 'Редактировать запись' : 'Запись на приём'}</h2><button type="button" class="link" data-close aria-label="Закрыть">✕</button></div>
     <div class="row"><label>Дата<input name="date" type="date" required value="${dayKey(start)}"></label><label>Начало<select name="hour">${Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${h === start.getHours() ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('')}</select></label></div>
     <label>Тип записи<select name="kind"><option value="appointment">Занятие</option><option value="break">Перерыв</option><option value="personal">Личное время</option></select></label>
@@ -13,7 +15,7 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
       <p class="calendar-selection" data-selection></p><label data-initial ${initial ? '' : 'hidden'}>Имя на первичном приёме<input name="initial_name" maxlength="120" value="${esc(row?.initial_name || '')}" placeholder="Можно заполнить позже"></label>
       <div class="calendar-contact" data-contact aria-live="polite"></div>
       <label>Стоимость занятия, ₽<input name="price" type="number" min="0" max="1000000" step="0.01" required value="${(row?.price_kopecks || 0) / 100}"></label>
-      <label class="calendar-check" data-tariff><input name="save_tariff" type="checkbox" checked>Использовать эту стоимость для новых записей пациента</label>
+      <label class="calendar-check" data-tariff><input name="save_tariff" type="checkbox" ${selected && hasTariff() ? '' : 'checked'}>Закрепить эту стоимость за пациентом для новых записей</label>
       <label class="calendar-check"><input name="paid" type="checkbox" ${row?.price_kopecks > 0 && row.paid_kopecks === row.price_kopecks ? 'checked' : ''}>Занятие оплачено</label>
       ${originalPartial ? `<p class="help">Ранее внесено ${rub(originalPartial)}. Частичная оплата сохранится; галочка отмечает полную оплату.</p>` : ''}
       <div class="calendar-balance" data-balance aria-live="polite"></div>
@@ -28,14 +30,15 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
   const close = () => { if (!busy && (!dirty || window.confirm('Закрыть без сохранения изменений?'))) { dialog.close(); dialog.remove(); } };
   dialog.querySelectorAll('[data-close]').forEach(b => b.onclick = close);
   dialog.oncancel = event => { event.preventDefault(); close(); };
-  dialog.addEventListener('input', () => { dirty = true; });
-  dialog.addEventListener('change', () => { dirty = true; });
+  const markDirty = () => { dirty = true; form.dataset.dirty = 'true'; };
+  dialog.addEventListener('input', markDirty);
+  dialog.addEventListener('change', markDirty);
   const showError = error => { dialog.querySelector('[data-error]').textContent = scheduleError(error); };
   async function operation(callback) {
     if (busy) return;
     busy = true; dialog.querySelector('[data-error]').textContent = '';
     const controls = [...form.querySelectorAll('button,input,select,textarea')].filter(c => !c.disabled); controls.forEach(c => c.disabled = true);
-    try { await callback(); dirty = false; dialog.close(); dialog.remove(); await onSaved(); }
+    try { await callback(); dirty = false; delete form.dataset.dirty; dialog.close(); dialog.remove(); await onSaved(); }
     catch (error) { showError(error); }
     finally { busy = false; controls.forEach(c => c.disabled = false); }
   }
@@ -52,8 +55,9 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
   }
   function choose(id) {
     if (row?.paid_kopecks > 0 && id !== row.patient_id) { showError(new Error('В этой записи уже есть оплата. Сначала разберись с оплатой, затем меняй пациента.')); return; }
-    selected = id; initial = !id; dirty = true;
-    field('price').value = (patients.find(p => p.id === selected)?.schedule_price_kopecks || 0) / 100;
+    selected = id; initial = !id; markDirty();
+    field('price').value = (selectedPatient()?.schedule_price_kopecks || 0) / 100;
+    field('save_tariff').checked = !!selected && !hasTariff();
     dialog.querySelector('[data-search]').value = selected ? selectedName() : '';
     renderPicker(); updateSelection(); contacts(); updateBalance();
   }
@@ -116,7 +120,9 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
         }
       }
     } catch (error) { return showError(error); }
-    const saveTariff = !!selected && field('save_tariff').checked;
+    // Первая ненулевая стоимость становится тарифом пациента автоматически.
+    // Существующий тариф меняется только по явной галочке специалиста.
+    const saveTariff = !!selected && (field('save_tariff').checked || !hasTariff()) && entries[0].price_kopecks > 0;
     operation(async () => { const { error } = await sb.rpc('save_schedule_entries', { entries, save_tariff: saveTariff }); if (error) throw error; });
   };
   const remove = dialog.querySelector('[data-delete]');

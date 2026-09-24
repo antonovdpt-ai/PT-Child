@@ -1,5 +1,5 @@
 import { rub, dayKey, localDate, addDays, periodBounds, periodRows, totals, scheduleError } from './schedule-domain.mjs?v=2';
-import { openScheduleEditor } from './schedule-editor.js?v=3';
+import { openScheduleEditor } from './schedule-editor.js?v=4';
 
 const dateLabel = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
 const monthLabel = new Intl.DateTimeFormat('ru-RU', { month: 'long' });
@@ -75,11 +75,15 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
         const h = i + first, at = new Date(`${key}T${String(h).padStart(2, '0')}:00:00`);
         const items = rows.filter(r => new Date(r.starts_at).getHours() === h);
         const blocked = appointments.some(r => ['planned', 'completed'].includes(r.status) && new Date(r.starts_at) <= at && new Date(r.ends_at) > at);
-        return `<div class="calendar-slot"><span class="calendar-time">${String(h).padStart(2, '0')}:00</span><div>${items.map(r => `<button class="calendar-entry ${safe(r.status)}" data-edit="${r.id}"><span><strong>${safe(name(r))}</strong>${!r.patient_id && r.kind === 'appointment' ? '<small>Первичный приём</small>' : ''}<small>${statuses[r.status]}${r.kind === 'appointment' ? ` · ${rub(r.price_kopecks)}` : ''}${new Date(r.starts_at).getMinutes() ? ` · начало ${new Date(r.starts_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}` : ''}</small></span>${r.kind === 'appointment' ? `<span class="calendar-paid">${r.price_kopecks > 0 && r.paid_kopecks >= r.price_kopecks ? '✓ Оплачено' : 'Без оплаты'}</span>` : ''}</button>`).join('')}
+        return `<div class="calendar-slot"><span class="calendar-time">${String(h).padStart(2, '0')}:00</span><div>${items.map(r => {
+          const paid = r.price_kopecks > 0 && r.paid_kopecks >= r.price_kopecks;
+          return `<div class="calendar-entry ${safe(r.status)}"><button type="button" class="calendar-entry-open" data-edit="${r.id}"><span><strong>${safe(name(r))}</strong>${!r.patient_id && r.kind === 'appointment' ? '<small>Первичный приём</small>' : ''}<small>${statuses[r.status]}${r.kind === 'appointment' ? ` · ${rub(r.price_kopecks)}` : ''}${new Date(r.starts_at).getMinutes() ? ` · начало ${new Date(r.starts_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}` : ''}</small></span></button>${r.kind === 'appointment' ? `<button type="button" class="calendar-paid ${paid ? 'paid' : 'unpaid'}" data-payment="${r.id}" aria-pressed="${paid}" ${r.price_kopecks <= 0 ? 'disabled title="Сначала укажите стоимость занятия"' : ''}>${paid ? '✓ Оплачено' : 'Не оплачено'}</button>` : ''}</div>`;
+        }).join('')}
           ${!blocked ? `<button class="calendar-empty" data-slot="${h}">+ Записать пациента <span>или первичный приём</span></button>` : !items.length ? '<span class="help">Занято предыдущей записью</span>' : ''}</div></div>`;
       }).join('')}</div><div class="calendar-total">${summary(rows)}</div>`;
     body.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => edit(null, key, Number(b.dataset.slot)));
     body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => edit(appointments.find(r => r.id === b.dataset.edit)));
+    body.querySelectorAll('[data-payment]').forEach(b => b.onclick = () => togglePayment(appointments.find(r => r.id === b.dataset.payment), b));
     const changeHours = () => {
       const from = Number(body.querySelector('[data-hour-from]').value), to = Number(body.querySelector('[data-hour-to]').value);
       if (from > to) { window.alert('Первый час должен быть раньше последнего.'); return fillDay(details); }
@@ -93,6 +97,24 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
   }
   function edit(row, key = dayKey(new Date()), hour = new Date().getHours()) {
     openScheduleEditor({ app: page, sb, user, patients, appointments, row, date: key, hour, esc: safe, onSaved: refresh });
+  }
+  async function togglePayment(row, button) {
+    if (!row || button.disabled || row.kind !== 'appointment' || row.price_kopecks <= 0) return;
+    const wasPaid = row.paid_kopecks >= row.price_kopecks;
+    button.disabled = true;
+    button.textContent = 'Сохраняю…';
+    try {
+      const entry = { ...row, paid_kopecks: wasPaid ? 0 : row.price_kopecks, expected_updated_at: row.updated_at };
+      delete entry.updated_at;
+      const { error } = await sb.rpc('save_schedule_entries', { entries: [entry], save_tariff: false });
+      if (error) throw error;
+      await refresh();
+    } catch (error) {
+      notice = scheduleError(error);
+      button.disabled = false;
+      button.textContent = wasPaid ? '✓ Оплачено' : 'Не оплачено';
+      draw();
+    }
   }
   function draw() {
     if (!page?.isConnected) return;
