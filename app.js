@@ -9301,9 +9301,21 @@ mediaList.querySelectorAll('[data-media-card]').forEach(card => {
 
   const showUnavailableState = () => {
     card.classList.add('is-unavailable');
-    image.alt = 'Фотография временно недоступна';
     previewButton.disabled = true;
     previewButton.removeAttribute('data-media-preview');
+    previewButton.removeAttribute('data-media-preview-kind');
+    previewButton.setAttribute(
+      'aria-label',
+      'Файл фотографии временно недоступен'
+    );
+
+    const unavailableState = document.createElement('span');
+    unavailableState.className = 'media-unavailable-state';
+    unavailableState.setAttribute('role', 'status');
+    unavailableState.textContent = 'Файл недоступен';
+
+    // Replacing the image removes the browser's broken-image icon entirely.
+    previewButton.replaceChildren(unavailableState);
   };
 
   image.onerror = async () => {
