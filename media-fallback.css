@@ -1,0 +1,24 @@
+/* Clear, non-interactive state for a private photo that cannot be retrieved. */
+.media-preview-button:disabled {
+  cursor: not-allowed;
+}
+
+.media-unavailable-state {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  padding: 18px;
+  place-items: center;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .media-unavailable-state {
+    min-height: 122px;
+    aspect-ratio: auto;
+  }
+}
