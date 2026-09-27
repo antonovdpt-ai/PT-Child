@@ -4960,51 +4960,45 @@ let editParentReportBtn = null;
   const box = document.getElementById('tabContent');
 let editingContactId = null;
 let editingParentReportId = null;
+const setParentReportStatus = (status, message) => {
+  const statusEl = document.getElementById('parentReportStatus');
+  if (!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.dataset.state = status;
+};
 
 if (state.tab === 'overview') {
   box.insertAdjacentHTML('beforeend', `
-    <div
-      class="card"
-      style="
-        margin-top:12px;
-        padding:16px;
-      "
-    >
+    <section class="card parent-report-launch">
+      <div class="parent-report-launch-copy">
+        <div class="workspace-eyebrow">Обратная связь</div>
+        <h3>Отчёт для родителя</h3>
+        <p>Подготовь черновик, проверь текст и сохрани PDF.</p>
+      </div>
       <button
         type="button"
-        class="btn primary full"
+        class="btn primary parent-report-launch-button"
         id="parentReportBtn"
       >
-        📄 Отчёт для родителя
+        Подготовить отчёт
       </button>
-
-      <div
-        class="muted tiny"
-        style="
-          margin-top:8px;
-          text-align:center;
-        "
-      >
-        Сформировать понятную обратную связь
-        по результатам работы с ребёнком
-      </div>
-    </div>
+    </section>
 
     <div
       id="parentReportEditor"
-      class="card"
+      class="card parent-report-editor"
       style="
         margin-top:12px;
         display:none;
       "
     >
-      <h3 style="margin-top:0">
-        📄 Отчёт для родителя
-      </h3>
-
-      <div class="muted tiny" style="margin-bottom:16px">
-        Проверь и отредактируй текст перед созданием PDF.
-      </div>
+      <header class="parent-report-editor-heading">
+        <div>
+          <div class="workspace-eyebrow">Отчёт для родителя</div>
+          <h3>Проверьте текст перед сохранением PDF</h3>
+          <p>ИИ готовит черновик, а решение о содержании всегда остаётся за специалистом.</p>
+        </div>
+      </header>
 
       <label>Специалист</label>
 <input
@@ -5062,13 +5056,13 @@ if (state.tab === 'overview') {
         placeholder="Практические рекомендации для родителей"
       ></textarea>
 
-      <div class="actions" style="margin-top:16px">
+      <div class="parent-report-actions">
         <button
           type="button"
           class="btn primary full"
           id="generateParentReportBtn"
         >
-          ✨ Подготовить черновик ИИ
+          Подготовить черновик ИИ
         </button>
 <button
   type="button"
@@ -5076,14 +5070,14 @@ if (state.tab === 'overview') {
   id="editParentReportBtn"
   style="display:none"
 >
-  ✏️ Редактировать
+  Редактировать
 </button>
         <button
   type="button"
   class="btn full"
   id="saveParentReportPdfBtn"
 >
-  📄 Сохранить PDF
+  Сохранить и открыть PDF
 </button>
 
         <button
@@ -5094,14 +5088,12 @@ if (state.tab === 'overview') {
           Закрыть
         </button>
       </div>
+      <div id="parentReportStatus" class="parent-report-status" aria-live="polite"></div>
     </div>
 
-<div
-  class="card"
-  style="margin-top:12px"
->
+<section class="card parent-report-history">
   <details>
-    <summary style="cursor:pointer; font-weight:600">
+    <summary class="parent-report-history-summary">
       История отчётов
       ${
         (state.parentReports || []).length
@@ -5115,7 +5107,7 @@ if (state.tab === 'overview') {
         (state.parentReports || []).length
           ? (state.parentReports || [])
               .map(report => `
-                <div class="item">
+                <article class="item parent-report-history-item">
                   <div class="item-title">
                     Отчёт от
                     ${esc(
@@ -5177,36 +5169,29 @@ if (state.tab === 'overview') {
 
 <button
   type="button"
-  class="link"
+  class="link report-history-action"
   data-open-parent-report="${report.id}"
-  style="margin-top:6px"
 >
   Открыть
 </button>
 
 <button
   type="button"
-  class="link"
+  class="link report-history-action"
   data-pdf-parent-report="${report.id}"
-  style="margin-top:6px; margin-left:12px"
 >
   📄 PDF
 </button>
 
 <button
   type="button"
-  class="link"
+  class="link report-history-action report-history-delete"
   data-delete-parent-report="${report.id}"
-  style="
-    margin-top:6px;
-    margin-left:12px;
-    color:#c62828;
-  "
 >
   Удалить
 </button>
 
-                </div>
+                </article>
               `)
               .join('')
           : `
@@ -5217,7 +5202,7 @@ if (state.tab === 'overview') {
       }
     </div>
   </details>
-</div>
+</section>
 
   `);
 
@@ -5242,6 +5227,7 @@ editParentReportBtn =
   if (parentReportBtn && parentReportEditor) {
     parentReportBtn.onclick = () => {
       editingParentReportId = null;
+      setParentReportStatus('', '');
 
       const reportTherapistName =
   document.getElementById('reportTherapistName');
@@ -5307,6 +5293,7 @@ if (generateParentReportBtn) {
     generateParentReportBtn.disabled = true;
     generateParentReportBtn.textContent =
       'Подготавливаю черновик...';
+    setParentReportStatus('loading', 'ИИ подготавливает черновик отчёта…');
 
     try {
       const context =
@@ -5335,16 +5322,15 @@ if (generateParentReportBtn) {
 
       generateParentReportBtn.textContent =
         '✓ Черновик подготовлен';
+      setParentReportStatus('saved', 'Черновик готов. Проверьте текст перед сохранением PDF.');
     } catch (error) {
       console.error(
         'Ошибка подготовки отчёта:',
         error
       );
 
-      alert(
-        'Не удалось подготовить черновик отчёта: ' +
-        error.message
-      );
+      alert('Не удалось подготовить черновик отчёта. Попробуйте ещё раз.');
+      setParentReportStatus('error', 'Не удалось подготовить черновик. Повторите попытку.');
 
       generateParentReportBtn.textContent =
         oldText;
@@ -5396,6 +5382,7 @@ const therapistName =
     saveParentReportPdfBtn.disabled = true;
     saveParentReportPdfBtn.textContent =
       'Сохраняю отчёт...';
+    setParentReportStatus('saving', 'Сохраняем отчёт и открываем PDF…');
 
    const reportPayload = {
   patient_id: p.id,
@@ -5451,10 +5438,8 @@ const { error } = saveResult;
         error
       );
 
-      alert(
-        'Не удалось сохранить отчёт: ' +
-        error.message
-      );
+      alert('Не удалось сохранить отчёт. Проверьте данные и попробуйте ещё раз.');
+      setParentReportStatus('error', 'Не удалось сохранить отчёт. Повторите попытку.');
 
       saveParentReportPdfBtn.disabled = false;
       saveParentReportPdfBtn.textContent =
@@ -5465,6 +5450,7 @@ const { error } = saveResult;
 
     saveParentReportPdfBtn.textContent =
       '✓ Отчёт сохранён';
+    setParentReportStatus('saved', 'Отчёт сохранён. Открываем версию для PDF.');
 
    openParentReportPrintView(
   p,
@@ -5691,10 +5677,7 @@ if (generateParentReportBtn) {
           error
         );
 
-        alert(
-          'Не удалось удалить отчёт: ' +
-          error.message
-        );
+        alert('Не удалось удалить отчёт. Попробуйте ещё раз.');
 
         deleteBtn.disabled = false;
         deleteBtn.textContent = oldText;
@@ -5708,8 +5691,9 @@ if (generateParentReportBtn) {
   });
 
  box.insertAdjacentHTML('beforeend', `
-  <div class="card" style="margin-top:12px">
+  <div class="card contacts-workspace" style="margin-top:12px">
     <div
+      class="contacts-workspace-heading"
       style="
         display:flex;
         justify-content:space-between;
@@ -5717,25 +5701,29 @@ if (generateParentReportBtn) {
         gap:12px;
       "
     >
+      <div>
+      <div class="workspace-eyebrow">Связь с семьёй</div>
       <h3 style="margin:0">
         Контакты родителей / представителей
       </h3>
+      <p class="contacts-workspace-help">Основной контакт всегда находится первым в списке.</p>
+      </div>
 
       <button
         type="button"
-        class="btn small"
+        class="btn small contacts-add-button"
         id="addContactBtn"
       >
         + Контакт
       </button>
     </div>
 
-    <div style="margin-top:10px">
+    <div class="contact-card-list" style="margin-top:10px">
       ${
         (state.contacts || []).length
           ? (state.contacts || [])
               .map(contact => `
-                <div class="item">
+                <article class="item contact-card">
                   <div class="item-title">
                     ${esc(contact.full_name)}
                     ${
@@ -5753,17 +5741,18 @@ if (generateParentReportBtn) {
 
                   ${
                     contact.phone
-                      ? `<div class="item-sub">📞 ${esc(contact.phone)}</div>`
+                      ? `<div class="item-sub contact-phone">${esc(contact.phone)}</div>`
                       : ''
                   }
 
                   ${
                     contact.telegram
-                      ? `<div class="item-sub">✈️ ${esc(contact.telegram)}</div>`
+                      ? `<div class="item-sub contact-telegram">${esc(contact.telegram)}</div>`
                       : ''
                   }
 
 <div
+  class="contact-card-actions"
   style="
     display:flex;
     gap:12px;
@@ -5779,7 +5768,7 @@ if (generateParentReportBtn) {
           class="link"
           data-call-contact="${contact.id}"
         >
-          📞 Позвонить
+          Позвонить
         </button>
 
         <button
@@ -5787,7 +5776,7 @@ if (generateParentReportBtn) {
           class="link"
           data-sms-contact="${contact.id}"
         >
-          ✉️ SMS
+          SMS
         </button>
       `
       : ''
@@ -5801,7 +5790,7 @@ if (generateParentReportBtn) {
           class="link"
           data-telegram-contact="${contact.id}"
         >
-          ✈️ Telegram
+          Telegram
         </button>
       `
       : ''
@@ -5825,10 +5814,10 @@ if (generateParentReportBtn) {
   </button>
 </div>
 
-                </div>
+                </article>
               `)
               .join('')
-          : '<div class="empty">Контакты пока не добавлены.</div>'
+          : '<div class="empty contact-empty-state">Контакты пока не добавлены.</div>'
       }
     </div>
   </div>
@@ -5837,15 +5826,21 @@ if (generateParentReportBtn) {
 box.insertAdjacentHTML('beforeend', `
   <div
     id="contactFormWrap"
-    class="card"
+    class="card contact-form-card"
     style="
       margin-top:12px;
       display:none;
     "
   >
-    <h3>Новый контакт</h3>
+    <header class="contact-form-heading">
+      <div>
+        <div class="workspace-eyebrow">Контакт</div>
+        <h3>Новый контакт</h3>
+        <p>Укажите способы связи, согласованные с семьёй.</p>
+      </div>
+    </header>
 
-    <form id="contactForm">
+    <form id="contactForm" class="contact-form">
       <label>Имя родителя / представителя</label>
       <input
         name="full_name"
@@ -5872,7 +5867,7 @@ box.insertAdjacentHTML('beforeend', `
         placeholder="@username"
       >
 
-      <label style="display:flex; gap:8px; align-items:center">
+      <label class="contact-primary-check">
         <input
           name="is_primary"
           type="checkbox"
@@ -5881,7 +5876,7 @@ box.insertAdjacentHTML('beforeend', `
         Основной контакт
       </label>
 
-      <div class="actions">
+      <div class="contact-form-actions">
         <button
           type="submit"
           class="btn primary full"
@@ -5901,7 +5896,7 @@ box.insertAdjacentHTML('beforeend', `
 
       <div
         id="contactStatus"
-        class="save-status"
+        class="save-status contact-save-status"
       ></div>
     </form>
   </div>
@@ -5919,10 +5914,30 @@ const contactCancelBtn =
 const contactForm =
   document.getElementById('contactForm');
 
+const setContactStatus = (status, message) => {
+  const statusEl = document.getElementById('contactStatus');
+  if (!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.dataset.state = status;
+};
+
+const resetContactForm = () => {
+  if (contactForm) contactForm.reset();
   editingContactId = null;
+
+  const formTitle = contactFormWrap?.querySelector('h3');
+  const contactSaveBtn = document.getElementById('contactSaveBtn');
+
+  if (formTitle) formTitle.textContent = 'Новый контакт';
+  if (contactSaveBtn) contactSaveBtn.textContent = 'Сохранить контакт';
+  setContactStatus('', '');
+};
+
+editingContactId = null;
 
 if (addContactBtn && contactFormWrap) {
   addContactBtn.onclick = () => {
+    resetContactForm();
     contactFormWrap.style.display = 'block';
 
     contactFormWrap.scrollIntoView({
@@ -5934,11 +5949,7 @@ if (addContactBtn && contactFormWrap) {
 
 if (contactCancelBtn && contactFormWrap) {
   contactCancelBtn.onclick = () => {
-    if (contactForm) {
-      contactForm.reset();
-    }
-editingContactId = null;
-
+    resetContactForm();
     contactFormWrap.style.display = 'none';
   };
 }
@@ -5949,9 +5960,6 @@ if (contactForm) {
 
     const contactSaveBtn =
       document.getElementById('contactSaveBtn');
-
-    const contactStatus =
-      document.getElementById('contactStatus');
 
     const fd = new FormData(contactForm);
 
@@ -5968,9 +5976,7 @@ if (contactForm) {
     contactSaveBtn.disabled = true;
     contactSaveBtn.textContent = 'Сохраняю...';
 
-    if (contactStatus) {
-      contactStatus.textContent = '';
-    }
+    setContactStatus('saving', 'Сохраняем контакт…');
 
     if (payload.is_primary) {
       const { error: resetPrimaryError } = await sb
@@ -5980,13 +5986,10 @@ if (contactForm) {
         .eq('therapist_id', user.id);
 
       if (resetPrimaryError) {
+        console.error('Ошибка выбора основного контакта:', resetPrimaryError);
         contactSaveBtn.disabled = false;
         contactSaveBtn.textContent = 'Сохранить контакт';
-
-        if (contactStatus) {
-          contactStatus.textContent =
-            'Ошибка: ' + resetPrimaryError.message;
-        }
+        setContactStatus('error', 'Не удалось выбрать основной контакт. Повторите попытку.');
 
         return;
       }
@@ -6004,20 +6007,15 @@ if (contactForm) {
       .insert(payload);
 
     if (error) {
+      console.error('Ошибка сохранения контакта:', error);
       contactSaveBtn.disabled = false;
       contactSaveBtn.textContent = 'Сохранить контакт';
-
-      if (contactStatus) {
-        contactStatus.textContent =
-          'Ошибка: ' + error.message;
-      }
+      setContactStatus('error', 'Не удалось сохранить контакт. Проверьте данные и попробуйте ещё раз.');
 
       return;
     }
 
-    if (contactStatus) {
-      contactStatus.textContent = '✓ Контакт сохранён';
-    }
+    setContactStatus('saved', 'Контакт сохранён.');
 editingContactId = null;
 
     await loadPatientData();
@@ -6166,13 +6164,11 @@ document
         .eq('therapist_id', user.id);
 
       if (error) {
+        console.error('Ошибка удаления контакта:', error);
         deleteBtn.disabled = false;
         deleteBtn.textContent = oldText;
 
-        alert(
-          'Не удалось удалить контакт: ' +
-          error.message
-        );
+        alert('Не удалось удалить контакт. Попробуйте ещё раз.');
 
         return;
       }
