@@ -2389,69 +2389,89 @@ function renderProfile() {
 
   app.innerHTML = `
     <div class="card profile-page">
-      <div class="topline">
+      <header class="profile-intro">
         <div>
-          <h2 style="margin-bottom:4px">
-            Профиль специалиста
-          </h2>
-
-          <div class="muted tiny">
-            Эти данные будут использоваться в документах Fizira.
-          </div>
+          <div class="workspace-eyebrow">Fizira</div>
+          <h1>Профиль специалиста</h1>
+          <p>Данные используются в документах, отчётах и рабочем пространстве Fizira.</p>
         </div>
-      </div>
+      </header>
 
       <form id="profileForm">
-        <label>ФИО</label>
-        <input
-          name="full_name"
-          required
-          value="${esc(profile.full_name || '')}"
-          placeholder="Например: Алексей Антонов"
-        >
+        <section class="profile-section">
+          <div class="profile-section-heading">
+            <h2>Основные данные</h2>
+            <p>Будут отображаться в отчётах для родителей и других документах.</p>
+          </div>
+          <div class="profile-field-grid">
+            <label>ФИО
+              <input
+                name="full_name"
+                required
+                value="${esc(profile.full_name || '')}"
+                placeholder="Например: Алексей Антонов"
+              >
+            </label>
 
-        <label>Профессия / специализация</label>
-        <input
-          name="profession"
-          required
-          value="${esc(profile.profession || '')}"
-          placeholder="Например: Физический терапевт"
-        >
+            <label>Профессия / специализация
+              <input
+                name="profession"
+                required
+                value="${esc(profile.profession || '')}"
+                placeholder="Например: Физический терапевт"
+              >
+            </label>
 
-        <label>Организация / место работы</label>
-        <input
-          name="organization"
-          value="${esc(profile.organization || '')}"
-          placeholder="Например: Центр детской реабилитации"
-        >
+            <label>Организация / место работы
+              <input
+                name="organization"
+                value="${esc(profile.organization || '')}"
+                placeholder="Например: Центр детской реабилитации"
+              >
+            </label>
 
-        <label>Телефон</label>
-        <input
-          name="phone"
-          type="tel"
-          value="${esc(profile.phone || '')}"
-          placeholder="+7..."
-        >
+            <label>Телефон
+              <input
+                name="phone"
+                type="tel"
+                value="${esc(profile.phone || '')}"
+                placeholder="+7..."
+              >
+            </label>
+          </div>
+        </section>
 
-        <label>Email</label>
-        <input
-          value="${esc(user?.email || '')}"
-          readonly
-        >
+        <section class="profile-section profile-account-section">
+          <div class="profile-section-heading">
+            <h2>Учётная запись</h2>
+            <p>Адрес привязан к входу в Fizira и здесь не редактируется.</p>
+          </div>
+          <label>Email
+            <input
+              value="${esc(user?.email || '')}"
+              readonly
+            >
+          </label>
+        </section>
 
-        <label>Логотип</label>
-        <input
-          id="profileLogoFile"
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-        >
+        <section class="profile-section profile-brand-section">
+          <div class="profile-section-heading">
+            <h2>Логотип</h2>
+            <p>Необязателен. Он появится в документах от вашего имени.</p>
+          </div>
+          <label class="profile-logo-picker">
+            <span>Выбрать файл</span>
+            <input
+              id="profileLogoFile"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+            >
+          </label>
+          <p class="help profile-logo-help">PNG, JPEG или WebP, до 5 МБ.</p>
+          <div id="profileLogoPreview" class="profile-logo-preview"></div>
+        </section>
 
-        <div
-          id="profileLogoPreview"
-          style="margin-top:10px"
-        ></div>
-
-        <div class="actions">
+        <div class="profile-actions">
           <button
             type="submit"
             class="btn primary full"
@@ -2462,56 +2482,28 @@ function renderProfile() {
 
           <button
             type="button"
-            class="btn full"
+            class="btn profile-back-button"
             id="profileBackBtn"
           >
-            ← К пациентам
+            К пациентам
           </button>
         </div>
 
-<div
-  style="
-    margin-top:28px;
-    padding-top:20px;
-    border-top:1px solid #e5e7eb;
-  "
->
-  <div
-    style="
-      font-weight:700;
-      color:#b42318;
-      margin-bottom:6px;
-    "
-  >
-    Удаление аккаунта
-  </div>
+        <section class="profile-danger-zone">
+          <div>
+            <h2>Удаление аккаунта</h2>
+            <p>Аккаунт, пациенты, занятия, оценки, документы, фотографии и другие связанные данные будут удалены безвозвратно.</p>
+          </div>
+          <button
+            type="button"
+            class="btn danger profile-delete-button"
+            id="deleteAccountBtn"
+          >
+            Удалить аккаунт
+          </button>
+        </section>
 
-  <div
-    class="muted tiny"
-    style="margin-bottom:12px"
-  >
-    Аккаунт, пациенты, занятия, оценки, документы,
-    фотографии и другие связанные данные будут удалены безвозвратно.
-  </div>
-
-  <button
-    type="button"
-    class="btn full"
-    id="deleteAccountBtn"
-    style="
-      color:#b42318;
-      border-color:#f0b4ae;
-      background:#fff;
-    "
-  >
-    Удалить аккаунт
-  </button>
-</div>
-
-        <div
-          id="profileStatus"
-          class="save-status"
-        ></div>
+        <div id="profileStatus" class="save-status profile-save-status" aria-live="polite"></div>
       </form>
     </div>
   `;
@@ -2553,12 +2545,7 @@ async function showSavedProfileLogo() {
     <img
       src="${esc(safeLogoUrl)}"
       alt="Логотип специалиста"
-      style="
-        max-width:180px;
-        max-height:100px;
-        object-fit:contain;
-        border-radius:8px;
-      "
+      class="profile-logo-image"
     >
   `;
 }
@@ -2568,12 +2555,16 @@ showSavedProfileLogo();
   const profileForm =
   document.getElementById('profileForm');
 
+  const setProfileStatus = (message = '', stateName = '') => {
+    const profileStatus = document.getElementById('profileStatus');
+    if (!profileStatus) return;
+    profileStatus.textContent = message;
+    profileStatus.dataset.state = stateName;
+  };
+
   const markProfileDirty = () => {
   const profileSaveBtn =
     document.getElementById('profileSaveBtn');
-
-  const profileStatus =
-    document.getElementById('profileStatus');
 
   if (profileSaveBtn) {
     profileSaveBtn.disabled = false;
@@ -2581,10 +2572,7 @@ showSavedProfileLogo();
       'Сохранить изменения';
   }
 
-  if (profileStatus) {
-    profileStatus.textContent =
-      'Есть несохранённые изменения';
-  }
+  setProfileStatus('Есть несохранённые изменения', 'dirty');
 };
 
 profileForm
@@ -2618,9 +2606,6 @@ if (profileForm) {
     const profileSaveBtn =
       document.getElementById('profileSaveBtn');
 
-    const profileStatus =
-      document.getElementById('profileStatus');
-
     const fd = new FormData(profileForm);
 
     const logoFile =
@@ -2642,10 +2627,7 @@ if (logoFile) {
     profileSaveBtn.textContent =
       'Сохранить профиль';
 
-    if (profileStatus) {
-      profileStatus.textContent =
-        'Ошибка: выберите PNG, JPEG или WebP.';
-    }
+    setProfileStatus('Выберите PNG, JPEG или WebP.', 'error');
 
     return;
   }
@@ -2655,10 +2637,7 @@ if (logoFile) {
     profileSaveBtn.textContent =
       'Сохранить профиль';
 
-    if (profileStatus) {
-      profileStatus.textContent =
-        'Ошибка: логотип должен быть не больше 5 МБ.';
-    }
+    setProfileStatus('Логотип должен быть не больше 5 МБ.', 'error');
 
     return;
   }
@@ -2688,11 +2667,7 @@ if (logoFile) {
     profileSaveBtn.textContent =
       'Сохранить профиль';
 
-    if (profileStatus) {
-      profileStatus.textContent =
-        'Ошибка загрузки логотипа: ' +
-        logoError.message;
-    }
+    setProfileStatus('Не удалось загрузить логотип. Повторите попытку.', 'error');
 
     return;
   }
@@ -2717,9 +2692,7 @@ if (logoFile) {
     profileSaveBtn.disabled = true;
     profileSaveBtn.textContent = 'Сохраняю...';
 
-    if (profileStatus) {
-      profileStatus.textContent = '';
-    }
+    setProfileStatus('Сохраняем изменения…', 'saving');
 
     const { data, error } = await sb
       .from('profiles')
@@ -2750,10 +2723,7 @@ if (logoFile) {
       profileSaveBtn.textContent =
         'Сохранить профиль';
 
-      if (profileStatus) {
-        profileStatus.textContent =
-          'Ошибка: ' + error.message;
-      }
+      setProfileStatus('Не удалось сохранить профиль. Проверьте подключение и повторите.', 'error');
 
       return;
     }
@@ -2764,10 +2734,7 @@ if (logoFile) {
 profileSaveBtn.textContent =
   '✓ Профиль сохранён';
 
-    if (profileStatus) {
-      profileStatus.textContent =
-        '✓ Данные сохранены в облаке';
-    }
+    setProfileStatus('Данные сохранены в облаке', 'saved');
 
     
   };
@@ -2778,14 +2745,8 @@ const profileBackBtn =
 
 if (profileBackBtn) {
   profileBackBtn.onclick = async () => {
-    const profileStatus =
-      document.getElementById('profileStatus');
-
     if (!isSpecialistProfileComplete(state.profile)) {
-      if (profileStatus) {
-        profileStatus.textContent =
-          'Сначала заполните ФИО и профессию и сохраните профиль.';
-      }
+      setProfileStatus('Сначала заполните ФИО и профессию и сохраните профиль.', 'error');
 
       return;
     }
@@ -2801,26 +2762,17 @@ const deleteAccountBtn =
 function requestAccountDeletionPassword() {
   return new Promise(resolve => {
     const overlay = document.createElement('div');
+    overlay.className = 'profile-delete-overlay';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'deletePasswordTitle');
-    overlay.style.cssText = [
-      'position:fixed',
-      'inset:0',
-      'z-index:10000',
-      'display:flex',
-      'align-items:center',
-      'justify-content:center',
-      'padding:20px',
-      'background:rgba(15,23,42,.55)'
-    ].join(';');
-
     overlay.innerHTML = `
-      <form class="card" style="width:min(420px,100%);margin:0">
-        <h3 id="deletePasswordTitle" style="margin-top:0">
-          Подтвердите удаление аккаунта
-        </h3>
-        <p class="muted">
+      <form class="card profile-delete-dialog">
+        <header>
+          <div class="workspace-eyebrow">Опасное действие</div>
+          <h2 id="deletePasswordTitle">Подтвердите удаление аккаунта</h2>
+        </header>
+        <p>
           Введите текущий пароль. Он будет проверен сервером Fizira и не
           сохраняется в приложении.
         </p>
@@ -2832,11 +2784,11 @@ function requestAccountDeletionPassword() {
           autocomplete="current-password"
           required
         >
-        <div style="display:flex;gap:10px;margin-top:18px">
-          <button type="button" data-action="cancel" style="flex:1">
+        <div class="profile-delete-actions">
+          <button type="button" class="btn" data-action="cancel">
             Отмена
           </button>
-          <button type="submit" class="danger" style="flex:1">
+          <button type="submit" class="btn danger">
             Удалить аккаунт
           </button>
         </div>
@@ -2891,17 +2843,11 @@ if (deleteAccountBtn) {
       return;
     }
 
-    const profileStatus =
-      document.getElementById('profileStatus');
-
     deleteAccountBtn.disabled = true;
     deleteAccountBtn.textContent =
       'Удаляю аккаунт...';
 
-    if (profileStatus) {
-      profileStatus.textContent =
-        'Удаляем аккаунт и связанные данные...';
-    }
+    setProfileStatus('Удаляем аккаунт и связанные данные…', 'saving');
 
     const { data, error } =
       await sb.functions.invoke(
@@ -2922,15 +2868,7 @@ if (deleteAccountBtn) {
       deleteAccountBtn.textContent =
         'Удалить аккаунт';
 
-      if (profileStatus) {
-        profileStatus.textContent =
-          'Не удалось удалить аккаунт: ' +
-          (
-            data?.error ||
-            error?.message ||
-            'неизвестная ошибка'
-          );
-      }
+      setProfileStatus('Не удалось удалить аккаунт. Повторите попытку или обратитесь в поддержку.', 'error');
 
       return;
     }
