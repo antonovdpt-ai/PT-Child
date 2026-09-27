@@ -6360,78 +6360,80 @@ document
     box.innerHTML = assessmentHtml(state.assessment);
 
 box.insertAdjacentHTML('beforeend', `
-  <div class="card" style="margin-top:12px">
-    <h3>Документы и исследования</h3>
-
-    <div class="muted" style="margin-bottom:14px">
-      Здесь можно хранить обследования, заключения, выписки и другие медицинские документы ребёнка.
-    </div>
-
-    <form id="documentForm">
-
-      <label>Тип документа</label>
-      <select name="document_type" required>
-        <option value="">Выберите тип</option>
-        <option value="mri_ct">МРТ / КТ</option>
-        <option value="xray">Рентген</option>
-        <option value="nsg">НСГ</option>
-        <option value="eeg">ЭЭГ</option>
-        <option value="enmg">ЭНМГ</option>
-        <option value="ultrasound">УЗИ</option>
-        <option value="doppler">Допплерография</option>
-        <option value="doctor_report">Заключение врача</option>
-        <option value="discharge">Выписка</option>
-        <option value="labs">Анализы</option>
-        <option value="genetic">Генетические исследования</option>
-        <option value="other">Другое</option>
-      </select>
-
-      <label style="margin-top:14px">Файл</label>
-      <input
-        id="documentFile"
-        type="file"
-        accept="image/*,application/pdf"
-        multiple
-        required
-      >
-
-      <label style="margin-top:14px">Дата исследования</label>
-      <input
-        type="date"
-        name="document_date"
-      >
-
-      <label style="margin-top:14px">Комментарий</label>
-      <textarea
-        name="document_note"
-        placeholder="Например: заключение невролога, контроль после лечения"
-      ></textarea>
-
-      <button
-        id="documentUploadBtn"
-        class="btn primary full"
-        type="submit"
-        style="margin-top:14px"
-      >
-        + Добавить документ
-      </button>
-
-      <div
-        id="documentStatus"
-        class="save-status"
-      ></div>
-    </form>
-  </div>
-
-  <div class="card" style="margin-top:12px">
-    <h3>Сохранённые документы</h3>
-
-    <div id="documentList">
-      <div class="muted">
-        Документы пока не загружены.
+  <section class="card document-workspace">
+    <div class="workspace-heading document-workspace-heading">
+      <div>
+        <h3>Документы и исследования</h3>
+        <p>Добавляйте обследования, заключения, выписки и другие документы ребёнка.</p>
       </div>
     </div>
-  </div>
+
+    <form id="documentForm" class="document-upload-form">
+      <div class="document-field-grid">
+        <label>Тип документа
+          <select name="document_type" required>
+            <option value="">Выберите тип</option>
+            <option value="mri_ct">МРТ / КТ</option>
+            <option value="xray">Рентген</option>
+            <option value="nsg">НСГ</option>
+            <option value="eeg">ЭЭГ</option>
+            <option value="enmg">ЭНМГ</option>
+            <option value="ultrasound">УЗИ</option>
+            <option value="doppler">Допплерография</option>
+            <option value="doctor_report">Заключение врача</option>
+            <option value="discharge">Выписка</option>
+            <option value="labs">Анализы</option>
+            <option value="genetic">Генетические исследования</option>
+            <option value="other">Другое</option>
+          </select>
+        </label>
+
+        <label>Дата исследования
+          <input type="date" name="document_date">
+        </label>
+      </div>
+
+      <label class="document-file-picker">Файлы
+        <input
+          id="documentFile"
+          type="file"
+          accept="image/*,application/pdf"
+          multiple
+          required
+        >
+      </label>
+      <p class="help document-file-help">Можно выбрать несколько изображений или PDF. Размер одного файла — до 20 МБ.</p>
+
+      <label>Комментарий
+        <textarea
+          name="document_note"
+          placeholder="Например: заключение невролога, контроль после лечения"
+        ></textarea>
+      </label>
+
+      <button id="documentUploadBtn" class="btn primary document-upload-button" type="submit">
+        Добавить документ
+      </button>
+
+      <div id="documentStatus" class="save-status document-save-status" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <section class="card documents-library">
+    <div class="workspace-heading documents-library-heading">
+      <div>
+        <h3>Сохранённые документы</h3>
+        <p>Открывайте документ в новой вкладке или удаляйте лишние файлы.</p>
+      </div>
+    </div>
+
+    <div id="documentList">
+      <div class="document-empty-state">
+        <strong>Документов пока нет</strong>
+        <span>Добавьте первое исследование или заключение выше.</span>
+      </div>
+    </div>
+  </section>
 `);
 
     const form = document.getElementById('assessmentForm'), btn = document.getElementById('assessmentSaveBtn'), status = document.getElementById('assessmentSaveStatus');
@@ -6449,6 +6451,19 @@ const documentFile = document.getElementById('documentFile');
 const documentUploadBtn = document.getElementById('documentUploadBtn');
 const documentStatus = document.getElementById('documentStatus');
 const documentList = document.getElementById('documentList');
+
+const documentEmptyHtml = `
+  <div class="document-empty-state">
+    <strong>Документов пока нет</strong>
+    <span>Добавьте первое исследование или заключение выше.</span>
+  </div>
+`;
+
+const setDocumentStatus = (message = '', stateName = '') => {
+  if (!documentStatus) return;
+  documentStatus.textContent = message;
+  documentStatus.dataset.state = stateName;
+};
 
 const documentTypeLabels = {
   mri_ct: 'МРТ / КТ',
@@ -6468,7 +6483,7 @@ const documentTypeLabels = {
 
 async function loadPatientDocuments() {
   documentList.innerHTML =
-    '<div class="muted">Загружаю документы...</div>';
+    '<div class="document-list-loading">Загружаем документы…</div>';
 
   try {
     const { data, error } = await sb
@@ -6483,8 +6498,7 @@ async function loadPatientDocuments() {
     if (error) throw error;
 
     if (!data || !data.length) {
-      documentList.innerHTML =
-        '<div class="muted">Документы пока не загружены.</div>';
+      documentList.innerHTML = documentEmptyHtml;
       return;
     }
 
@@ -6534,21 +6548,17 @@ async function loadPatientDocuments() {
   )
 ];
 
+    if (!availableItems.length) {
+      documentList.innerHTML = documentEmptyHtml;
+      return;
+    }
+
 documentList.innerHTML = `
-  <div
-    style="
-      display:flex;
-      gap:8px;
-      overflow-x:auto;
-      margin-bottom:14px;
-      padding-bottom:4px;
-    "
-  >
+  <div class="document-filter-bar" aria-label="Фильтр документов">
     <button
       type="button"
-      class="btn primary"
+      class="btn document-filter-chip primary"
       data-document-filter="all"
-      style="white-space:nowrap"
     >
       Все
     </button>
@@ -6557,9 +6567,8 @@ documentList.innerHTML = `
       .map(type => `
         <button
           type="button"
-          class="btn"
+          class="btn document-filter-chip"
           data-document-filter="${type}"
-          style="white-space:nowrap"
         >
           ${documentTypeLabels[type] || 'Другое'}
         </button>
@@ -6567,7 +6576,7 @@ documentList.innerHTML = `
       .join('')}
   </div>
 
-  <div>
+  <div class="document-card-list">
     ${availableItems
       .map(item => {
         const dateValue = item.captured_at || item.created_at;
@@ -6579,29 +6588,20 @@ documentList.innerHTML = `
         
 
         return `
-          <div
-            class="item"
+          <article
+            class="document-card"
             data-document-card="${item.id}"
             data-document-type="${item.document_type || 'other'}"
-            style="margin-top:12px"
           >
-            <div class="item-title">
-              ${documentTypeLabels[item.document_type] || 'Документ'}
+            <div class="document-card-content">
+              <span class="document-card-type">Документ</span>
+              <h4>${documentTypeLabels[item.document_type] || 'Документ'}</h4>
+              <p class="document-card-date">${dateText}</p>
+              ${item.note ? `<p class="document-card-note">${esc(item.note)}</p>` : ''}
             </div>
-
-            <div class="item-sub">
-              ${dateText}
-            </div>
-
-            ${
-              item.note
-                ? `<div style="margin-top:6px">${esc(item.note)}</div>`
-                : ''
-            }
-
-            <div class="actions" style="margin-top:10px">
+            <div class="document-card-actions">
               <a
-                class="btn"
+                class="btn small"
                 href="${esc(item.url)}"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -6611,16 +6611,13 @@ documentList.innerHTML = `
 
               <button
                 type="button"
-                class="link"
+                class="link document-delete-link"
                 data-delete-document="${item.id}"
-                style="color:#b42318"
               >
                 Удалить
               </button>
             </div>
-
-            
-        `;
+          </article>`;
       })
       .join('')}
   </div>
@@ -6695,7 +6692,7 @@ const remainingCards =
 
 if (!remainingCards.length) {
   documentList.innerHTML =
-    '<div class="muted">Документы пока не загружены.</div>';
+    documentEmptyHtml;
   return;
 }
 
@@ -6734,9 +6731,7 @@ if (!remainingSameType) {
           } catch (error) {
             console.error(error);
 
-            alert(
-              'Не удалось удалить документ: ' + error.message
-            );
+            alert('Не удалось удалить документ. Повторите попытку.');
 
             btn.disabled = false;
             btn.textContent = 'Удалить';
@@ -6748,7 +6743,7 @@ if (!remainingSameType) {
     console.error(error);
 
     documentList.innerHTML =
-      `<div class="error">Не удалось загрузить документы: ${esc(error.message)}</div>`;
+      '<div class="error">Не удалось загрузить документы. Проверьте подключение и обновите страницу.</div>';
   }
 }
 
@@ -6760,8 +6755,7 @@ documentForm.onsubmit = async e => {
   const files = Array.from(documentFile.files);
 
   if (!files.length) {
-    documentStatus.textContent =
-      'Выберите хотя бы один файл.';
+    setDocumentStatus('Выберите хотя бы один файл.', 'error');
     return;
   }
 
@@ -6776,8 +6770,7 @@ documentForm.onsubmit = async e => {
   );
 
   if (invalidFile) {
-    documentStatus.textContent =
-      'Можно загружать изображения или PDF.';
+    setDocumentStatus('Можно загружать изображения или PDF.', 'error');
     return;
   }
 
@@ -6786,8 +6779,7 @@ documentForm.onsubmit = async e => {
   );
 
   if (tooLargeFile) {
-    documentStatus.textContent =
-      `Файл "${tooLargeFile.name}" больше 20 МБ.`;
+    setDocumentStatus(`Файл «${tooLargeFile.name}» больше 20 МБ.`, 'error');
     return;
   }
 
@@ -6799,7 +6791,7 @@ documentForm.onsubmit = async e => {
     fd.get('document_note')?.trim() || null;
 
   documentUploadBtn.disabled = true;
-  documentStatus.textContent = '';
+  setDocumentStatus('Готовим загрузку…', 'saving');
 
   let uploadedCount = 0;
 
@@ -6808,7 +6800,9 @@ documentForm.onsubmit = async e => {
       const file = files[i];
 
       documentUploadBtn.textContent =
-        `⏳ Загружаю ${i + 1} из ${files.length}...`;
+        `Загружаем ${i + 1} из ${files.length}…`;
+
+      setDocumentStatus(`Загружаем файл ${i + 1} из ${files.length}…`, 'saving');
 
       const safeName = file.name
         .replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -6853,11 +6847,10 @@ documentForm.onsubmit = async e => {
       uploadedCount++;
     }
 
-    documentStatus.textContent =
-      `✓ Загружено документов: ${uploadedCount}`;
+    setDocumentStatus(`Загружено документов: ${uploadedCount}`, 'saved');
 
     documentUploadBtn.textContent =
-      '✓ Документы добавлены';
+      'Документы добавлены';
 
     documentForm.reset();
 
@@ -6865,7 +6858,7 @@ documentForm.onsubmit = async e => {
 
     setTimeout(() => {
       documentUploadBtn.textContent =
-        '+ Добавить документ';
+        'Добавить документ';
 
       documentUploadBtn.disabled = false;
     }, 1200);
@@ -6873,11 +6866,15 @@ documentForm.onsubmit = async e => {
   } catch (error) {
     console.error(error);
 
-    documentStatus.textContent =
-      `Загружено ${uploadedCount} из ${files.length}. Ошибка: ${error.message}`;
+    setDocumentStatus(
+      uploadedCount
+        ? `Загружено ${uploadedCount} из ${files.length}. Остальные файлы не добавлены.`
+        : 'Не удалось добавить документы. Проверьте подключение и повторите.',
+      'error'
+    );
 
     documentUploadBtn.textContent =
-      '+ Добавить документ';
+      'Добавить документ';
 
     documentUploadBtn.disabled = false;
   }
