@@ -1527,46 +1527,52 @@ async function init() {
   }
 }
 
+function authIdentity() {
+  return `
+    <div class="auth-identity">
+      <img src="fizira-symbol.png" alt="" width="34" height="34">
+      <div>
+        <div class="auth-wordmark">Fizira</div>
+        <div class="auth-caption">Рабочее пространство специалиста</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderLogin() {
   app.innerHTML = `
-    <div class="auth-wrap">
-      <div class="card">
-        <h2>Вход специалиста</h2>
+    <div class="auth-wrap auth-screen">
+      <section class="card auth-card">
+        ${authIdentity()}
+        <header class="auth-heading">
+          <h1>Вход специалиста</h1>
+          <p>Введите данные учётной записи Fizira.</p>
+        </header>
 
         <div id="flash"></div>
 
-        <form id="loginForm">
-          <label>Email</label>
-          <input
-            type="email"
-            name="email"
-            required
-            autocomplete="email"
-          >
+        <form id="loginForm" class="auth-form">
+          <label>Email
+            <input
+              type="email"
+              name="email"
+              required
+              autocomplete="email"
+            >
+          </label>
 
-          <label>Пароль Fizira</label>
-          <input
-            type="password"
-            name="password"
-            required
-            autocomplete="current-password"
-          >
-<div
-  style="
-    text-align:right;
-    margin-top:6px;
-    margin-bottom:12px;
-  "
->
-  <button
-    type="button"
-    id="forgotPasswordBtn"
-    class="link"
-  >
-    Забыли пароль?
-  </button>
-</div>
-          <div class="actions">
+          <label>Пароль Fizira
+            <input
+              type="password"
+              name="password"
+              required
+              autocomplete="current-password"
+            >
+          </label>
+          <div class="auth-inline-action">
+            <button type="button" id="forgotPasswordBtn" class="link">Забыли пароль?</button>
+          </div>
+          <div class="auth-actions">
             <button
               class="btn primary full"
               type="submit"
@@ -1583,7 +1589,7 @@ function renderLogin() {
             </button>
           </div>
         </form>
-      </div>
+      </section>
     </div>
   `;
 
@@ -1618,8 +1624,7 @@ function renderLogin() {
 
         flash(
           'error',
-          'Не удалось войти: ' +
-            error.message
+          'Не удалось войти. Проверьте email и пароль и повторите попытку.'
         );
       }
     };
@@ -1639,27 +1644,27 @@ function renderLogin() {
 
 function renderForgotPassword() {
   app.innerHTML = `
-    <div class="auth-wrap">
-      <div class="card">
-        <h2>Восстановление пароля</h2>
-
-        <div class="muted tiny">
-          Укажите email, который использовали при регистрации.
-        </div>
+    <div class="auth-wrap auth-screen">
+      <section class="card auth-card">
+        ${authIdentity()}
+        <header class="auth-heading">
+          <h1>Восстановление пароля</h1>
+          <p>Укажите email, который использовали при регистрации.</p>
+        </header>
 
         <div id="flash"></div>
 
-        <form id="forgotPasswordForm">
-          <label>Email</label>
+        <form id="forgotPasswordForm" class="auth-form">
+          <label>Email
+            <input
+              type="email"
+              name="email"
+              required
+              autocomplete="email"
+            >
+          </label>
 
-          <input
-            type="email"
-            name="email"
-            required
-            autocomplete="email"
-          >
-
-          <div class="actions">
+          <div class="auth-actions">
             <button
               type="submit"
               class="btn primary full"
@@ -1673,11 +1678,11 @@ function renderForgotPassword() {
               class="btn full"
               id="backFromResetBtn"
             >
-              ← Назад ко входу
+              Вернуться ко входу
             </button>
           </div>
         </form>
-      </div>
+      </section>
     </div>
   `;
 
@@ -1718,8 +1723,7 @@ forgotPasswordForm.onsubmit = async e => {
 
     flash(
       'error',
-      'Не удалось отправить письмо: ' +
-        error.message
+      'Не удалось отправить письмо. Проверьте адрес и повторите попытку.'
     );
 
     return;
@@ -1745,123 +1749,18 @@ forgotPasswordForm.onsubmit = async e => {
 
 function renderUpdatePassword() {
   app.innerHTML = `
-    <style>
-      #passwordRecoveryScreen {
-        padding: 32px 0 56px;
-      }
-
-      #passwordRecoveryCard {
-        width: 100%;
-        max-width: 500px;
-        box-sizing: border-box;
-        padding: 36px;
-        border-radius: 20px;
-        box-shadow: 0 16px 44px rgba(15, 23, 42, 0.08);
-      }
-
-      .recovery-brand {
-        margin-bottom: 12px;
-        color: #2563eb;
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-      }
-
-      #passwordRecoveryCard h2 {
-        margin: 0 0 10px;
-        font-size: 28px;
-        line-height: 1.2;
-      }
-
-      .recovery-description {
-        margin: 0;
-        color: #667085;
-        font-size: 15px;
-        line-height: 1.6;
-      }
-
-      #updatePasswordForm {
-        margin-top: 28px;
-      }
-
-      .recovery-field + .recovery-field {
-        margin-top: 20px;
-      }
-
-      .recovery-field label {
-        display: block;
-        margin-bottom: 8px;
-        font-weight: 600;
-      }
-
-      .recovery-field input {
-        width: 100%;
-        min-height: 48px;
-        box-sizing: border-box;
-      }
-
-      .recovery-actions {
-        margin-top: 28px;
-      }
-
-      .recovery-success {
-        margin-top: 0 !important;
-        text-align: center;
-      }
-
-      .recovery-success-icon {
-        display: grid;
-        width: 64px;
-        height: 64px;
-        margin: 0 auto 22px;
-        place-items: center;
-        border-radius: 50%;
-        background: #e9f9ef;
-        color: #16803d;
-        font-size: 32px;
-        font-weight: 800;
-      }
-
-      .recovery-success .recovery-description {
-        max-width: 350px;
-        margin: 0 auto;
-      }
-
-      .recovery-success .btn {
-        margin-top: 28px;
-      }
-
-      @media (max-width: 600px) {
-        #passwordRecoveryScreen {
-          padding: 18px 0 36px;
-        }
-
-        #passwordRecoveryCard {
-          padding: 28px 22px;
-          border-radius: 16px;
-        }
-
-        #passwordRecoveryCard h2 {
-          font-size: 24px;
-        }
-      }
-    </style>
-
-    <div class="auth-wrap" id="passwordRecoveryScreen">
-      <div class="card" id="passwordRecoveryCard">
-        <div class="recovery-brand">Fizira</div>
-        <h2>Создайте новый пароль</h2>
-
-        <p class="recovery-description">
-          Придумайте новый пароль длиной не менее 8 символов.
-        </p>
+    <div class="auth-wrap auth-screen" id="passwordRecoveryScreen">
+      <section class="card auth-card recovery-card" id="passwordRecoveryCard">
+        ${authIdentity()}
+        <header class="auth-heading">
+          <h1>Создайте новый пароль</h1>
+          <p>Придумайте новый пароль длиной не менее 8 символов.</p>
+        </header>
 
         <div id="flash"></div>
 
-        <form id="updatePasswordForm">
-          <div class="recovery-field">
-            <label for="newPassword">Новый пароль</label>
+        <form id="updatePasswordForm" class="auth-form recovery-form">
+          <label for="newPassword">Новый пароль
             <input
               id="newPassword"
               type="password"
@@ -1870,10 +1769,9 @@ function renderUpdatePassword() {
               minlength="8"
               autocomplete="new-password"
             >
-          </div>
+          </label>
 
-          <div class="recovery-field">
-            <label for="newPasswordConfirm">Повторите пароль</label>
+          <label for="newPasswordConfirm">Повторите пароль
             <input
               id="newPasswordConfirm"
               type="password"
@@ -1882,9 +1780,9 @@ function renderUpdatePassword() {
               minlength="8"
               autocomplete="new-password"
             >
-          </div>
+          </label>
 
-          <div class="recovery-actions">
+          <div class="auth-actions recovery-actions">
             <button
               type="submit"
               class="btn primary full"
@@ -1894,7 +1792,7 @@ function renderUpdatePassword() {
             </button>
           </div>
         </form>
-      </div>
+      </section>
     </div>
   `;
 
@@ -1933,7 +1831,7 @@ function renderUpdatePassword() {
 
       flash(
         'error',
-        'Не удалось изменить пароль: ' + error.message
+        'Не удалось изменить пароль. Попробуйте ещё раз.'
       );
 
       return;
@@ -1943,18 +1841,13 @@ function renderUpdatePassword() {
       document.getElementById('passwordRecoveryCard');
 
     recoveryCard.innerHTML = `
-      <div
-        id="updatePasswordForm"
-        class="recovery-success"
-        role="status"
-        aria-live="polite"
-      >
-        <div class="recovery-success-icon" aria-hidden="true">✓</div>
-        <div class="recovery-brand">Fizira</div>
+      <div id="updatePasswordForm" class="recovery-success" role="status" aria-live="polite">
+        <div class="recovery-success-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4.2 4.2L19 6.8" /></svg></div>
+        ${authIdentity()}
 
-        <h2>Пароль изменён</h2>
+        <h1>Пароль изменён</h1>
 
-        <p class="recovery-description">
+        <p class="auth-success-description">
           Новый пароль успешно сохранён. Теперь вы можете продолжить работу в приложении.
         </p>
 
@@ -2089,38 +1982,16 @@ function showLegalDocument(type) {
     `;
 
   const overlay = document.createElement('div');
-
-  overlay.style.cssText = `
-    position:fixed;
-    inset:0;
-    background:rgba(15,23,42,.45);
-    z-index:9999;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:20px;
-  `;
+  overlay.className = 'legal-overlay';
 
   overlay.innerHTML = `
-    <div
-      class="card"
-      style="
-        width:min(640px, 100%);
-        max-height:80vh;
-        overflow:auto;
-        padding:22px;
-      "
-    >
-      <h2 style="margin-top:0">
-        ${title}
-      </h2>
+    <section class="card legal-dialog" role="dialog" aria-modal="true" aria-label="${title}">
+      <header>
+        <div class="workspace-eyebrow">Fizira</div>
+        <h2>${title}</h2>
+      </header>
 
-      <div
-        style="
-          line-height:1.6;
-          font-size:15px;
-        "
-      >
+      <div class="legal-content">
         ${content}
       </div>
 
@@ -2128,11 +1999,10 @@ function showLegalDocument(type) {
         type="button"
         class="btn primary full"
         id="closeLegalDocumentBtn"
-        style="margin-top:18px"
       >
         Понятно
       </button>
-    </div>
+    </section>
   `;
 
   document.body.appendChild(overlay);
@@ -2152,100 +2022,57 @@ function showLegalDocument(type) {
 
 function renderRegister() {
   app.innerHTML = `
-    <div class="auth-wrap">
-      <div class="card">
-        <h2>Создать аккаунт</h2>
-
-        <div class="muted tiny">
-          Регистрация специалиста Fizira
-        </div>
+    <div class="auth-wrap auth-screen">
+      <section class="card auth-card">
+        ${authIdentity()}
+        <header class="auth-heading">
+          <h1>Создать аккаунт</h1>
+          <p>Регистрация специалиста Fizira занимает меньше минуты.</p>
+        </header>
 
         <div id="flash"></div>
 
-        <form id="registerForm">
-          <label>Email</label>
-          <input
-            type="email"
-            name="email"
-            required
-            autocomplete="email"
-          >
+        <form id="registerForm" class="auth-form">
+          <label>Email
+            <input
+              type="email"
+              name="email"
+              required
+              autocomplete="email"
+            >
+          </label>
 
-          <label>Пароль</label>
-          <input
-            type="password"
-            name="password"
-            required
-            minlength="8"
-            autocomplete="new-password"
-          >
+          <label>Пароль
+            <input
+              type="password"
+              name="password"
+              required
+              minlength="8"
+              autocomplete="new-password"
+            >
+          </label>
 
-          <label>Повторите пароль</label>
-          <input
-            type="password"
-            name="password_confirm"
-            required
-            minlength="8"
-            autocomplete="new-password"
-          >
+          <label>Повторите пароль
+            <input
+              type="password"
+              name="password_confirm"
+              required
+              minlength="8"
+              autocomplete="new-password"
+            >
+          </label>
 
-          <label
-  style="
-    display:flex;
-    align-items:flex-start;
-    gap:10px;
-    margin-top:16px;
-    cursor:pointer;
-  "
->
-  <input
-    type="checkbox"
-    name="legal_consent"
-    required
-    style="
-      width:auto;
-      margin-top:3px;
-    "
-  >
+          <label class="auth-consent">
+            <input type="checkbox" name="legal_consent" required>
+            <span>Я принимаю Условия использования и Политику конфиденциальности Fizira</span>
+          </label>
 
-  <span
-    style="
-      font-size:14px;
-      line-height:1.4;
-    "
-  >
-    Я принимаю Условия использования
-    и Политику конфиденциальности Fizira
-  </span>
-</label>
+          <div class="auth-legal-links">
+            <button type="button" class="link" id="showTermsBtn">Условия использования</button>
+            <button type="button" class="link" id="showPrivacyBtn">Политика конфиденциальности</button>
+          </div>
 
-<div
-  style="
-    display:flex;
-    gap:14px;
-    flex-wrap:wrap;
-    margin-top:8px;
-    margin-bottom:14px;
-  "
->
-  <button
-    type="button"
-    class="link"
-    id="showTermsBtn"
-  >
-    Условия использования
-  </button>
-
-  <button
-    type="button"
-    class="link"
-    id="showPrivacyBtn"
-  >
-    Политика конфиденциальности
-  </button>
-</div>
-
-          <div class="actions">
+          <div class="auth-actions">
             <button
               class="btn primary full"
               type="submit"
@@ -2259,11 +2086,11 @@ function renderRegister() {
               type="button"
               id="backToLoginBtn"
             >
-              ← Уже есть аккаунт
+              Уже есть аккаунт
             </button>
           </div>
         </form>
-      </div>
+      </section>
     </div>
   `;
 
@@ -2333,8 +2160,7 @@ const { data, error } =
 
     flash(
       'error',
-      'Не удалось создать аккаунт: ' +
-        error.message
+      'Не удалось создать аккаунт. Проверьте данные и повторите попытку.'
     );
 
     return;
