@@ -879,11 +879,11 @@ function renderHeader() {
 
     <div class="header-user-actions">
       <button
-        id="cabinetBtn"
+        id="profileBtn"
         type="button"
         class="btn account-button"
       >
-        Личный кабинет
+        Профиль
       </button>
 
       <button
@@ -893,29 +893,44 @@ function renderHeader() {
         aria-label="Выйти из аккаунта"
         title="Выйти"
       >
-        Выйти
+        <span class="logout-label">Выйти</span>
+        <svg class="logout-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20H13"/><path d="M12 12h8"/><path d="m17 8 4 4-4 4"/></svg>
       </button>
     </div>
   </div>
 `;
 
-document.getElementById('cabinetBtn').onclick = () => {
+function openSchedule() {
   renderCabinet({ app, sb, state, user, esc, renderPatients, renderProfile }).catch(error => {
     console.error('Ошибка личного кабинета:', error);
     flash('error', error.message || 'Не удалось открыть личный кабинет.');
   });
+}
+
+function openProfile() {
+  renderProfile();
+}
+
+window.fiziraNavigate = route => {
+  if (route === 'schedule') return openSchedule();
+  if (route === 'profile') return openProfile();
+  return renderPatients();
 };
+
+document.getElementById('profileBtn').onclick = openProfile;
 
   document.getElementById('logoutBtn').onclick = async event => {
     const button = event.currentTarget;
     button.disabled = true;
-    button.textContent = 'Выхожу...';
+    button.setAttribute('aria-label', 'Выхожу из аккаунта');
+    button.querySelector('.logout-label')?.replaceChildren('Выхожу…');
 
     const { error } = await sb.auth.signOut();
 
     if (error) {
       button.disabled = false;
-      button.textContent = 'Выйти';
+      button.setAttribute('aria-label', 'Выйти из аккаунта');
+      button.querySelector('.logout-label')?.replaceChildren('Выйти');
       flash('error', `Не удалось выйти: ${error.message}`);
     }
   };
@@ -2389,7 +2404,7 @@ function renderProfile() {
   const profile = state.profile || {};
 
   app.innerHTML = `
-    <div class="card">
+    <div class="card profile-page">
       <div class="topline">
         <div>
           <h2 style="margin-bottom:4px">
