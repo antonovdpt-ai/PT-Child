@@ -1187,6 +1187,21 @@ function enableAssessmentSectionCollapse(form) {
   const sections =
     form.querySelectorAll('.section-card');
 
+  const completion =
+    form.querySelector('#assessmentSectionProgress');
+
+  const updateCompletion = () => {
+    if (!completion) return;
+
+    const filled =
+      Array.from(sections).filter(section =>
+        section.dataset.hasData === '1'
+      ).length;
+
+    completion.textContent =
+      `Заполнено разделов: ${filled} из ${sections.length}`;
+  };
+
   sections.forEach((section, index) => {
     if (
       section.dataset.collapsibleReady === '1'
@@ -1200,6 +1215,7 @@ function enableAssessmentSectionCollapse(form) {
     if (!head) return;
 
     section.dataset.collapsibleReady = '1';
+    section.classList.add('assessment-section');
 
     const body =
       document.createElement('div');
@@ -1213,28 +1229,21 @@ function enableAssessmentSectionCollapse(form) {
 
     section.appendChild(body);
 
-    head.style.cursor = 'pointer';
-    head.style.userSelect = 'none';
-    head.style.display = 'flex';
-    head.style.alignItems = 'center';
-    head.style.gap = '8px';
+    head.classList.add('assessment-section-trigger');
+    head.setAttribute('role', 'button');
+    head.setAttribute('tabindex', '0');
 
     const statusBadge =
       document.createElement('span');
 
-    statusBadge.style.marginLeft = 'auto';
-    statusBadge.style.fontSize = '12px';
-    statusBadge.style.fontWeight = '600';
-    statusBadge.style.whiteSpace = 'nowrap';
+    statusBadge.className = 'assessment-section-status';
 
     head.appendChild(statusBadge);
 
     const toggle =
       document.createElement('span');
 
-    toggle.style.fontSize = '14px';
-    toggle.style.color = '#6b7280';
-    toggle.style.marginLeft = '4px';
+    toggle.className = 'assessment-section-toggle';
 
     head.appendChild(toggle);
 
@@ -1263,16 +1272,18 @@ function enableAssessmentSectionCollapse(form) {
       if (hasData) {
         statusBadge.textContent =
           '✓ есть данные';
-
-        statusBadge.style.color =
-          '#15803d';
+        statusBadge.classList.add('is-complete');
+        statusBadge.classList.remove('is-empty');
+        section.dataset.hasData = '1';
       } else {
         statusBadge.textContent =
           'пусто';
-
-        statusBadge.style.color =
-          '#9ca3af';
+        statusBadge.classList.add('is-empty');
+        statusBadge.classList.remove('is-complete');
+        section.dataset.hasData = '0';
       }
+
+      updateCompletion();
     };
 
     controls.forEach(control => {
@@ -1294,7 +1305,7 @@ function enableAssessmentSectionCollapse(form) {
         open ? '1' : '0';
 
       toggle.textContent =
-        open ? '▼' : '▶';
+        open ? 'Свернуть' : 'Открыть';
 
       head.setAttribute(
         'aria-expanded',
@@ -1311,6 +1322,12 @@ function enableAssessmentSectionCollapse(form) {
         section.dataset.open === '1';
 
       setOpen(!currentlyOpen);
+    };
+
+    head.onkeydown = event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      head.click();
     };
   });
 }
@@ -1330,49 +1347,16 @@ function enableAssessmentFloatingSave(form, btn, status) {
 
   if (!actions) return;
 
-  actions.style.position = 'fixed';
-  actions.style.left = '50%';
-  actions.style.bottom =
-    'max(12px, env(safe-area-inset-bottom))';
-  actions.style.transform =
-    'translateX(-50%)';
-
-  actions.style.width =
-    'min(470px, calc(100vw - 24px))';
-
-  actions.style.boxSizing = 'border-box';
-  actions.style.zIndex = '999';
-
-  actions.style.margin = '0';
-  actions.style.padding = '10px';
-
-  actions.style.background =
-    'rgba(255, 255, 255, 0.96)';
-
-  actions.style.backdropFilter =
-    'blur(8px)';
-
-  actions.style.border =
-    '1px solid #e5e7eb';
-
-  actions.style.borderRadius = '14px';
-
-  actions.style.boxShadow =
-    '0 10px 30px rgba(0, 0, 0, 0.12)';
-
-  actions.style.display = 'block';
-
-  btn.style.width = '100%';
-  btn.style.margin = '0';
+  actions.classList.add('assessment-save-bar');
+  btn.classList.add('assessment-save-button');
 
   if (status) {
     actions.appendChild(status);
 
-    status.style.marginTop = '6px';
-    status.style.marginBottom = '0';
+    status.classList.add('assessment-save-status');
   }
 
-  form.style.paddingBottom = '100px';
+  form.classList.add('assessment-form');
 }
 
 async function loadProfile() {
@@ -3527,12 +3511,29 @@ function goalsHtml(goals, deletable = false) {
 function renderPatient() {
   const p = currentPatient(); if (!p) return renderPatients();
   const tabs = [['overview', 'Обзор'], ['assessment', 'Оценка'], ['goals', 'Цели'], ['sessions', 'Занятия'], ['progress', 'Динамика'], ['media', 'Медиа']];
-  app.innerHTML = `<div class="card"><div class="patient-top"><div><div class="muted tiny">Карточка ребёнка</div><h1>${esc(p.display_name)}</h1><div class="meta">
-  ${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}
-</div>
-<div class="muted tiny" style="margin-top:4px">
-  Дата рождения: ${p.date_of_birth ? esc(fmtDate(p.date_of_birth)) : "Не указана"}
-</div></div><span class="badge">облако</span></div><div class="sep"></div><div class="item-title">${esc(p.primary_complaint || 'Причина обращения пока не заполнена')}</div><div class="actions"><button class="btn full" id="editPatient" type="button">✏️ Редактировать карточку</button><button class="btn full" id="backPatients" type="button">← К пациентам</button></div></div><div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('')}</div><div id="flash"></div><div id="tabContent"></div>`;
+  app.innerHTML = `
+    <section class="card patient-hero">
+      <div class="patient-hero-top">
+        <div class="patient-hero-identity">
+          <div class="patient-eyebrow">Карточка ребёнка</div>
+          <h1>${esc(p.display_name)}</h1>
+          <div class="patient-hero-meta">${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}</div>
+          <div class="patient-hero-date">Дата рождения: ${p.date_of_birth ? esc(fmtDate(p.date_of_birth)) : "Не указана"}</div>
+        </div>
+        <span class="badge patient-cloud-status">Облако</span>
+      </div>
+      <div class="patient-complaint-summary">
+        <span>Причина обращения</span>
+        <p>${esc(p.primary_complaint || 'Причина обращения пока не заполнена')}</p>
+      </div>
+      <div class="actions patient-hero-actions">
+        <button class="btn" id="editPatient" type="button">Редактировать карточку</button>
+        <button class="btn" id="backPatients" type="button">К пациентам</button>
+      </div>
+    </section>
+    <nav class="tabs patient-tabs" aria-label="Разделы карточки пациента">${tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" data-tab="${k}" ${state.tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('')}</nav>
+    <div id="flash"></div>
+    <div id="tabContent"></div>`;
   document.getElementById('editPatient').onclick = renderEditPatient; document.getElementById('backPatients').onclick = renderPatients; document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderPatient() }); renderTab(p);
   const actions = app.querySelector(".actions");
   
@@ -3627,13 +3628,14 @@ if (!deletedPatients || deletedPatients.length !== 1) {
 
   const aiBtn = document.createElement("button");
   aiBtn.id = "aiAnalyzeBtn";
-  aiBtn.className = "primary";
-  aiBtn.textContent = "✨ Анализ ИИ";
+  aiBtn.className = "btn primary ai-action-button";
+  aiBtn.textContent = "Анализ пациента";
   actions.prepend(aiBtn);
 
   const aiDocumentsPanel = document.createElement("div");
 
 aiDocumentsPanel.id = "aiDocumentsPanel";
+aiDocumentsPanel.className = "ai-documents-panel";
 
 aiDocumentsPanel.style.cssText = `
   width:100%;
@@ -3655,7 +3657,7 @@ aiDocumentsPanel.innerHTML = `
   >
     <div>
       <div style="font-weight:700">
-        📎 Документы для ИИ
+        Документы для анализа
       </div>
 
       <div
@@ -3963,23 +3965,23 @@ loadAiDocumentChoices();
 
   const historyBtn = document.createElement("button");
   historyBtn.id = "aiHistoryBtn";
-  historyBtn.className = "btn";
-  historyBtn.textContent = "🕘 История анализов";
+  historyBtn.className = "btn ai-history-button";
+  historyBtn.textContent = "История анализов";
 
   aiBtn.insertAdjacentElement("afterend", historyBtn);
 
   const aiResult = document.createElement("div");
-  aiResult.className = "card";
+  aiResult.className = "card ai-result-card";
   aiResult.style.display = "none";
   aiResult.style.marginTop = "12px";
   aiResult.style.whiteSpace = "pre-wrap";
 
   const aiToggleBtn = document.createElement("button");
-aiToggleBtn.className = "btn full";
+aiToggleBtn.className = "btn full ai-result-toggle";
 aiToggleBtn.type = "button";
 aiToggleBtn.style.display = "none";
 aiToggleBtn.style.marginTop = "12px";
-aiToggleBtn.textContent = "▲ Свернуть анализ";
+aiToggleBtn.textContent = "Свернуть анализ";
 
 
 
@@ -3988,7 +3990,7 @@ function showAiResult(html) {
   aiResult.style.display = "block";
 
   aiToggleBtn.style.display = "block";
-  aiToggleBtn.textContent = "▲ Свернуть анализ";
+  aiToggleBtn.textContent = "Свернуть анализ";
 }
 
 aiToggleBtn.onclick = () => {
@@ -3996,10 +3998,10 @@ aiToggleBtn.onclick = () => {
 
   if (isOpen) {
     aiResult.style.display = "none";
-    aiToggleBtn.textContent = "▼ Развернуть анализ";
+    aiToggleBtn.textContent = "Развернуть анализ";
   } else {
     aiResult.style.display = "block";
-    aiToggleBtn.textContent = "▲ Свернуть анализ";
+    aiToggleBtn.textContent = "Свернуть анализ";
   }
 };
 
@@ -4022,7 +4024,7 @@ aiToggleBtn.onclick = () => {
     }
 
     historyBtn.disabled = true;
-    historyBtn.textContent = "⏳ Загружаю...";
+    historyBtn.textContent = "Загружаем…";
 
     try {
       const history = await loadAiAnalysisHistory(p.id);
@@ -4030,7 +4032,7 @@ aiToggleBtn.onclick = () => {
       historyPanel.innerHTML = "";
 
       const title = document.createElement("h3");
-      title.textContent = "🕘 История анализов";
+      title.textContent = "История анализов";
       historyPanel.appendChild(title);
 
       if (!history.length) {
@@ -4073,7 +4075,7 @@ aiToggleBtn.onclick = () => {
       historyPanel.style.display = "block";
     } finally {
       historyBtn.disabled = false;
-      historyBtn.textContent = "🕘 История анализов";
+      historyBtn.textContent = "История анализов";
     }
   };
 
@@ -4085,15 +4087,15 @@ aiToggleBtn.onclick = () => {
 
 aiResult.style.display = "none";
 aiToggleBtn.style.display = "block";
-aiToggleBtn.textContent = "▼ Развернуть анализ";
+aiToggleBtn.textContent = "Развернуть анализ";
   
 
-  aiBtn.textContent = "✨ Обновить анализ ИИ";
+  aiBtn.textContent = "Обновить анализ";
   }
 
   aiBtn.onclick = async () => {
     aiBtn.disabled = true;
-    aiBtn.textContent = "⏳ Анализирую...";
+    aiBtn.textContent = "Анализируем…";
     aiResult.style.display = "block";
     aiResult.textContent = "ИИ анализирует данные ребёнка...";
 
@@ -4288,8 +4290,8 @@ const answer =
 
       setTimeout(() => {
         aiBtn.textContent = p.ai_analysis
-          ? "✨ Обновить анализ ИИ"
-          : "✨ Анализ ИИ";
+          ? "Обновить анализ"
+          : "Анализ пациента";
         aiBtn.disabled = false;
       }, 1200);
 
@@ -4320,8 +4322,9 @@ function assessmentHtml(a) {
   const sd = getStructured(a), m = sd.milestones || {}, obs = sd.observation || {}, body = sd.body || {}, ankle = sd.ankle || {}, neuro = sd.neuro || {}, hx = sd.history || {}, compl = sd.complaint || {}, tests = sd.tests || {};
   return `
   <form id="assessmentForm">
-    <div class="card">
-      <div class="topline"><div><h3 style="margin-bottom:2px">Первичная оценка</h3><div class="muted tiny">Подробная облачная форма v0.6</div></div><span class="badge">${a?.id ? 'сохранена' : 'черновик'}</span></div>
+    <div class="card assessment-card">
+      <div class="assessment-intro"><div><h3>Первичная оценка</h3><div class="muted tiny">Заполняйте только применимые разделы — данные сохраняются в текущей форме.</div></div><span class="badge">${a?.id ? 'сохранена' : 'черновик'}</span></div>
+      <div id="assessmentSectionProgress" class="assessment-progress">Заполнено разделов: 0 из 9</div>
 
       <div class="section-card">
         <div class="section-head"><div class="section-num">1</div><div class="section-title">Жалоба</div></div>
