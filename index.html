@@ -7,8 +7,9 @@
   <meta name="referrer" content="no-referrer" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Fizira</title>
-  <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=0.158-layout-fix" />
+  <link rel="icon" type="image/png" sizes="512x512" href="fizira-symbol.png?v=0.159-navigation" />
+  <link rel="apple-touch-icon" href="fizira-symbol.png?v=0.159-navigation" />
+  <link rel="stylesheet" href="styles.css?v=0.159-navigation" />
 </head>
 <body>
   <div class="shell">
@@ -26,6 +27,10 @@
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3.5 2" /></svg>
           <span>Расписание</span>
         </button>
+        <button class="sidebar-nav-item" id="sideProfile" type="button">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5" /><path d="M5.5 20c.8-3.2 3.2-5 6.5-5s5.7 1.8 6.5 5" /></svg>
+          <span>Профиль</span>
+        </button>
       </nav>
       <div class="sidebar-footer"><span class="status-dot" aria-hidden="true"></span><span>Система работает</span></div>
     </aside>
@@ -39,21 +44,31 @@
     <div class="warning">Тестовая версия. Пока используйте только вымышленные данные пациентов.</div>
     <main id="app"><div class="card center">Загрузка…</div></main>
   </div>
-  <script type="module" src="app.js?v=0.158-layout-fix"></script>
+  <script type="module" src="app.js?v=0.159-navigation"></script>
   <script>
     (() => {
       const syncShell = () => {
-        const authenticated = Boolean(document.getElementById('cabinetBtn') || document.getElementById('logoutBtn'));
+        const authenticated = Boolean(document.getElementById('logoutBtn'));
         document.body.classList.toggle('is-authenticated', authenticated);
-        document.getElementById('sidePatients')?.classList.toggle('is-active', !document.querySelector('.cabinet-page'));
-        document.getElementById('sideCabinet')?.classList.toggle('is-active', Boolean(document.querySelector('.cabinet-page')));
+        const section = document.querySelector('.cabinet-page')
+          ? 'schedule'
+          : document.querySelector('.profile-page')
+            ? 'profile'
+            : 'patients';
+        document.getElementById('sidePatients')?.classList.toggle('is-active', section === 'patients');
+        document.getElementById('sideCabinet')?.classList.toggle('is-active', section === 'schedule');
+        document.getElementById('sideProfile')?.classList.toggle('is-active', section === 'profile');
       };
       new MutationObserver(syncShell).observe(document.body, { childList: true, subtree: true });
       document.addEventListener('click', event => {
-        const target = event.target.closest?.('#sidePatients, #sideCabinet');
+        const target = event.target.closest?.('#sidePatients, #sideCabinet, #sideProfile');
         if (!target) return;
-        if (target.id === 'sideCabinet') document.getElementById('cabinetBtn')?.click();
-        if (target.id === 'sidePatients') document.querySelector('#cabinetBack, #backPatients')?.click();
+        const route = target.id === 'sideCabinet'
+          ? 'schedule'
+          : target.id === 'sideProfile'
+            ? 'profile'
+            : 'patients';
+        window.fiziraNavigate?.(route);
         setTimeout(syncShell, 0);
       });
       syncShell();
