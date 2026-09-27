@@ -1,5 +1,5 @@
 import { rub, dayKey, localDate, addDays, periodBounds, periodRows, totals, scheduleError } from './schedule-domain.mjs?v=2';
-import { openScheduleEditor } from './schedule-editor.js?v=5';
+import { openScheduleEditor } from './schedule-editor.js?v=6';
 
 const dateLabel = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
 const monthLabel = new Intl.DateTimeFormat('ru-RU', { month: 'long' });
@@ -18,8 +18,9 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     return `<span>Занятий: <b>${t.count}</b> · проведено: <b>${t.completed}</b></span><span>Заработано: <b>${rub(t.earned)}</b></span>`;
   };
   function navigation(active) {
-    return `<div class="cabinet-head"><div><h1>Личный кабинет</h1><button class="link" data-nav="patients">← Пациенты</button></div>
-      <nav class="cabinet-tabs" aria-label="Личный кабинет"><button data-nav="schedule" class="${active === 'schedule' ? 'active' : ''}" ${active === 'schedule' ? 'aria-current="page"' : ''}>Расписание</button><button data-nav="profile" class="${active === 'profile' ? 'active' : ''}" ${active === 'profile' ? 'aria-current="page"' : ''}>Профиль</button></nav></div>`;
+    const isSchedule = active === 'schedule';
+    return `<header class="cabinet-head cabinet-page-heading"><div><div class="workspace-eyebrow">Fizira</div><h1>${isSchedule ? 'Расписание' : 'Профиль специалиста'}</h1><p>${isSchedule ? 'Занятия, статусы и оплата в одном рабочем представлении.' : 'Данные рабочего пространства и специалиста.'}</p><button class="link cabinet-back-link" data-nav="patients">К пациентам</button></div>
+      <nav class="cabinet-tabs" aria-label="Личный кабинет"><button data-nav="schedule" class="${isSchedule ? 'active' : ''}" ${isSchedule ? 'aria-current="page"' : ''}>Расписание</button><button data-nav="profile" class="${active === 'profile' ? 'active' : ''}" ${active === 'profile' ? 'aria-current="page"' : ''}>Профиль</button></nav></header>`;
   }
   function bindNav(root) {
     root.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => {
@@ -93,7 +94,7 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
           const paid = r.price_kopecks > 0 && r.paid_kopecks >= r.price_kopecks;
           const details = `${r.kind === 'appointment' ? rub(r.price_kopecks) : statuses[r.status]}${new Date(r.starts_at).getMinutes() ? ` · начало ${new Date(r.starts_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}` : ''}`;
           const statusOptions = Object.entries(statuses).map(([value, label]) => `<option value="${value}" ${r.status === value ? 'selected' : ''}>${label}</option>`).join('');
-          return `<div class="calendar-entry ${safe(r.status)}"><button type="button" class="calendar-entry-open" data-edit="${r.id}"><span><strong>${safe(name(r))}</strong>${!r.patient_id && r.kind === 'appointment' ? '<small>Первичный приём</small>' : ''}<small>${details}</small></span></button>${r.kind === 'appointment' ? `<div class="calendar-entry-actions"><select class="calendar-status ${safe(r.status)}" data-status="${r.id}" aria-label="Статус занятия ${safe(name(r))}">${statusOptions}</select><button type="button" class="calendar-paid ${paid ? 'paid' : 'unpaid'}" data-payment="${r.id}" aria-pressed="${paid}" ${r.price_kopecks <= 0 ? 'disabled title="Сначала укажите стоимость занятия"' : ''}>${paid ? '✓ Оплачено' : 'Не оплачено'}</button></div>` : ''}</div>`;
+          return `<article class="calendar-entry ${safe(r.status)}"><button type="button" class="calendar-entry-open" data-edit="${r.id}"><span class="calendar-entry-copy"><strong>${safe(name(r))}</strong>${!r.patient_id && r.kind === 'appointment' ? '<small>Первичный приём</small>' : ''}<small>${details}</small></span></button>${r.kind === 'appointment' ? `<div class="calendar-entry-actions"><select class="calendar-status ${safe(r.status)}" data-status="${r.id}" aria-label="Статус занятия ${safe(name(r))}">${statusOptions}</select><button type="button" class="calendar-paid ${paid ? 'paid' : 'unpaid'}" data-payment="${r.id}" aria-pressed="${paid}" ${r.price_kopecks <= 0 ? 'disabled title="Сначала укажите стоимость занятия"' : ''}>${paid ? 'Оплачено' : 'Не оплачено'}</button></div>` : ''}</article>`;
         }).join('')}
           ${!blocked ? `<button class="calendar-empty" data-slot="${h}">+ Записать пациента <span>или первичный приём</span></button>` : !items.length ? '<span class="help">Занято предыдущей записью</span>' : ''}</div></div>`;
       }).join('')}</div><div class="calendar-total">${summary(rows)}</div>`;
@@ -129,7 +130,7 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     } catch (error) {
       notice = scheduleError(error);
       button.disabled = false;
-      button.textContent = wasPaid ? '✓ Оплачено' : 'Не оплачено';
+      button.textContent = wasPaid ? 'Оплачено' : 'Не оплачено';
       draw();
     }
   }
@@ -153,16 +154,15 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     const { from, to } = periodBounds(date, mode), rows = periodRows(appointments, date, mode);
     const days = []; for (let d = new Date(from); d < to; d = addDays(d, 1)) days.push(d);
     const title = mode === 'year' ? String(from.getFullYear()) : mode === 'month' ? `${monthLabel.format(from)} ${from.getFullYear()}` : mode === 'day' ? dateLabel.format(from) : `${dateLabel.format(from)} — ${dateLabel.format(addDays(to, -1))}`;
-    page.innerHTML = `${navigation('schedule')}<div class="calendar-toolbar"><div class="cabinet-tabs" aria-label="Период расписания">${Object.entries(modes).map(([k, v]) => `<button data-mode="${k}" class="${mode === k ? 'active' : ''}" aria-pressed="${mode === k}">${v}</button>`).join('')}</div>
-      <div class="calendar-controls"><button class="link" data-step="-1" aria-label="Предыдущий период">←</button><input type="date" data-date value="${dayKey(date)}" aria-label="Дата расписания"><button class="link" data-step="1" aria-label="Следующий период">→</button><button class="link" data-today>Сегодня</button><button class="link" data-refresh ${loading ? 'disabled' : ''}>Обновить</button></div></div>
-      <div class="calendar-title"><h2>${safe(title)}</h2>${mode === 'week' && loaded ? '<button class="btn secondary" data-copy>Скопировать на следующую неделю</button>' : ''}</div>
-      <p class="help">Открой день и нажми на свободный час или существующую запись. Время — по часовому поясу устройства.</p>
+    page.innerHTML = `${navigation('schedule')}<section class="calendar-toolbar calendar-period-toolbar"><div class="cabinet-tabs" aria-label="Период расписания">${Object.entries(modes).map(([k, v]) => `<button data-mode="${k}" class="${mode === k ? 'active' : ''}" aria-pressed="${mode === k}">${v}</button>`).join('')}</div>
+      <div class="calendar-controls"><button class="link" data-step="-1" aria-label="Предыдущий период">←</button><input type="date" data-date value="${dayKey(date)}" aria-label="Дата расписания"><button class="link" data-step="1" aria-label="Следующий период">→</button><button class="link" data-today>Сегодня</button><button class="link" data-refresh ${loading ? 'disabled' : ''}>Обновить</button></div></section>
+      <div class="calendar-title calendar-period-heading"><div><h2>${safe(title)}</h2><p class="help">Открой день и нажми на свободный час или существующую запись. Время — по часовому поясу устройства.</p></div>${mode === 'week' && loaded ? '<button class="btn secondary" data-copy>Скопировать на следующую неделю</button>' : ''}</div>
       <div class="error" role="alert">${safe(notice)}</div>
       ${loaded ? (mode === 'year' ? Array.from({ length: 12 }, (_, i) => {
         const month = new Date(from.getFullYear(), i, 1, 12), monthRows = periodRows(appointments, month, 'month');
         return `<details class="calendar-month"><summary><b>${safe(monthLabel.format(month))}</b><span>${totals(monthRows).count} занятий · ${rub(totals(monthRows).earned)}</span></summary>${days.filter(d => d.getMonth() === i).map(dayHtml).join('')}<div class="calendar-total">${summary(monthRows)}</div></details>`;
       }).join('') : days.map(dayHtml).join('')) : `<div class="card">${notice ? 'Расписание пока недоступно.' : 'Загружаю расписание…'}</div>`}
-      ${loaded ? `<div class="calendar-total calendar-period-total">${summary(rows)}</div><section class="card calendar-metrics"><h2>Рабочие показатели</h2><label>Интервал <select data-metrics>${Object.entries(modes).map(([k, v]) => `<option value="${k}" ${metricsMode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label><div data-metric-values></div><p class="help">Заработано — стоимость проведённых занятий. Отметки оплаты учитывают долг отдельно.</p></section>` : ''}`;
+      ${loaded ? `<div class="calendar-total calendar-period-total">${summary(rows)}</div><section class="card calendar-metrics"><div class="workspace-heading calendar-metrics-heading"><div><h2>Рабочие показатели</h2><p>Доход учитывает только проведённые занятия.</p></div></div><label>Интервал <select data-metrics>${Object.entries(modes).map(([k, v]) => `<option value="${k}" ${metricsMode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label><div data-metric-values></div><p class="help">Отметки оплаты учитывают долг отдельно.</p></section>` : ''}`;
     bindNav(page);
     page.querySelector('[data-refresh]').onclick = refresh;
     page.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { mode = b.dataset.mode; metricsMode = mode; draw(); });
@@ -188,7 +188,7 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     const rows = periodRows(appointments, date, metricsMode), { from, to } = periodBounds(date, metricsMode), t = totals(rows);
     const prices = rows.filter(r => r.kind === 'appointment' && !['cancelled', 'no_show'].includes(r.status)).map(r => r.price_kopecks);
     const price = !prices.length ? '—' : Math.min(...prices) === Math.max(...prices) ? rub(prices[0]) : `${rub(Math.min(...prices))} – ${rub(Math.max(...prices))}`;
-    page.querySelector('[data-metric-values]').innerHTML = `<p class="help">${from.toLocaleDateString('ru-RU')} — ${addDays(to, -1).toLocaleDateString('ru-RU')}</p><div class="calendar-metric-grid"><div><span>Стоимость занятия</span><strong>${price}</strong></div><div><span>Заработано</span><strong>${rub(t.earned)}</strong></div></div><p>Занятий: ${t.count} · проведено: ${t.completed}</p>`;
+    page.querySelector('[data-metric-values]').innerHTML = `<p class="help calendar-metrics-period">${from.toLocaleDateString('ru-RU')} — ${addDays(to, -1).toLocaleDateString('ru-RU')}</p><div class="calendar-metric-grid"><div><span>Стоимость занятия</span><strong>${price}</strong></div><div><span>Заработано</span><strong>${rub(t.earned)}</strong></div></div><p class="calendar-metrics-summary">Занятий: <b>${t.count}</b> · проведено: <b>${t.completed}</b></p>`;
   }
   async function copyWeek(button) {
     const source = periodRows(appointments, date, 'week').filter(r => ['planned', 'completed'].includes(r.status));
