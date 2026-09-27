@@ -872,42 +872,16 @@ function renderHeader() {
   }
 
  headerActions.innerHTML = `
-  <div
-    style="
-      display:flex;
-      flex-direction:column;
-      align-items:flex-end;
-      gap:5px;
-    "
-  >
-    <div
-      style="
-        font-size:12px;
-        color:#7a8493;
-        line-height:1.2;
-      "
-    >
+  <div class="header-user">
+    <div class="header-user-email">
       ${esc(user.email || '')}
     </div>
 
-    <div
-      style="
-        display:flex;
-        align-items:center;
-        gap:14px;
-      "
-    >
+    <div class="header-user-actions">
       <button
         id="cabinetBtn"
         type="button"
-        class="btn"
-        style="
-          padding:6px 14px;
-          min-height:34px;
-          border-radius:10px;
-          font-size:14px;
-          font-weight:600;
-        "
+        class="btn account-button"
       >
         Личный кабинет
       </button>
@@ -915,12 +889,9 @@ function renderHeader() {
       <button
         id="logoutBtn"
         type="button"
-        class="link"
-        style="
-          padding:4px 0;
-          font-size:14px;
-          color:#697386;
-        "
+        class="link logout-button"
+        aria-label="Выйти из аккаунта"
+        title="Выйти"
       >
         Выйти
       </button>
@@ -3151,27 +3122,11 @@ const patientCardHtml = p => `
     type="button"
     class="patient-card"
     data-pid="${p.id}"
-
-data-patient-name="${esc(String(p.display_name || ''))}"
-
-    style="
-      padding:10px 12px;
-      text-align:left;
-    "
+    data-patient-name="${esc(String(p.display_name || ''))}"
   >
-    <div
-      style="
-        display:flex;
-        justify-content:space-between;
-        gap:12px;
-        align-items:center;
-      "
-    >
-      <div style="min-width:0; flex:1">
-        <div
-          class="name"
-          style="margin-bottom:2px"
-        >
+    <div class="patient-card-content">
+      <div class="patient-card-main">
+        <div class="name">
           ${esc(p.display_name)}
         </div>
 
@@ -3184,15 +3139,7 @@ data-patient-name="${esc(String(p.display_name || ''))}"
         ${
           p.primary_complaint
             ? `
-              <div
-                class="item-sub"
-                style="
-                  margin-top:5px;
-                  white-space:nowrap;
-                  overflow:hidden;
-                  text-overflow:ellipsis;
-                "
-              >
+              <div class="item-sub patient-complaint">
                 ${esc(p.primary_complaint)}
               </div>
             `
@@ -3200,14 +3147,7 @@ data-patient-name="${esc(String(p.display_name || ''))}"
         }
       </div>
 
-      <div
-        class="muted tiny"
-        style="
-          flex:none;
-          text-align:right;
-          white-space:nowrap;
-        "
-      >
+      <div class="patient-counts" aria-label="Статистика пациента">
         ${counts[p.id]?.goals || 0} целей
         <br>
         ${counts[p.id]?.sessions || 0} занятий
@@ -3217,7 +3157,7 @@ data-patient-name="${esc(String(p.display_name || ''))}"
 `;
 
   app.innerHTML = `
-  <div class="topline">
+  <div class="topline patients-page-heading">
     <div>
       <h2 style="margin-bottom:2px">Пациенты</h2>
       <div class="muted tiny">
@@ -3236,63 +3176,38 @@ data-patient-name="${esc(String(p.display_name || ''))}"
 
   <div id="flash"></div>
 
-  <div style="margin-top:12px">
-  <input
-    id="patientSearch"
-    type="search"
-    placeholder="🔎 Найти пациента по имени"
-    autocomplete="off"
-    style="
-      width:100%;
-      box-sizing:border-box;
-    "
-  >
-</div>
+  <div class="patient-search">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
+    <input
+      id="patientSearch"
+      type="search"
+      placeholder="Найти пациента по имени"
+      autocomplete="off"
+    >
+  </div>
 
   ${
   state.patients.length
     ? `
-      <div id="recentPatientsSection" style="margin-top:14px">
-        <div
-          class="item-title"
-          style="margin-bottom:8px"
-        >
-          🕘 Недавние
+      <div id="recentPatientsSection" class="patient-group">
+        <div class="patient-group-title">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3.5 2" /></svg>
+          <span>Недавние</span>
         </div>
 
-        <div
-          class="patient-list"
-          style="display:grid; gap:8px"
-        >
+        <div class="patient-list">
           ${recentPatients.map(patientCardHtml).join('')}
         </div>
       </div>
 
-      <div id="allPatientsSection" style="margin-top:22px">
-        <div
-          class="item-title"
-          style="margin-bottom:8px"
-        >
-          Все пациенты
-        </div>
-<div
-  id="patientAlphabet"
-  style="
-    display:flex;
-    flex-wrap:wrap;
-    gap:6px;
-    margin-bottom:10px;
-  "
->
+      <div id="allPatientsSection" class="patient-group patient-group-all">
+        <div class="patient-group-title">Все пациенты</div>
+<div id="patientAlphabet" class="patient-alphabet">
 
 <button
   type="button"
   class="btn small"
   id="showAllPatients"
-  style="
-    min-width:42px;
-    padding:6px 9px;
-  "
 >
   Все
 </button>
@@ -3303,20 +3218,13 @@ data-patient-name="${esc(String(p.display_name || ''))}"
         type="button"
         class="btn small"
         data-patient-letter="${esc(letter)}"
-        style="
-          min-width:36px;
-          padding:6px 9px;
-        "
       >
         ${esc(letter)}
       </button>
     `)
     .join('')}
 </div>
-        <div
-          class="patient-list"
-          style="display:grid; gap:8px"
-        >
+        <div class="patient-list">
           ${alphabeticPatients.map(patientCardHtml).join('')}
         </div>
       </div>
