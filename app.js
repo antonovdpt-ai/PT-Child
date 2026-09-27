@@ -9113,6 +9113,32 @@ const setMediaStatus = (status, message) => {
   mediaStatus.dataset.state = status;
 };
 
+async function getPatientMediaSignedUrl(storagePath) {
+  const { data, error } = await sb.storage
+    .from('patient-media')
+    .createSignedUrl(storagePath, 3600);
+
+  if (error) {
+    console.error('Не удалось получить временную ссылку на фотографию:', error);
+    return '';
+  }
+
+  return safeStorageUrl(data?.signedUrl);
+}
+
+async function getPatientMediaObjectUrl(storagePath) {
+  const { data, error } = await sb.storage
+    .from('patient-media')
+    .download(storagePath);
+
+  if (error || !data) {
+    console.error('Не удалось загрузить фотографию из приватного хранилища:', error);
+    return '';
+  }
+
+  return URL.createObjectURL(data);
+}
+
 async function loadPatientMedia() {
   mediaList.innerHTML =
     '<div class="media-list-loading">Загружаю материалы...</div>';
@@ -9132,19 +9158,9 @@ async function loadPatientMedia() {
       return;
     }
 
-   const items = await Promise.all(
+const items = await Promise.all(
   data.map(async item => {
-    const { data: signedData, error: signedError } =
-      await sb.storage
-        .from('patient-media')
-        .createSignedUrl(item.storage_path, 3600);
-
-    if (signedError) {
-      console.error(signedError);
-      return null;
-    }
-
-    const safeUrl = safeStorageUrl(signedData?.signedUrl);
+    const safeUrl = await getPatientMediaSignedUrl(item.storage_path);
 
     if (!safeUrl) {
       console.error('Получен недопустимый URL фотографии');
@@ -9274,6 +9290,55 @@ mediaList.innerHTML = `
   </div>
 `;
 
+mediaList.querySelectorAll('[data-media-card]').forEach(card => {
+  const item = availableItems.find(
+    currentItem => currentItem.id === card.dataset.mediaCard
+  );
+  const image = card.querySelector('.media-gallery-image');
+  const previewButton = card.querySelector('[data-media-preview]');
+
+  if (!item || !image || !previewButton) return;
+
+  const showUnavailableState = () => {
+    card.classList.add('is-unavailable');
+    image.alt = 'Фотография временно недоступна';
+    previewButton.disabled = true;
+    previewButton.removeAttribute('data-media-preview');
+  };
+
+  image.onerror = async () => {
+    const recoveryStep = image.dataset.mediaRecoveryStep || 'refresh';
+
+    if (recoveryStep === 'refresh') {
+      image.dataset.mediaRecoveryStep = 'blob';
+
+      const refreshedUrl = await getPatientMediaSignedUrl(item.storage_path);
+
+      if (refreshedUrl) {
+        previewButton.dataset.mediaPreview = refreshedUrl;
+        delete previewButton.dataset.mediaPreviewKind;
+        image.src = refreshedUrl;
+        return;
+      }
+    }
+
+    if (image.dataset.mediaRecoveryStep === 'blob') {
+      image.dataset.mediaRecoveryStep = 'finished';
+
+      const objectUrl = await getPatientMediaObjectUrl(item.storage_path);
+
+      if (objectUrl) {
+        previewButton.dataset.mediaPreview = objectUrl;
+        previewButton.dataset.mediaPreviewKind = 'blob';
+        image.src = objectUrl;
+        return;
+      }
+    }
+
+    showUnavailableState();
+  };
+});
+
 mediaList.querySelectorAll('[data-media-filter]').forEach(filterBtn => {
   filterBtn.onclick = () => {
     const selectedCategory = filterBtn.dataset.mediaFilter;
@@ -9298,6 +9363,19 @@ mediaList.querySelectorAll('[data-media-filter]').forEach(filterBtn => {
 
 mediaList.querySelectorAll('[data-media-preview]').forEach(previewBtn => {
   previewBtn.onclick = () => {
+    const previewSource = previewBtn.dataset.mediaPreview;
+    const previewUrl =
+      previewBtn.dataset.mediaPreviewKind === 'blob' &&
+      previewSource?.startsWith('blob:')
+        ? previewSource
+        : safeStorageUrl(previewSource);
+
+    if (!previewUrl) return;
+
+    const mediaCard = previewBtn.closest('[data-media-card]');
+    const mediaItem = availableItems.find(
+      item => item.id === mediaCard?.dataset.mediaCard
+    );
     const overlay = document.createElement('div');
     overlay.className = 'media-preview-overlay';
     overlay.setAttribute('role', 'dialog');
@@ -9307,7 +9385,7 @@ mediaList.querySelectorAll('[data-media-preview]').forEach(previewBtn => {
     overlay.innerHTML = `
       <div class="media-preview-dialog">
         <img
-          src="${esc(safeStorageUrl(previewBtn.dataset.mediaPreview))}"
+          src="${esc(previewUrl)}"
           alt="Фото пациента"
         >
         <button
@@ -9323,6 +9401,24 @@ mediaList.querySelectorAll('[data-media-preview]').forEach(previewBtn => {
     const closePreview = () => overlay.remove();
 
     const closeButton = overlay.querySelector('.media-preview-close');
+    const previewImage = overlay.querySelector('img');
+
+    previewImage.onerror = async () => {
+      if (!mediaItem || previewImage.dataset.mediaRecoveryAttempted) return;
+
+      previewImage.dataset.mediaRecoveryAttempted = '1';
+
+      const objectUrl = await getPatientMediaObjectUrl(
+        mediaItem.storage_path
+      );
+
+      if (!objectUrl) return;
+
+      previewBtn.dataset.mediaPreview = objectUrl;
+      previewBtn.dataset.mediaPreviewKind = 'blob';
+      previewImage.src = objectUrl;
+    };
+
     closeButton.onclick = closePreview;
 
     overlay.onclick = e => {
