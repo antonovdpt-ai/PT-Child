@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Fizira</title>
   <link rel="icon" href="favicon.ico" />
-  <link rel="stylesheet" href="styles.css?v=0.157-fizira-theme" />
+  <link rel="stylesheet" href="styles.css?v=0.158-layout-fix" />
 </head>
 <body>
   <div class="shell">
@@ -18,13 +18,19 @@
         <div><div class="sidebar-wordmark">Fizira</div><div class="sidebar-caption">Рабочее пространство</div></div>
       </div>
       <nav class="sidebar-nav">
-        <button class="sidebar-nav-item is-active" id="sidePatients" type="button"><span class="nav-icon" aria-hidden="true">⌂</span><span>Пациенты</span></button>
-        <button class="sidebar-nav-item" id="sideCabinet" type="button"><span class="nav-icon" aria-hidden="true">◷</span><span>Расписание</span></button>
+        <button class="sidebar-nav-item is-active" id="sidePatients" type="button">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" /></svg>
+          <span>Пациенты</span>
+        </button>
+        <button class="sidebar-nav-item" id="sideCabinet" type="button">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3.5 2" /></svg>
+          <span>Расписание</span>
+        </button>
       </nav>
       <div class="sidebar-footer"><span class="status-dot" aria-hidden="true"></span><span>Система работает</span></div>
     </aside>
     <header class="header">
-      <div>
+      <div class="header-intro">
         <div class="brand">Fizira</div>
         <div class="muted tiny">Рабочее пространство специалиста</div>
       </div>
@@ -33,7 +39,7 @@
     <div class="warning">Тестовая версия. Пока используйте только вымышленные данные пациентов.</div>
     <main id="app"><div class="card center">Загрузка…</div></main>
   </div>
-  <script type="module" src="app.js?v=0.156-inline-status"></script>
+  <script type="module" src="app.js?v=0.158-layout-fix"></script>
   <script>
     (() => {
       const syncShell = () => {
