@@ -9017,72 +9017,90 @@ if (dynamicsHistoryError) {
 }
 if (state.tab === 'media') {
   box.innerHTML = `
-    <div class="card">
-      <h3>Фото и материалы</h3>
-
-      <div class="muted" style="margin-bottom:16px">
-        Фото можно сохранять в карточке ребёнка и позже сравнивать между собой.
+    <section class="card media-upload-workspace">
+      <div class="media-workspace-heading">
+        <div>
+          <div class="workspace-eyebrow">Клинические материалы</div>
+          <h3>Фото и материалы</h3>
+          <p>Добавляйте несколько фотографий за один раз, чтобы сравнивать изменения в динамике.</p>
+        </div>
       </div>
 
-      <form id="mediaForm">
-        <label>Фото</label>
-        <input
-          id="mediaFile"
-          name="media_file"
-          type="file"
-          accept="image/*"
-          multiple
-          required
-        />
+      <form id="mediaForm" class="media-upload-form">
+        <label class="media-file-picker">
+          <span>Фотографии</span>
+          <input
+            id="mediaFile"
+            name="media_file"
+            type="file"
+            accept="image/*"
+            multiple
+            required
+          />
+          <small>Можно выбрать несколько изображений. Максимальный размер каждого файла — 20 МБ.</small>
+        </label>
 
-        <label style="margin-top:14px">Категория</label>
-<select name="category">
-<option value="other" selected>Другое</option>
-  <option value="posture">Поза / осанка</option>
-  <option value="sitting">Сидение</option>
-  <option value="crawling">Ползание</option>
-  <option value="standing">Стояние</option>
-  <option value="walking">Ходьба</option>
-  <option value="transitions">Переходы</option>
-  <option value="lower_limb">Стопы / ноги</option>
-  <option value="upper_limb">Руки</option>
-  <option value="equipment">ТСР / ортезы</option>
-  
-</select>
+        <div class="media-field-grid">
+          <label>
+            Категория
+            <select name="category">
+              <option value="other" selected>Другое</option>
+              <option value="posture">Поза / осанка</option>
+              <option value="sitting">Сидение</option>
+              <option value="crawling">Ползание</option>
+              <option value="standing">Стояние</option>
+              <option value="walking">Ходьба</option>
+              <option value="transitions">Переходы</option>
+              <option value="lower_limb">Стопы / ноги</option>
+              <option value="upper_limb">Руки</option>
+              <option value="equipment">ТСР / ортезы</option>
+            </select>
+          </label>
 
-        <label style="margin-top:14px">Комментарий</label>
-        <textarea
-          name="note"
-          placeholder="Например: стойка у опоры, вид сбоку"
-        ></textarea>
+          <label>
+            Дата материала / исследования
+            <input
+              name="captured_at"
+              type="date"
+              value="${new Date().toISOString().slice(0, 10)}"
+            />
+          </label>
+        </div>
 
-        <label>Дата материала / исследования</label>
-        <input
-          name="captured_at"
-          type="date"
-          value="${new Date().toISOString().slice(0, 10)}"
-        />
+        <label class="media-note-field">
+          Комментарий
+          <textarea
+            name="note"
+            placeholder="Например: стойка у опоры, вид сбоку"
+          ></textarea>
+        </label>
 
-        <div class="actions">
+        <div class="media-upload-actions">
           <button
             id="mediaUploadBtn"
-            class="btn primary full"
+            class="btn primary media-upload-button"
             type="submit"
           >
             + Добавить фото
           </button>
         </div>
 
-        <div id="mediaStatus" class="save-status"></div>
+        <div id="mediaStatus" class="save-status media-save-status" aria-live="polite"></div>
       </form>
-  </div>
+    </section>
 
-  <div class="card">
-  <h3>Материалы ребёнка</h3>
-  <div id="mediaList">
-  <div class="muted">Загружаю материалы...</div>
-  </div>
-  </div>
+    <section class="card media-library">
+      <div class="media-library-heading">
+        <div>
+          <div class="workspace-eyebrow">Галерея пациента</div>
+          <h3>Материалы ребёнка</h3>
+          <p>Фотографии доступны только в рабочем пространстве специалиста.</p>
+        </div>
+      </div>
+      <div id="mediaList">
+        <div class="media-list-loading">Загружаю материалы...</div>
+      </div>
+    </section>
   `;
 const mediaForm = document.getElementById('mediaForm');
 const mediaFile = document.getElementById('mediaFile');
@@ -9090,9 +9108,14 @@ const mediaUploadBtn = document.getElementById('mediaUploadBtn');
 const mediaStatus = document.getElementById('mediaStatus');
 const mediaList = document.getElementById('mediaList');
 
+const setMediaStatus = (status, message) => {
+  mediaStatus.textContent = message;
+  mediaStatus.dataset.state = status;
+};
+
 async function loadPatientMedia() {
   mediaList.innerHTML =
-    '<div class="muted">Загружаю материалы...</div>';
+    '<div class="media-list-loading">Загружаю материалы...</div>';
 
   try {
     const { data, error } = await sb
@@ -9105,7 +9128,7 @@ async function loadPatientMedia() {
 
     if (!data || !data.length) {
       mediaList.innerHTML =
-        '<div class="muted">Загруженных фотографий пока нет.</div>';
+        '<div class="media-empty-state"><strong>Фото пока не добавлены</strong><span>Добавьте первые материалы, чтобы видеть динамику ребёнка.</span></div>';
       return;
     }
 
@@ -9151,7 +9174,7 @@ const availableItems = items
 
 if (!availableItems.length) {
   mediaList.innerHTML =
-    '<div class="muted">Не удалось открыть сохранённые фотографии.</div>';
+    '<div class="media-empty-state"><strong>Материалы недоступны</strong><span>Не удалось открыть сохранённые фотографии. Обновите страницу и попробуйте снова.</span></div>';
   return;
 }
 
@@ -9175,20 +9198,11 @@ const usedCategories = [
 ];
 
 mediaList.innerHTML = `
-  <div
-    style="
-      display:flex;
-      gap:8px;
-      overflow-x:auto;
-      margin-bottom:14px;
-      padding-bottom:4px;
-    "
-  >
+  <div class="media-filter-bar" role="toolbar" aria-label="Фильтр материалов">
     <button
       type="button"
-      class="btn primary"
+      class="btn primary media-filter-chip"
       data-media-filter="all"
-      style="white-space:nowrap"
     >
       Все
     </button>
@@ -9197,9 +9211,8 @@ mediaList.innerHTML = `
       .map(category => `
         <button
           type="button"
-          class="btn"
+          class="btn media-filter-chip"
           data-media-filter="${category}"
-          style="white-space:nowrap"
         >
           ${categoryLabels[category] || 'Другое'}
         </button>
@@ -9207,104 +9220,54 @@ mediaList.innerHTML = `
       .join('')}
   </div>
 
-  <div style="
-    display:grid;
-    grid-template-columns:repeat(2, minmax(0, 1fr));
-    gap:12px;
-  ">
+  <div class="media-gallery-grid">
     ${availableItems
       .map(item => {
         const dateValue = item.captured_at || item.created_at;
-
         const dateText = dateValue
           ? new Date(dateValue).toLocaleDateString('ru-RU')
           : 'Дата не указана';
 
         return `
-          <div
-            class="item"
+          <article
+            class="item media-gallery-card"
             data-media-card="${item.id}"
             data-media-category="${item.category || 'other'}"
-            style="
-              margin:0;
-              padding:8px;
-              min-width:0;
-            "
           >
-            <img
-              src="${esc(item.url)}"
-              data-media-preview="${esc(item.url)}"
-              alt="Фото пациента"
-              style="
-                width:100%;
-                height:160px;
-                object-fit:cover;
-                border-radius:10px;
-                display:block;
-                margin-bottom:8px;
-                cursor:pointer;
-              "
-            >
-
-            <div
-              class="item-title"
-              style="font-size:14px"
-            >
-              ${dateText}
-            </div>
-
-            <div
-  style="
-    display:inline-block;
-    margin-top:5px;
-    margin-bottom:4px;
-    padding:3px 7px;
-    border-radius:999px;
-    background:#eef4ff;
-    font-size:12px;
-    font-weight:600;
-  "
->
-  ${categoryLabels[item.category] || 'Другое'}
-</div>
-
-            ${
-              item.note
-                ? `
-                  <div
-                    class="item-sub"
-                    style="
-                      font-size:13px;
-                      margin-top:4px;
-                      overflow:hidden;
-                      display:-webkit-box;
-                      -webkit-line-clamp:2;
-                      -webkit-box-orient:vertical;
-                    "
-                  >
-                    ${esc(item.note)}
-                  </div>
-                `
-                : `
-                  <div class="muted tiny">
-                    Без комментария
-                  </div>
-                `
-            }
-
             <button
               type="button"
-              class="link"
-              data-delete-media="${item.id}"
-              style="
-                color:#b42318;
-                margin-top:8px;
-                font-size:13px;
-              "
+              class="media-preview-button"
+              data-media-preview="${esc(item.url)}"
+              aria-label="Открыть фотографию за ${dateText}"
             >
-              Удалить
+              <img
+                class="media-gallery-image"
+                src="${esc(item.url)}"
+                alt="Фото пациента"
+              >
             </button>
-          </div>
+
+            <div class="media-gallery-body">
+              <div class="media-gallery-meta">
+                <span class="media-gallery-date">${dateText}</span>
+                <span class="media-category-badge">${categoryLabels[item.category] || 'Другое'}</span>
+              </div>
+
+              ${
+                item.note
+                  ? `<p class="media-gallery-note">${esc(item.note)}</p>`
+                  : `<p class="media-gallery-note media-gallery-note-empty">Без комментария</p>`
+              }
+
+              <button
+                type="button"
+                class="link media-delete-action"
+                data-delete-media="${item.id}"
+              >
+                Удалить
+              </button>
+            </div>
+          </article>
         `;
       })
       .join('')}
@@ -9333,56 +9296,34 @@ mediaList.querySelectorAll('[data-media-filter]').forEach(filterBtn => {
   };
 });
 
-mediaList.querySelectorAll('[data-media-preview]').forEach(img => {
-  img.onclick = () => {
+mediaList.querySelectorAll('[data-media-preview]').forEach(previewBtn => {
+  previewBtn.onclick = () => {
     const overlay = document.createElement('div');
-
-    overlay.style.cssText = `
-      position:fixed;
-      inset:0;
-      z-index:9999;
-      background:rgba(0,0,0,0.88);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:20px;
-    `;
+    overlay.className = 'media-preview-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Просмотр фотографии');
 
     overlay.innerHTML = `
-      <img
-        src="${esc(safeStorageUrl(img.dataset.mediaPreview))}"
-        alt="Фото пациента"
-        style="
-          max-width:100%;
-          max-height:90vh;
-          object-fit:contain;
-          border-radius:12px;
-        "
-      >
-
-      <button
-        type="button"
-        aria-label="Закрыть"
-        style="
-          position:fixed;
-          top:18px;
-          right:18px;
-          width:46px;
-          height:46px;
-          border:0;
-          border-radius:50%;
-          background:white;
-          font-size:28px;
-          cursor:pointer;
-        "
-      >
-        ×
-      </button>
+      <div class="media-preview-dialog">
+        <img
+          src="${esc(safeStorageUrl(previewBtn.dataset.mediaPreview))}"
+          alt="Фото пациента"
+        >
+        <button
+          type="button"
+          class="media-preview-close"
+          aria-label="Закрыть"
+        >
+          ×
+        </button>
+      </div>
     `;
 
     const closePreview = () => overlay.remove();
 
-    overlay.querySelector('button').onclick = closePreview;
+    const closeButton = overlay.querySelector('.media-preview-close');
+    closeButton.onclick = closePreview;
 
     overlay.onclick = e => {
       if (e.target === overlay) {
@@ -9390,7 +9331,14 @@ mediaList.querySelectorAll('[data-media-preview]').forEach(img => {
       }
     };
 
+    overlay.onkeydown = e => {
+      if (e.key === 'Escape') {
+        closePreview();
+      }
+    };
+
     document.body.appendChild(overlay);
+    closeButton.focus();
   };
 });
 
@@ -9441,18 +9389,16 @@ if (card) {
 
 if (!mediaList.querySelector('[data-media-card]')) {
   mediaList.innerHTML =
-    '<div class="muted">Загруженных фотографий пока нет.</div>';
+    '<div class="media-empty-state"><strong>Фото пока не добавлены</strong><span>Добавьте первые материалы, чтобы видеть динамику ребёнка.</span></div>';
 }
 
     } catch (error) {
       console.error(error);
 
-      alert(
-        'Не удалось удалить фото: ' + error.message
-      );
+      alert('Не удалось удалить фото. Повторите попытку.');
 
       btn.disabled = false;
-      btn.textContent = 'Удалить фото';
+      btn.textContent = 'Удалить';
     }
   };
 });
@@ -9461,7 +9407,7 @@ if (!mediaList.querySelector('[data-media-card]')) {
     console.error(error);
 
     mediaList.innerHTML =
-      `<div class="error">Не удалось загрузить материалы: ${esc(error.message)}</div>`;
+      '<div class="media-empty-state"><strong>Не удалось загрузить материалы</strong><span>Обновите страницу и попробуйте снова.</span></div>';
   }
 }
 
@@ -9473,7 +9419,7 @@ mediaForm.onsubmit = async e => {
   const files = Array.from(mediaFile.files);
 
   if (!files.length) {
-    mediaStatus.textContent = 'Выберите хотя бы одну фотографию.';
+    setMediaStatus('error', 'Выберите хотя бы одну фотографию.');
     return;
   }
 
@@ -9482,8 +9428,7 @@ mediaForm.onsubmit = async e => {
   );
 
   if (invalidFile) {
-    mediaStatus.textContent =
-      'Сейчас можно загружать только изображения.';
+    setMediaStatus('error', 'Сейчас можно загружать только изображения.');
     return;
   }
 
@@ -9492,13 +9437,12 @@ mediaForm.onsubmit = async e => {
   );
 
   if (tooLargeFile) {
-    mediaStatus.textContent =
-      `Файл "${tooLargeFile.name}" больше 20 МБ.`;
+    setMediaStatus('error', `Файл "${tooLargeFile.name}" больше 20 МБ.`);
     return;
   }
 
   mediaUploadBtn.disabled = true;
-  mediaStatus.textContent = '';
+  setMediaStatus('saving', `Подготавливаем к загрузке: ${files.length} фото.`);
 
   const fd = new FormData(mediaForm);
   const capturedDate = fd.get('captured_at');
@@ -9513,6 +9457,10 @@ mediaForm.onsubmit = async e => {
 
       mediaUploadBtn.textContent =
         `⏳ Загружаю ${i + 1} из ${files.length}...`;
+      setMediaStatus(
+        'saving',
+        `Загружаем фотографию ${i + 1} из ${files.length}.`
+      );
 
       const safeName = file.name
         .replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -9556,8 +9504,7 @@ mediaForm.onsubmit = async e => {
       uploadedCount++;
     }
 
-    mediaStatus.textContent =
-      `✓ Загружено фотографий: ${uploadedCount}`;
+    setMediaStatus('saved', `Загружено фотографий: ${uploadedCount}.`);
 
     mediaUploadBtn.textContent =
       '✓ Фотографии добавлены';
@@ -9572,8 +9519,10 @@ mediaForm.onsubmit = async e => {
   } catch (error) {
     console.error(error);
 
-    mediaStatus.textContent =
-      `Загружено ${uploadedCount} из ${files.length}. Ошибка: ${error.message}`;
+    setMediaStatus(
+      'error',
+      `Загружено ${uploadedCount} из ${files.length}. Не удалось завершить загрузку. Повторите попытку.`
+    );
 
     mediaUploadBtn.textContent = '+ Добавить фото';
     mediaUploadBtn.disabled = false;
