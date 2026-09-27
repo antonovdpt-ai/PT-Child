@@ -71,14 +71,14 @@ test('calendar supports patient search, parent contacts, debt and profile naviga
   const unpaid = app.querySelector('[data-payment="next"]');
   assert.equal(unpaid.textContent, 'Не оплачено');
   unpaid.click();
-  await waitFor(() => app.querySelector('[data-payment="next"]')?.textContent === '✓ Оплачено');
+  await waitFor(() => app.querySelector('[data-payment="next"]')?.textContent === 'Оплачено');
   assert.equal(app.querySelector('dialog'), null, 'inline payment does not open the editor');
   assert.equal(appointments.find(row => row.id === 'next').paid_kopecks, 300000);
   app.querySelector('[data-payment="next"]').click();
   await waitFor(() => app.querySelector('[data-payment="next"]')?.textContent === 'Не оплачено');
   assert.equal(appointments.find(row => row.id === 'next').paid_kopecks, 0, 'payment can be reversed inline');
   app.querySelector('[data-payment="next"]').click();
-  await waitFor(() => app.querySelector('[data-payment="next"]')?.textContent === '✓ Оплачено');
+  await waitFor(() => app.querySelector('[data-payment="next"]')?.textContent === 'Оплачено');
   app.querySelector('[data-edit="next"]').click();
   const search = app.querySelector('[data-search]');
   assert.equal(search.value, 'Иван Тестов', 'existing appointment shows the selected patient in the field');
