@@ -556,7 +556,7 @@ async function openParentReportPrintView(
   if (!printWindow) {
 
     alert(
-      'Браузер заблокировал окно отчёта. Разреши всплывающие окна для PT Child.'
+      'Браузер заблокировал окно отчёта. Разреши всплывающие окна для Fizira.'
     );
     return;
   }
@@ -1544,7 +1544,7 @@ function renderLogin() {
             autocomplete="email"
           >
 
-          <label>Пароль PT Child</label>
+          <label>Пароль Fizira</label>
           <input
             type="password"
             name="password"
@@ -2044,7 +2044,7 @@ function showLegalDocument(type) {
   const content = isTerms
     ? `
       <p>
-        PT Child предназначен для использования специалистами
+        Fizira предназначена для использования специалистами
         в области физической терапии и реабилитации.
       </p>
 
@@ -2055,7 +2055,7 @@ function showLegalDocument(type) {
       </p>
 
       <p>
-        Функции искусственного интеллекта PT Child являются
+        Функции искусственного интеллекта Fizira являются
         вспомогательным инструментом и не заменяют
         профессиональное клиническое решение специалиста.
       </p>
@@ -2067,7 +2067,7 @@ function showLegalDocument(type) {
     `
     : `
       <p>
-        PT Child обрабатывает данные, которые специалист
+        Fizira обрабатывает данные, которые специалист
         вносит в приложение для ведения своей профессиональной работы.
       </p>
 
@@ -2157,7 +2157,7 @@ function renderRegister() {
         <h2>Создать аккаунт</h2>
 
         <div class="muted tiny">
-          Регистрация специалиста PT Child
+          Регистрация специалиста Fizira
         </div>
 
         <div id="flash"></div>
@@ -2215,7 +2215,7 @@ function renderRegister() {
     "
   >
     Я принимаю Условия использования
-    и Политику конфиденциальности PT Child
+    и Политику конфиденциальности Fizira
   </span>
 </label>
 
@@ -2361,7 +2361,7 @@ const { data, error } =
 
   flash(
     'success',
-    'Мы отправили письмо для подтверждения email. Перейдите по ссылке из письма, затем войдите в PT Child.'
+    'Мы отправили письмо для подтверждения email. Перейдите по ссылке из письма, затем войдите в Fizira.'
   );
 };
 
@@ -2396,7 +2396,7 @@ function renderProfile() {
           </h2>
 
           <div class="muted tiny">
-            Эти данные будут использоваться в документах PT Child.
+            Эти данные будут использоваться в документах Fizira.
           </div>
         </div>
       </div>
@@ -3481,32 +3481,33 @@ async function loadPatientData() {
 }
 
 function goalsHtml(goals, deletable = false) {
-  if (!goals.length) return `<div class="empty">Целей пока нет.</div>`;
-  return goals.map(g => `<div class="goal"><div class="goal-top"><div class="item-title">${esc(g.title)}</div><div class="goal-pct">${g.progress}%</div></div><div class="progress"><span style="width:${Math.max(0, Math.min(100, g.progress))}%"></span></div><div class="item-sub">${esc(g.criterion || 'Критерий не указан')} · ${g.deadline ? fmtDate(g.deadline) : 'срок не указан'}</div>${deletable ? `<div style="display:flex;gap:14px;margin-top:7px;flex-wrap:wrap">
-  <button
-    type="button"
-    class="link"
-    data-edit-goal="${g.id}"
-  >
-    Изменить
-  </button>
-<button
-  type="button"
-  class="link"
-  data-complete-goal="${g.id}"
-  style="color:#15803d"
->
-  Завершить
-</button>
-  <button
-    type="button"
-    class="link"
-    style="color:#9b3333"
-    data-del-goal="${g.id}"
-  >
-    Удалить цель
-  </button>
-</div>` : ''}</div>`).join('');
+  if (!goals.length) {
+    return `<div class="empty compact-empty">Целей пока нет.</div>`;
+  }
+
+  return goals.map(g => `
+    <article class="goal goal-card">
+      <div class="goal-top">
+        <div>
+          <div class="goal-label">Функциональная цель</div>
+          <div class="item-title">${esc(g.title)}</div>
+        </div>
+        <div class="goal-pct">${g.progress}%</div>
+      </div>
+      <div class="progress"><span style="width:${Math.max(0, Math.min(100, g.progress))}%"></span></div>
+      <div class="goal-meta">
+        <span>${esc(g.criterion || 'Критерий не указан')}</span>
+        <span>${g.deadline ? fmtDate(g.deadline) : 'Срок не указан'}</span>
+      </div>
+      ${deletable ? `
+        <div class="goal-actions">
+          <button type="button" class="link" data-edit-goal="${g.id}">Изменить</button>
+          <button type="button" class="link goal-complete-link" data-complete-goal="${g.id}">Завершить</button>
+          <button type="button" class="link goal-delete-link" data-del-goal="${g.id}">Удалить</button>
+        </div>
+      ` : ''}
+    </article>
+  `).join('');
 }
 function renderPatient() {
   const p = currentPatient(); if (!p) return renderPatients();
@@ -4087,7 +4088,7 @@ aiToggleBtn.onclick = () => {
 
 aiResult.style.display = "none";
 aiToggleBtn.style.display = "block";
-aiToggleBtn.textContent = "Развернуть анализ";
+  aiToggleBtn.textContent = "Развернуть анализ";
   
 
   aiBtn.textContent = "Обновить анализ";
@@ -7618,33 +7619,40 @@ if (saveStandardizedHistoryBtn) {
   }
 
   if (state.tab === 'goals') {
-    box.innerHTML = `<div class="card"><h3>Активные цели</h3>${goalsHtml(
-  state.goals.filter(g => g.status === 'active'),
-  true
-)}</div>
+    box.innerHTML = `<section class="card goals-workspace">
+  <div class="workspace-heading">
+    <div>
+      <h3>Активные цели</h3>
+      <p>Функциональные ориентиры и их подтверждённый прогресс.</p>
+    </div>
+    <span class="badge">${state.goals.filter(g => g.status === 'active').length}</span>
+  </div>
+  ${goalsHtml(
+    state.goals.filter(g => g.status === 'active'),
+    true
+  )}
+</section>
 ${state.goals.some(g => g.status === 'achieved') ? `
-  <div class="card">
-    <h3>✅ Достигнутые цели</h3>
+  <section class="card goals-achieved">
+    <div class="workspace-heading">
+      <div><h3>Достигнутые цели</h3><p>Сохраняются в истории пациента.</p></div>
+    </div>
 
     ${goalsHtml(
       state.goals.filter(g => g.status === 'achieved'),
       false
     )}
-  </div>
+  </section>
 ` : ''}
-<form class="card" id="goalForm"><h3>＋ Новая цель</h3><label>Функциональная цель</label><textarea name="title" required></textarea><label>Исходное состояние</label><textarea name="baseline"></textarea><label>Критерий достижения</label><input name="criterion"><label>Срок</label><input type="date" name="deadline"><label>Прогресс</label><select name="progress"><option value="0">0%</option><option value="20">20%</option><option value="40">40%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option></select><div class="actions"><button id="goalSaveBtn" class="btn primary full" type="submit">Добавить цель</button></div><div id="goalStatus" class="save-status"></div></form>`;
+<form class="card goal-form-card" id="goalForm"><div class="form-heading"><div><h3>Новая цель</h3><p>Сформулируйте наблюдаемый результат и критерий его достижения.</p></div></div><label>Функциональная цель</label><textarea name="title" required></textarea><label>Исходное состояние</label><textarea name="baseline"></textarea><label>Критерий достижения</label><input name="criterion"><label>Срок</label><input type="date" name="deadline"><label>Прогресс</label><select name="progress"><option value="0">0%</option><option value="20">20%</option><option value="40">40%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option></select><div class="actions"><button id="goalSaveBtn" class="btn primary full" type="submit">Добавить цель</button></div><div id="goalStatus" class="save-status"></div></form>`;
     const form = document.getElementById('goalForm'), btn = document.getElementById('goalSaveBtn'), status = document.getElementById('goalStatus');
     watchFormDirty(form, btn, 'Добавить цель');
 
 const goalFormToggle = document.createElement('button');
 
 goalFormToggle.type = 'button';
-goalFormToggle.className = 'btn';
-goalFormToggle.textContent = '＋ Добавить новую цель';
-
-goalFormToggle.style.width = '100%';
-goalFormToggle.style.marginTop = '12px';
-goalFormToggle.style.marginBottom = '0';
+goalFormToggle.className = 'btn goal-form-toggle';
+goalFormToggle.textContent = 'Добавить цель';
 
 form.parentNode.insertBefore(
   goalFormToggle,
@@ -7659,8 +7667,8 @@ const setGoalFormOpen = open => {
 
   goalFormToggle.textContent =
     open
-      ? '− Скрыть форму'
-      : '＋ Добавить новую цель';
+      ? 'Скрыть форму'
+      : 'Добавить цель';
 };
 
 goalFormToggle.onclick = () => {
@@ -7685,7 +7693,7 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
     setGoalFormOpen(true);
 
     form.querySelector('h3').textContent =
-      '✏️ Изменить цель';
+      'Изменить цель';
 
     form.elements.title.value =
       goal.title || '';
@@ -7814,17 +7822,17 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
 document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () => { const { error } = await sb.from('goals').delete().eq('id', b.dataset.delGoal); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
   }
   if (state.tab === 'sessions') {
-    box.innerHTML = `<form class="card" id="sessionForm"><h3>➕ Новое занятие</h3>
+    box.innerHTML = `<form class="card session-form-card" id="sessionForm"><div class="form-heading"><div><h3>Новое занятие</h3><p>Зафиксируйте наблюдения, переносимость и функциональные изменения.</p></div></div>
 
 <div
-  class="item"
+  class="session-ai-intake"
   style="margin-bottom:18px"
 >
   <div
     class="item-title"
     style="margin-bottom:6px"
   >
-    🎙 Рассказать о занятии
+    Рассказать о занятии
   </div>
 
   <div
@@ -7846,7 +7854,7 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
     id="analyzeSessionBtn"
     style="margin-top:10px"
   >
-    ✨ Разобрать с ИИ
+    Разобрать с ИИ
   </button>
 
   <div
@@ -7859,7 +7867,7 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
 </div>
 
 <div
-  class="muted tiny"
+  class="muted tiny session-manual-divider"
   style="text-align:center; margin:4px 0 14px"
 >
   или заполните занятие вручную
@@ -7891,20 +7899,20 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
 
 <div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form>
 
-<div class="card" style="margin-top:16px">
-  <h3>✨ Следующее занятие</h3>
+<section class="card next-session-card">
+  <div class="workspace-heading"><div><h3>Следующее занятие</h3><p>План создаётся только как черновик для проверки специалистом.</p></div></div>
 
-  <div class="muted" style="margin-bottom:12px">
-    PT Child может подготовить следующий шаг с учётом целей,
+  <div class="muted next-session-description">
+    Fizira может подготовить следующий шаг с учётом целей,
     последних занятий и оценки ребёнка.
   </div>
 
   <button
     type="button"
-    class="btn full"
+    class="btn primary full"
     id="prepareNextSessionBtn"
   >
-    ✨ Подготовить следующее занятие
+    Подготовить следующее занятие
   </button>
 
   <div
@@ -7915,25 +7923,20 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
 
   <div
     id="nextSessionPlan"
-    style="margin-top:12px"
+    class="next-session-plan"
   ></div>
-</div>
+</section>
 
-<div class="card"><h3>История занятий</h3>
+<section class="card session-history-card"><div class="workspace-heading"><div><h3>История занятий</h3><p>Последовательность проведённых занятий и изменений функции.</p></div><span class="badge">${state.sessions.length}</span></div>
 
 ${state.sessions.map(s => `
   
-  <details class="item"><summary class="item-title" style="cursor:pointer">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</summary>
+  <details class="item session-history-entry"><summary class="item-title">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</summary>
   
  <div class="item-sub">${esc(s.note || '')}</div>${sessionDynamicsHtml(s)}${plannedSessionHtml(s.planned_session)}
 
 <div
-  style="
-    display:flex;
-    gap:14px;
-    margin-top:7px;
-    flex-wrap:wrap;
-  "
+  class="session-history-actions"
 >
   <button
     type="button"
@@ -7952,7 +7955,7 @@ ${state.sessions.map(s => `
     Удалить
   </button>
 </div>
-</details>`).join('') || `<div class="empty">Занятий пока нет.</div>`}</div>`;
+</details>`).join('') || `<div class="empty compact-empty">Занятий пока нет.</div>`}</section>`;
     const form = document.getElementById('sessionForm'), btn = document.getElementById('sessionSaveBtn'), status = document.getElementById('sessionStatus'); watchFormDirty(form, btn, 'Сохранить занятие');
 
     enableVoiceInput(form);
@@ -7970,7 +7973,7 @@ const sessionAiStatus =
   document.createElement('div');
 
 sessionGoalSuggestions.id = 'sessionGoalSuggestions';
-sessionGoalSuggestions.style.marginTop = '12px';
+sessionGoalSuggestions.className = 'session-goal-suggestions';
 
 sessionAiStatus.insertAdjacentElement(
   'afterend',
@@ -7989,9 +7992,9 @@ analyzeSessionBtn.onclick = async () => {
   }
 
   analyzeSessionBtn.disabled = true;
-  analyzeSessionBtn.textContent = '✨ Анализирую...';
+  analyzeSessionBtn.textContent = 'Анализируем…';
   sessionAiStatus.textContent =
-    'PT Child разбирает запись занятия...';
+    'Fizira разбирает запись занятия...';
 
   try {
     const activeGoals = state.goals
@@ -8069,12 +8072,11 @@ const suggestedProgress =
 }
 
   const card = document.createElement('div');
-  card.className = 'item';
-  card.style.marginTop = '10px';
+  card.className = 'session-goal-suggestion';
 
   card.innerHTML = `
     <div class="item-title">
-      🎯 ${esc(goal.title)}
+      ${esc(goal.title)}
     </div>
 
     <div class="muted" style="margin-top:6px">
@@ -8153,7 +8155,7 @@ const suggestedProgress =
 if (!sessionGoalSuggestions.children.length) {
   sessionGoalSuggestions.innerHTML = `
     <div class="muted tiny">
-      🎯 ИИ не предлагает менять прогресс активных целей.
+      ИИ не предлагает менять прогресс активных целей.
     </div>
   `;
 }
@@ -8171,7 +8173,7 @@ if (!sessionGoalSuggestions.children.length) {
   } finally {
     analyzeSessionBtn.disabled = false;
     analyzeSessionBtn.textContent =
-      '✨ Разобрать с ИИ';
+      'Разобрать с ИИ';
   }
 };
 
@@ -8213,7 +8215,7 @@ if (savedNextSessionPlan && nextSessionPlan) {
   nextSessionPlan.innerHTML = `
     <div class="item">
       <div class="item-title">
-        🎯 Главная задача
+        Главная задача
       </div>
 
       <div style="margin-top:6px">
@@ -8226,7 +8228,7 @@ if (savedNextSessionPlan && nextSessionPlan) {
         ? `
           <div class="item">
             <div class="item-title">
-              👀 Проверить в начале
+              Проверить в начале
             </div>
 
             <div style="margin-top:6px">
@@ -8254,7 +8256,7 @@ if (savedNextSessionPlan && nextSessionPlan) {
         class="item-title"
         style="cursor:pointer"
       >
-        ▶ Подробнее о плане
+        Подробнее о плане
       </summary>
 
       ${
@@ -8272,7 +8274,7 @@ if (savedNextSessionPlan && nextSessionPlan) {
         savedWhatToTrack.length
           ? `
             <div class="item-sub" style="margin-top:16px">
-              <b>📌 Что отслеживать</b>
+              <b>Что отслеживать</b>
               <ul>
                 ${savedWhatToTrack
                   .map(item => `<li>${esc(item)}</li>`)
@@ -8287,7 +8289,7 @@ if (savedNextSessionPlan && nextSessionPlan) {
         savedSuccessCriteria.length
           ? `
             <div class="item-sub" style="margin-top:16px">
-              <b>✅ Признаки прогресса</b>
+              <b>Признаки прогресса</b>
               <ul>
                 ${savedSuccessCriteria
                   .map(item => `<li>${esc(item)}</li>`)
@@ -8302,7 +8304,7 @@ if (savedNextSessionPlan && nextSessionPlan) {
         savedCautions.length
           ? `
             <div class="item-sub" style="margin-top:16px">
-              <b>⚠️ Учесть</b>
+              <b>Учесть</b>
               <ul>
                 ${savedCautions
                   .map(item => `<li>${esc(item)}</li>`)
@@ -8320,10 +8322,10 @@ if (prepareNextSessionBtn) {
   prepareNextSessionBtn.onclick = async () => {
     prepareNextSessionBtn.disabled = true;
     prepareNextSessionBtn.textContent =
-      '✨ Готовлю план...';
+      'Готовим план…';
 
     nextSessionPlanStatus.textContent =
-      'PT Child анализирует цели и последние занятия...';
+      'Fizira анализирует цели и последние занятия...';
 
     nextSessionPlan.innerHTML = '';
 
@@ -8356,7 +8358,7 @@ if (prepareNextSessionBtn) {
      nextSessionPlan.innerHTML = `
   <div class="item">
     <div class="item-title">
-      🎯 Главная задача
+      Главная задача
     </div>
 
     <div style="margin-top:6px">
@@ -8369,7 +8371,7 @@ if (prepareNextSessionBtn) {
       ? `
         <div class="item">
           <div class="item-title">
-            👀 Проверить в начале
+            Проверить в начале
           </div>
 
           <div style="margin-top:6px">
@@ -8397,7 +8399,7 @@ if (prepareNextSessionBtn) {
       class="item-title"
       style="cursor:pointer"
     >
-      ▶ Подробнее о плане
+      Подробнее о плане
     </summary>
 
     ${
@@ -8447,7 +8449,7 @@ if (prepareNextSessionBtn) {
       whatToTrack.length
         ? `
           <div class="item-sub" style="margin-top:16px">
-            <b>📌 Что отслеживать</b>
+            <b>Что отслеживать</b>
             <ul>
               ${whatToTrack
                 .map(item => `<li>${esc(item)}</li>`)
@@ -8462,7 +8464,7 @@ if (prepareNextSessionBtn) {
       successCriteria.length
         ? `
           <div class="item-sub" style="margin-top:16px">
-            <b>✅ Признаки прогресса</b>
+            <b>Признаки прогресса</b>
             <ul>
               ${successCriteria
                 .map(item => `<li>${esc(item)}</li>`)
@@ -8477,7 +8479,7 @@ if (prepareNextSessionBtn) {
       cautions.length
         ? `
           <div class="item-sub" style="margin-top:16px">
-            <b>⚠️ Учесть</b>
+            <b>Учесть</b>
             <ul>
               ${cautions
                 .map(item => `<li>${esc(item)}</li>`)
@@ -8495,7 +8497,7 @@ if (prepareNextSessionBtn) {
     class="btn primary full"
     id="useNextSessionPlanBtn"
   >
-    ✅ Использовать как план занятия
+    Использовать как план занятия
   </button>
 </div>
 
@@ -8531,7 +8533,7 @@ if (useNextSessionPlanBtn) {
 
       useNextSessionPlanBtn.disabled = false;
       useNextSessionPlanBtn.textContent =
-        '✅ Использовать как план занятия';
+        'Использовать как план занятия';
 
       nextSessionPlanStatus.textContent =
         `Ошибка сохранения: ${savePlanError.message}`;
@@ -8560,7 +8562,7 @@ if (useNextSessionPlanBtn) {
     } finally {
       prepareNextSessionBtn.disabled = false;
       prepareNextSessionBtn.textContent =
-        '✨ Подготовить следующее занятие';
+        'Подготовить следующее занятие';
     }
   };
 }
@@ -8579,7 +8581,7 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
     editingSessionId = session.id;
 
     form.querySelector('h3').textContent =
-      '✏️ Изменить занятие';
+      'Изменить занятие';
 
     form.elements.session_date.value =
       session.session_date || '';
@@ -8771,44 +8773,43 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
     .slice(0, 5);
 
   box.innerHTML = `
-    <div class="card">
-      <h3>Динамика по занятиям</h3>
+    <section class="card progress-overview-card">
+      <div class="workspace-heading"><div><h3>Динамика по занятиям</h3><p>Сводка подтверждённых изменений по записям занятий.</p></div></div>
 
-      <button id="aiDynamicsBtn" class="btn primary full" type="button" style="margin-bottom:12px">
-       ✨ Анализ динамики ИИ
+      <button id="aiDynamicsBtn" class="btn primary full ai-dynamics-action" type="button">
+       Анализировать динамику
       </button>
 
-      <div id="aiDynamicsStatus" class="muted tiny" style="margin-bottom:12px"></div>
+      <div id="aiDynamicsStatus" class="muted tiny ai-dynamics-status"></div>
       <button
   id="aiDynamicsHistoryBtn"
-  class="btn full"
+  class="btn ai-dynamics-history"
   type="button"
-  style="margin-bottom:12px"
 >
-  🕘 История анализов динамики
+  История анализов
 </button>
 
 <div
   id="aiDynamicsHistoryPanel"
-  class="card"
-  style="display:none; margin-bottom:12px"
+  class="card ai-dynamics-history-panel"
+  style="display:none"
 ></div>
 
       <button
            id="aiDynamicsToggleBtn"
-           class="btn full"
+           class="btn ai-result-toggle"
            type="button"
-           style="display:none; margin-bottom:12px"
+           style="display:none"
       >
-           ▲ Свернуть анализ
+           Свернуть анализ
       </button>
 
-       <div id="aiDynamicsResult" class="card" style="display:none; margin-bottom:12px"></div>
+       <div id="aiDynamicsResult" class="card ai-result-card ai-dynamics-result" style="display:none"></div>
 
       ${
         sessionsWithDynamics.length
           ? `
-            <div class="metric-grid">
+            <div class="metric-grid dynamics-metric-grid">
               <div class="metric">
                 <b>${improvedCount}</b>
                 <span>улучшений</span>
@@ -8832,17 +8833,17 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
           `
           : `<div class="empty">Данных о динамике пока нет.</div>`
       }
-    </div>
+    </section>
 
-    <div class="card">
-      <h3>Функциональные изменения</h3>
+    <section class="card progress-changes-card">
+      <div class="workspace-heading"><div><h3>Функциональные изменения</h3><p>Последние наблюдения, записанные специалистом.</p></div></div>
 
       ${
         recentChanges.length
           ? recentChanges
               .map(
                 s => `
-                 <details class="item">
+                 <details class="item progress-change-entry">
   <summary
     class="item-title"
     style="cursor:pointer"
@@ -8859,10 +8860,10 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
               .join('')
           : `<div class="empty">Функциональные изменения пока не зафиксированы.</div>`
       }
-    </div>
+    </section>
 
-    <div class="card">
-      <h3>Динамика по целям</h3>
+    <section class="card progress-goals-card">
+      <div class="workspace-heading"><div><h3>Динамика по целям</h3><p>Прогресс фиксируется только после подтверждения специалистом.</p></div></div>
 
       ${
        state.goals.some(g => g.status === 'active')
@@ -8898,13 +8899,8 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
       }
 
 ${state.goals.some(g => g.status === 'achieved') ? `
-  <div style="margin-top:18px">
-    <div
-      class="item-title"
-      style="margin-bottom:10px"
-    >
-      ✅ Достигнутые цели
-    </div>
+  <div class="achieved-goals-list">
+    <div class="item-title">Достигнутые цели</div>
 
     ${goalsHtml(
       state.goals.filter(g => g.status === 'achieved'),
@@ -8913,7 +8909,7 @@ ${state.goals.some(g => g.status === 'achieved') ? `
   </div>
 ` : ''}
 
-    </div>
+    </section>
   `;
 
 const aiDynamicsBtn = document.getElementById('aiDynamicsBtn');
@@ -8933,10 +8929,10 @@ if (aiDynamicsToggleBtn && aiDynamicsResult) {
 
     if (isOpen) {
       aiDynamicsResult.style.display = 'none';
-      aiDynamicsToggleBtn.textContent = '▼ Развернуть анализ';
+      aiDynamicsToggleBtn.textContent = 'Развернуть анализ';
     } else {
       aiDynamicsResult.style.display = 'block';
-      aiDynamicsToggleBtn.textContent = '▲ Свернуть анализ';
+      aiDynamicsToggleBtn.textContent = 'Свернуть анализ';
     }
   };
 }
@@ -8948,13 +8944,13 @@ if (aiDynamicsHistoryBtn && aiDynamicsHistoryPanel && aiDynamicsResult) {
     }
 
     aiDynamicsHistoryBtn.disabled = true;
-    aiDynamicsHistoryBtn.textContent = '⏳ Загружаю историю...';
+    aiDynamicsHistoryBtn.textContent = 'Загружаем…';
 
     try {
       const history = await loadAiDynamicsHistory(p.id);
 
       aiDynamicsHistoryPanel.innerHTML =
-        '<h3>🕘 История анализов динамики</h3>';
+        '<h3>История анализов динамики</h3>';
 
       if (!history.length) {
         aiDynamicsHistoryPanel.innerHTML +=
@@ -8985,7 +8981,7 @@ if (aiDynamicsHistoryBtn && aiDynamicsHistoryPanel && aiDynamicsResult) {
 
             if (aiDynamicsToggleBtn) {
               aiDynamicsToggleBtn.style.display = 'block';
-              aiDynamicsToggleBtn.textContent = '▲ Свернуть анализ';
+              aiDynamicsToggleBtn.textContent = 'Свернуть анализ';
             }
           };
 
@@ -9003,7 +8999,7 @@ if (aiDynamicsHistoryBtn && aiDynamicsHistoryPanel && aiDynamicsResult) {
       aiDynamicsHistoryPanel.style.display = 'block';
     } finally {
       aiDynamicsHistoryBtn.disabled = false;
-      aiDynamicsHistoryBtn.textContent = '🕘 История анализов динамики';
+      aiDynamicsHistoryBtn.textContent = 'История анализов';
     }
   };
 }
@@ -9018,9 +9014,9 @@ if (
   aiDynamicsResult.style.display = "none";
 
   aiDynamicsToggleBtn.style.display = 'block';
-  aiDynamicsToggleBtn.textContent = "▼ Развернуть анализ";
+  aiDynamicsToggleBtn.textContent = "Развернуть анализ";
 
-  aiDynamicsBtn.textContent = "✨ Обновить анализ динамики ИИ";
+  aiDynamicsBtn.textContent = "Обновить анализ";
 
   const savedDynamicsDate =
     formatAIAnalysisDate(p.ai_dynamics_updated_at);
@@ -9033,7 +9029,7 @@ if (
 if (aiDynamicsBtn) {
   aiDynamicsBtn.onclick = async () => {
     aiDynamicsBtn.disabled = true;
-    aiDynamicsBtn.textContent = '⏳ Анализирую динамику...';
+    aiDynamicsBtn.textContent = 'Анализируем…';
 
     aiDynamicsStatus.textContent =
       'ИИ сопоставляет занятия, функциональные изменения и цели.';
@@ -9244,17 +9240,17 @@ if (dynamicsHistoryError) {
     aiDynamicsResult.innerHTML = formatAIResult(answer);
 
     aiDynamicsToggleBtn.style.display = "block";
-    aiDynamicsToggleBtn.textContent = "▲ Свернуть анализ";
+    aiDynamicsToggleBtn.textContent = "Свернуть анализ";
 
     aiDynamicsStatus.textContent = "✓ Анализ динамики готов и сохранён.";
-    aiDynamicsBtn.textContent = "✨ Обновить анализ динамики ИИ";
+    aiDynamicsBtn.textContent = "Обновить анализ";
     } catch (error) {
       console.error(error);
 
       aiDynamicsStatus.textContent =
         'Не удалось выполнить анализ динамики ИИ. Попробуйте ещё раз.';
 
-      aiDynamicsBtn.textContent = '✨ Повторить анализ динамики ИИ';
+      aiDynamicsBtn.textContent = 'Повторить анализ';
     } finally {
       aiDynamicsBtn.disabled = false;
     }
