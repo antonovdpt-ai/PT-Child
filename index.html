@@ -3,14 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#f5f6f8" />
+  <meta name="theme-color" content="#f7faf9" />
   <meta name="referrer" content="no-referrer" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Fizira</title>
-  <link rel="stylesheet" href="styles.css?v=0.156-inline-status" />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="styles.css?v=0.157-fizira-theme" />
 </head>
 <body>
   <div class="shell">
+    <aside class="app-sidebar" id="appSidebar" aria-label="Основная навигация">
+      <div class="sidebar-brand">
+        <img src="fizira-symbol.png" alt="" width="32" height="32" />
+        <div><div class="sidebar-wordmark">Fizira</div><div class="sidebar-caption">Рабочее пространство</div></div>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="sidebar-nav-item is-active" id="sidePatients" type="button"><span class="nav-icon" aria-hidden="true">⌂</span><span>Пациенты</span></button>
+        <button class="sidebar-nav-item" id="sideCabinet" type="button"><span class="nav-icon" aria-hidden="true">◷</span><span>Расписание</span></button>
+      </nav>
+      <div class="sidebar-footer"><span class="status-dot" aria-hidden="true"></span><span>Система работает</span></div>
+    </aside>
     <header class="header">
       <div>
         <div class="brand">Fizira</div>
@@ -22,5 +34,24 @@
     <main id="app"><div class="card center">Загрузка…</div></main>
   </div>
   <script type="module" src="app.js?v=0.156-inline-status"></script>
+  <script>
+    (() => {
+      const syncShell = () => {
+        const authenticated = Boolean(document.getElementById('cabinetBtn') || document.getElementById('logoutBtn'));
+        document.body.classList.toggle('is-authenticated', authenticated);
+        document.getElementById('sidePatients')?.classList.toggle('is-active', !document.querySelector('.cabinet-page'));
+        document.getElementById('sideCabinet')?.classList.toggle('is-active', Boolean(document.querySelector('.cabinet-page')));
+      };
+      new MutationObserver(syncShell).observe(document.body, { childList: true, subtree: true });
+      document.addEventListener('click', event => {
+        const target = event.target.closest?.('#sidePatients, #sideCabinet');
+        if (!target) return;
+        if (target.id === 'sideCabinet') document.getElementById('cabinetBtn')?.click();
+        if (target.id === 'sidePatients') document.querySelector('#cabinetBack, #backPatients')?.click();
+        setTimeout(syncShell, 0);
+      });
+      syncShell();
+    })();
+  </script>
 </body>
 </html>
