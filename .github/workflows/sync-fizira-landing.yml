@@ -65,7 +65,17 @@ jobs:
           const end = "/* FIZIRA_MOBILE_FIX_END */";
           const css = fs.readFileSync(cssPath, "utf8");
           const patch = fs.readFileSync(patchPath, "utf8").trim();
-          const escapedStart = start.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\          NODE
+          let cleanCss = css;
+          const startAt = cleanCss.indexOf(start);
+          if (startAt !== -1) {
+            const endAt = cleanCss.indexOf(end, startAt);
+            if (endAt === -1) {
+              throw new Error("Responsive patch start marker has no end marker");
+            }
+            cleanCss = cleanCss.slice(0, startAt) + cleanCss.slice(endAt + end.length);
+          }
+          fs.writeFileSync(cssPath, cleanCss.trimEnd() + "\n\n" + patch + "\n");
+          NODE
           grep -Fq "<title>Fizira" landing/index.html");
           const escapedEnd = end.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\          NODE
           grep -Fq "<title>Fizira" landing/index.html");
