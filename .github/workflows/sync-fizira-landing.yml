@@ -64,6 +64,14 @@ jobs:
           test -s landing/favicon.ico
           tar -czf fizira-landing.tar.gz -C landing .
 
+      - name: Export landing snapshot for responsive review
+        uses: actions/upload-artifact@v4
+        with:
+          name: fizira-landing-snapshot
+          path: fizira-landing.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Configure restricted SSH access
         env:
           SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
