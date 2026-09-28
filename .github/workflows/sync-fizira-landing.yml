@@ -1,10 +1,11 @@
-name: One-time copy of Fizira landing to Timeweb
+name: Sync Fizira landing to Timeweb
 
 on:
   push:
     branches: [main]
     paths:
       - ".github/workflows/sync-fizira-landing.yml"
+      - "ops/landing/mobile.css"
   workflow_dispatch:
 
 permissions:
@@ -56,9 +57,26 @@ jobs:
           );
           fs.writeFileSync(path, html);
           NODE
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const cssPath = "landing/styles.css";
+          const patchPath = "ops/landing/mobile.css";
+          const start = "/* FIZIRA_MOBILE_FIX_START */";
+          const end = "/* FIZIRA_MOBILE_FIX_END */";
+          const css = fs.readFileSync(cssPath, "utf8");
+          const patch = fs.readFileSync(patchPath, "utf8").trim();
+          const escapedStart = start.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\          NODE
+          grep -Fq "<title>Fizira" landing/index.html");
+          const escapedEnd = end.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\          NODE
+          grep -Fq "<title>Fizira" landing/index.html");
+          const previousPatch = new RegExp("\\n?" + escapedStart + "[\\s\\S]*?" + escapedEnd + "\\n?", "g");
+          const cleanCss = css.replace(previousPatch, "").trimEnd();
+          fs.writeFileSync(cssPath, cleanCss + "\\n\\n" + patch + "\\n");
+          NODE
           grep -Fq "<title>Fizira" landing/index.html
           grep -Fq "app.fizira.com" landing/index.html
           test -s landing/styles.css
+          grep -Fq "FIZIRA_MOBILE_FIX_END" landing/styles.css
           test -s landing/script.js
           test -s landing/assets/fizira-logo-black.png
           test -s landing/favicon.ico
