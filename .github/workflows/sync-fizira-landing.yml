@@ -66,8 +66,8 @@ jobs:
 
       - name: Configure restricted SSH access
         env:
-          SSH_KEY: \${{ secrets.TIMEWEB_SSH_KEY }}
-          KNOWN_HOSTS: \${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
@@ -78,27 +78,27 @@ jobs:
 
       - name: Upload landing assets without changing Caddy or DNS
         env:
-          HOST: \${{ secrets.TIMEWEB_HOST }}
-          PORT: \${{ secrets.TIMEWEB_PORT }}
-          USER: \${{ secrets.TIMEWEB_USER }}
-          SHA: \${{ github.sha }}
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           remote_cache=".cache/fizira-landing"
           ssh \
-            -p "\${PORT:-22}" \
+            -p "${PORT:-22}" \
             -i ~/.ssh/id_ed25519 \
             -o BatchMode=yes \
             "$USER@$HOST" \
             "mkdir -p '$remote_cache'"
           scp \
-            -P "\${PORT:-22}" \
+            -P "${PORT:-22}" \
             -i ~/.ssh/id_ed25519 \
             -o BatchMode=yes \
             fizira-landing.tar.gz \
             "$USER@$HOST:$remote_cache/$SHA.tar.gz"
           ssh \
-            -p "\${PORT:-22}" \
+            -p "${PORT:-22}" \
             -i ~/.ssh/id_ed25519 \
             -o BatchMode=yes \
             "$USER@$HOST" \
