@@ -1,0 +1,64 @@
+name: Timeweb root-domain preflight
+
+on:
+  push:
+    branches: [server-staging]
+    paths:
+      - ".github/workflows/timeweb-root-domain-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Probe root-domain virtual host locally
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          ssh \
+            -p "${PORT:-22}" \
+            -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            "$USER@$HOST" \
+            'set -eu
+             printf "%s\n" "=== HTTP FIZIRA.COM VIA LOCAL CADDY ==="
+             curl --silent --show-error --connect-timeout 5 \
+               --resolve fizira.com:80:127.0.0.1 \
+               --max-redirs 0 -D - -o /dev/null http://fizira.com/ || true
+             printf "%s\n" "=== HTTPS FIZIRA.COM VIA LOCAL CADDY ==="
+             curl --silent --show-error --connect-timeout 5 --insecure \
+               --resolve fizira.com:443:127.0.0.1 \
+               --max-redirs 0 -D - -o /dev/null https://fizira.com/ || true
+             printf "%s\n" "=== HTTPS APP.FIZIRA.COM VIA LOCAL CADDY ==="
+             curl --silent --show-error --connect-timeout 5 --insecure \
+               --resolve app.fizira.com:443:127.0.0.1 \
+               --max-redirs 0 -D - -o /dev/null https://app.fizira.com/ || true' \
+            > timeweb-root-domain-preflight.txt
+
+      - name: Upload preflight artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: timeweb-root-domain-preflight
+          path: timeweb-root-domain-preflight.txt
+          if-no-files-found: error
+          retention-days: 1
