@@ -1,0 +1,94 @@
+/* FIZIRA_MOBILE_FIX_START */
+/* Keep the 760 px product mock-up from defining the mobile grid width. */
+@media (max-width: 620px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .hero {
+    padding: 108px 0 68px;
+  }
+
+  .hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hero-copy {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .eyebrow {
+    max-width: 100%;
+    align-items: flex-start;
+    gap: 9px;
+    font-size: .7rem;
+    line-height: 1.45;
+    letter-spacing: .075em;
+  }
+
+  .eyebrow > span {
+    flex: 0 0 22px;
+    margin-top: .65em;
+  }
+
+  .hero h1 {
+    max-width: 100%;
+    margin: 20px 0;
+    font-size: clamp(2.25rem, 10.8vw, 3.1rem);
+    line-height: 1.02;
+    letter-spacing: -.045em;
+  }
+
+  .hero-copy > p {
+    max-width: 100%;
+    line-height: 1.58;
+  }
+
+  .hero-actions {
+    gap: 10px;
+    margin: 28px 0 16px;
+  }
+
+  .hero-actions .button {
+    max-width: 100%;
+    padding-inline: 18px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .hero-copy .release-note {
+    font-size: .78rem;
+    line-height: 1.5;
+  }
+
+  .hero-product {
+    min-width: 760px;
+    max-width: none;
+    margin: 24px 0 -265px;
+  }
+}
+
+@media (max-width: 402px) {
+  .hero-product {
+    transform: scale(.44);
+    margin-bottom: -292px;
+  }
+}
+
+@media (max-width: 363px) {
+  .hero-product {
+    transform: scale(.4);
+    margin-bottom: -312px;
+  }
+}
+
+@media (max-width: 340px) {
+  .hero-product {
+    transform: scale(.38);
+    margin-bottom: -323px;
+  }
+}
+/* FIZIRA_MOBILE_FIX_END */
