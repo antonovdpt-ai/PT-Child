@@ -1,0 +1,122 @@
+name: Deploy Fizira frontend to Timeweb
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "app.js"
+      - "cabinet.js"
+      - "styles.css"
+      - "media-fallback.css"
+      - "auth-domain.mjs"
+      - "schedule-domain.mjs"
+      - "schedule-editor.js"
+      - "security-utils.mjs"
+      - "favicon.ico"
+      - "fizira-symbol.png"
+      - ".github/workflows/deploy-fizira-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package public frontend assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=(
+            index.html
+            app.js
+            cabinet.js
+            styles.css
+            media-fallback.css
+            auth-domain.mjs
+            schedule-domain.mjs
+            schedule-editor.js
+            security-utils.mjs
+            favicon.ico
+            fizira-symbol.png
+          )
+          for asset in "${assets[@]}"; do
+            test -f "$asset"
+          done
+          tar -czf fizira-frontend.tar.gz "${assets[@]}"
+          grep -Eo 'app\.js\?v=[^"]+' index.html | head -n 1 > expected-app-marker.txt
+          test -s expected-app-marker.txt
+
+      - name: Configure restricted SSH access
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload and activate public frontend
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          remote_cache=".cache/fizira-frontend"
+          ssh \
+            -p "${PORT:-22}" \
+            -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            "$USER@$HOST" \
+            "mkdir -p '$remote_cache'"
+          scp \
+            -P "${PORT:-22}" \
+            -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            fizira-frontend.tar.gz \
+            "$USER@$HOST:$remote_cache/$SHA.tar.gz"
+          ssh \
+            -p "${PORT:-22}" \
+            -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            "$USER@$HOST" \
+            "set -eu
+             target='/root/supabase-project/volumes/proxy/app'
+             archive=\"\$HOME/$remote_cache/$SHA.tar.gz\"
+             stage=\"\$(mktemp -d \"\$target/.fizira-stage.XXXXXX\")\"
+             tar -xzf \"\$archive\" -C \"\$stage\"
+             for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png index.html; do
+               test -f \"\$stage/\$asset\"
+             done
+             for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png; do
+               mv \"\$stage/\$asset\" \"\$target/\$asset\"
+             done
+             mv \"\$stage/index.html\" \"\$target/index.html\"
+             rmdir \"\$stage\"
+             rm -f \"\$archive\""
+
+      - name: Verify published version on the public domain
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          expected_marker="$(cat expected-app-marker.txt)"
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 \
+            "https://app.fizira.com/?release=$SHA" \
+            -o deployed-index.html
+          grep -F "$expected_marker" deployed-index.html
