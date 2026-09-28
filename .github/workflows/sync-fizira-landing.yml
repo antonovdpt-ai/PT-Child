@@ -76,13 +76,6 @@ jobs:
           }
           fs.writeFileSync(cssPath, cleanCss.trimEnd() + "\n\n" + patch + "\n");
           NODE
-          grep -Fq "<title>Fizira" landing/index.html");
-          const escapedEnd = end.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\          NODE
-          grep -Fq "<title>Fizira" landing/index.html");
-          const previousPatch = new RegExp("\\n?" + escapedStart + "[\\s\\S]*?" + escapedEnd + "\\n?", "g");
-          const cleanCss = css.replace(previousPatch, "").trimEnd();
-          fs.writeFileSync(cssPath, cleanCss + "\\n\\n" + patch + "\\n");
-          NODE
           grep -Fq "<title>Fizira" landing/index.html
           grep -Fq "app.fizira.com" landing/index.html
           test -s landing/styles.css
