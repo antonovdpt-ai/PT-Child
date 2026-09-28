@@ -1,0 +1,120 @@
+name: One-time copy of Fizira landing to Timeweb
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync-fizira-landing.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fizira-landing-copy
+  cancel-in-progress: false
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch public landing assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p landing/assets
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
+            -A "Mozilla/5.0 (compatible; FiziraLandingMigration/1.0)" \
+            https://fizira.com/ \
+            -o landing/index.html
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
+            -A "Mozilla/5.0 (compatible; FiziraLandingMigration/1.0)" \
+            https://fizira.com/styles.css \
+            -o landing/styles.css
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
+            -A "Mozilla/5.0 (compatible; FiziraLandingMigration/1.0)" \
+            https://fizira.com/script.js \
+            -o landing/script.js
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
+            -A "Mozilla/5.0 (compatible; FiziraLandingMigration/1.0)" \
+            https://fizira.com/assets/fizira-logo-black.png \
+            -o landing/assets/fizira-logo-black.png
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
+            -A "Mozilla/5.0 (compatible; FiziraLandingMigration/1.0)" \
+            https://fizira.com/favicon.ico \
+            -o landing/favicon.ico
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const path = "landing/index.html";
+          const html = fs.readFileSync(path, "utf8").replace(
+            /<script>\(function\(\)\{function c\(\)[\s\S]*?<\/script>/,
+            ""
+          );
+          fs.writeFileSync(path, html);
+          NODE
+          grep -Fq "<title>Fizira" landing/index.html
+          grep -Fq "app.fizira.com" landing/index.html
+          test -s landing/styles.css
+          test -s landing/script.js
+          test -s landing/assets/fizira-logo-black.png
+          test -s landing/favicon.ico
+          tar -czf fizira-landing.tar.gz -C landing .
+
+      - name: Configure restricted SSH access
+        env:
+          SSH_KEY: \${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: \${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload landing assets without changing Caddy or DNS
+        env:
+          HOST: \${{ secrets.TIMEWEB_HOST }}
+          PORT: \${{ secrets.TIMEWEB_PORT }}
+          USER: \${{ secrets.TIMEWEB_USER }}
+          SHA: \${{ github.sha }}
+        run: |
+          set -euo pipefail
+          remote_cache=".cache/fizira-landing"
+          ssh \
+            -p "\${PORT:-22}" \
+            -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            "$USER@$HOST" \
+            "mkdir -p '$remote_cache'"
+          scp \
+            -P "\${PORT:-22}" \
+            -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            fizira-landing.tar.gz \
+            "$USER@$HOST:$remote_cache/$SHA.tar.gz"
+          ssh \
+            -p "\${PORT:-22}" \
+            -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            "$USER@$HOST" \
+            "set -eu
+             root='/root/supabase-project/volumes/proxy/app'
+             target=\"\$root/landing\"
+             archive=\"\$HOME/$remote_cache/$SHA.tar.gz\"
+             stage=\"\$(mktemp -d \"\$root/.landing-stage.XXXXXX\")\"
+             tar -xzf \"\$archive\" -C \"\$stage\"
+             for asset in index.html styles.css script.js favicon.ico assets/fizira-logo-black.png; do
+               test -s \"\$stage/\$asset\"
+             done
+             mkdir -p \"\$target/assets\"
+             for asset in index.html styles.css script.js favicon.ico assets/fizira-logo-black.png; do
+               install -m 644 \"\$stage/\$asset\" \"\$target/\$asset\"
+             done
+             rm -rf \"\$stage\"
+             rm -f \"\$archive\"
+             test -s \"\$target/index.html\""
