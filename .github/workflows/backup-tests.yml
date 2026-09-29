@@ -30,6 +30,20 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
+          required_executables=(
+            ops/backup/automated-backup.sh
+            ops/backup/create-backup.sh
+            ops/backup/install-pull-mode.sh
+            ops/backup/install.sh
+            ops/backup/tests/test-automated-backup.sh
+            ops/backup/tests/test-create-backup.sh
+          )
+          for script in "${required_executables[@]}"; do
+            test -x "$script" || {
+              echo "Required backup entrypoint is not executable: $script" >&2
+              exit 1
+            }
+          done
           while IFS= read -r -d '' script; do
             bash -n "$script"
           done < <(find ops/backup -type f -name '*.sh' -print0)
