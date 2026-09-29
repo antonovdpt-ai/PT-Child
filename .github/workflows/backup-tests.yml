@@ -1,0 +1,60 @@
+name: Fizira backup tests
+
+on:
+  pull_request:
+    paths:
+      - "ops/backup/**"
+      - ".github/workflows/backup-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ops/backup/**"
+      - ".github/workflows/backup-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fizira-backup-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check shell syntax
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          while IFS= read -r -d '' script; do
+            bash -n "$script"
+          done < <(find ops/backup -type f -name '*.sh' -print0)
+
+      - name: Test snapshot creation
+        run: bash ops/backup/tests/test-create-backup.sh
+
+      - name: Test encryption and delivery orchestration
+        run: bash ops/backup/tests/test-automated-backup.sh
+
+      - name: Check Windows task scripts
+        shell: pwsh
+        run: |
+          $errors = @()
+          Get-ChildItem ops/backup/windows -Filter *.ps1 | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref] $tokens,
+              [ref] $parseErrors
+            ) | Out-Null
+            $errors += $parseErrors
+          }
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
