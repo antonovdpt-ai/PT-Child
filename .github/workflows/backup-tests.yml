@@ -38,7 +38,7 @@ jobs:
         run: bash ops/backup/tests/test-create-backup.sh
 
       - name: Test encryption and delivery orchestration
-        run: bash ops/backup/tests/test-automated-backup.sh
+        run: sudo bash ops/backup/tests/test-automated-backup.sh
 
       - name: Check Windows task scripts
         shell: pwsh
