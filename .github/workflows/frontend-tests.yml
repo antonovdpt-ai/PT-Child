@@ -1,0 +1,55 @@
+name: Fizira frontend tests
+
+on:
+  pull_request:
+    paths:
+      - "app.js"
+      - "cabinet.js"
+      - "auth-domain.mjs"
+      - "schedule-domain.mjs"
+      - "schedule-editor.js"
+      - "security-utils.mjs"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/frontend-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app.js"
+      - "cabinet.js"
+      - "auth-domain.mjs"
+      - "schedule-domain.mjs"
+      - "schedule-editor.js"
+      - "security-utils.mjs"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/frontend-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fizira-frontend-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use supported Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run regression tests
+        run: npm test

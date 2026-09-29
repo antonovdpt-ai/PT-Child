@@ -17,10 +17,26 @@ test('calendar supports patient search, parent contacts, debt and profile naviga
   window.HTMLDialogElement.prototype.showModal = function(){ this.open = true; };
   window.HTMLDialogElement.prototype.close = function(){ this.open = false; };
   document.body.innerHTML = '<main id="app"></main>';
+  const toDayKey = date => [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, '0'),
+    String(date.getUTCDate()).padStart(2, '0')
+  ].join('-');
+  const today = new Date();
+  const todayKey = toDayKey(today);
+  const futureKey = toDayKey(
+    new Date(Date.UTC(
+      today.getUTCFullYear(),
+      today.getUTCMonth(),
+      today.getUTCDate() + 7
+    ))
+  );
+  const atHour = (day, hour) =>
+    `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
   const appointments = [
-    { id:'old', therapist_id:'u1', patient_id:'p1', starts_at:'2026-09-23T08:00:00.000Z', ends_at:'2026-09-23T09:00:00.000Z', kind:'appointment', status:'completed', price_kopecks:300000, paid_kopecks:0, note:null, initial_name:null, updated_at:'2026-09-23T08:00:00.000Z' },
-    { id:'next', therapist_id:'u1', patient_id:'p1', starts_at:'2026-09-23T09:00:00.000Z', ends_at:'2026-09-23T10:00:00.000Z', kind:'appointment', status:'planned', price_kopecks:300000, paid_kopecks:0, note:null, initial_name:null, updated_at:'2026-09-23T08:00:00.000Z' },
-    { id:'future', therapist_id:'u1', patient_id:'p1', starts_at:'2099-09-23T09:00:00.000Z', ends_at:'2099-09-23T10:00:00.000Z', kind:'appointment', status:'planned', price_kopecks:300000, paid_kopecks:0, note:null, initial_name:null, updated_at:'2026-09-23T08:00:00.000Z' }
+    { id:'old', therapist_id:'u1', patient_id:'p1', starts_at:atHour(todayKey, 8), ends_at:atHour(todayKey, 9), kind:'appointment', status:'completed', price_kopecks:300000, paid_kopecks:0, note:null, initial_name:null, updated_at:atHour(todayKey, 8) },
+    { id:'next', therapist_id:'u1', patient_id:'p1', starts_at:atHour(todayKey, 9), ends_at:atHour(todayKey, 10), kind:'appointment', status:'planned', price_kopecks:300000, paid_kopecks:0, note:null, initial_name:null, updated_at:atHour(todayKey, 8) },
+    { id:'future', therapist_id:'u1', patient_id:'p1', starts_at:atHour(futureKey, 9), ends_at:atHour(futureKey, 10), kind:'appointment', status:'planned', price_kopecks:300000, paid_kopecks:0, note:null, initial_name:null, updated_at:atHour(todayKey, 8) }
   ];
   const patients = [{ id:'p1', therapist_id:'u1', display_name:'Иван Тестов', schedule_price_kopecks:300000 }, { id:'p2', therapist_id:'u1', display_name:'Мария Пример', schedule_price_kopecks:250000 }, { id:'p3', therapist_id:'u1', display_name:'Новый Пациент', schedule_price_kopecks:null }];
   const contacts = [{ patient_id:'p1', therapist_id:'u1', full_name:'Елена Тестова', relation:'мама', phone:'+7 900 000-00-00', is_primary:true }];
@@ -51,7 +67,7 @@ test('calendar supports patient search, parent contacts, debt and profile naviga
   await renderCabinet({ app, sb, state:{patients}, user:{id:'u1'}, esc, renderPatients:()=>{}, renderProfile:()=>app.innerHTML='<div>PROFILE FORM</div>' });
   await waitFor(() => app.querySelector('[data-copy]'));
   assert.doesNotMatch(app.textContent, /Добавить блок|Окончание/);
-  const appointmentDay = app.querySelector('[data-day="2026-09-23"]');
+  const appointmentDay = app.querySelector(`[data-day="${todayKey}"]`);
   appointmentDay.open = true;
   appointmentDay.dispatchEvent(new Event('toggle'));
   await waitFor(() => app.querySelector('[data-edit="next"]'));

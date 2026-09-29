@@ -33,6 +33,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Use supported Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Run frontend regression tests
+        run: |
+          npm ci
+          npm test
+
       - name: Package public frontend assets
         shell: bash
         run: |
