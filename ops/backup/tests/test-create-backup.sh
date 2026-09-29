@@ -63,7 +63,8 @@ grep -Fq BACKUP_OK <<< "$OUTPUT"
 BACKUP_DIR="$(sed -n 's/^path=//p' <<< "$OUTPUT")"
 [[ -d "$BACKUP_DIR" ]]
 
-for file in postgres.dump storage.tar.gz functions.tar.gz config.tar.gz metadata.txt SHA256SUMS; do
+for file in postgres.dump storage.tar.gz storage-files.sha256 \
+  storage-file-count.txt functions.tar.gz config.tar.gz metadata.txt SHA256SUMS; do
   [[ -f "$BACKUP_DIR/$file" ]]
 done
 
@@ -71,6 +72,24 @@ done
   cd "$BACKUP_DIR"
   sha256sum --check SHA256SUMS >/dev/null
 )
+
+[[ "$(cat "$BACKUP_DIR/storage-file-count.txt")" == 'storage_files=1' ]]
+STORAGE_RESTORE="$TEST_ROOT/storage-restore"
+mkdir -p "$STORAGE_RESTORE"
+tar -xzf "$BACKUP_DIR/storage.tar.gz" -C "$STORAGE_RESTORE"
+(
+  cd "$STORAGE_RESTORE"
+  sha256sum --check "$BACKUP_DIR/storage-files.sha256" >/dev/null
+)
+grep -Fq 'storage/bucket/object' "$BACKUP_DIR/storage-files.sha256"
+printf 'tampered object\n' > "$STORAGE_RESTORE/storage/bucket/object"
+if (
+  cd "$STORAGE_RESTORE"
+  sha256sum --check "$BACKUP_DIR/storage-files.sha256" >/dev/null 2>&1
+); then
+  echo "Storage checksum verification accepted a modified object" >&2
+  exit 1
+fi
 
 CONFIG_LIST="$(tar -tzf "$BACKUP_DIR/config.tar.gz")"
 grep -Fxq './.env' <<< "$CONFIG_LIST"

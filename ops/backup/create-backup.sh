@@ -9,8 +9,12 @@ DB_CONTAINER="${FIZIRA_DB_CONTAINER:-supabase-db}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 FINAL_DIR="${BACKUP_ROOT}/${STAMP}"
 WORK_DIR="${BACKUP_ROOT}/.${STAMP}.partial"
+STORAGE_VERIFY_DIR=""
 
 cleanup() {
+  if [[ -n "$STORAGE_VERIFY_DIR" && -d "$STORAGE_VERIFY_DIR" ]]; then
+    rm -rf -- "$STORAGE_VERIFY_DIR"
+  fi
   if [[ -d "$WORK_DIR" ]]; then
     rm -rf -- "$WORK_DIR"
   fi
@@ -70,6 +74,30 @@ docker exec "$DB_CONTAINER" pg_dump \
 echo "[2/6] Archiving Storage objects..."
 tar -C "${PROJECT_ROOT}/volumes" -czf "${WORK_DIR}/storage.tar.gz" storage
 
+STORAGE_VERIFY_DIR="$(mktemp -d "${BACKUP_ROOT}/.storage-verify.XXXXXX")"
+tar -xzf "${WORK_DIR}/storage.tar.gz" -C "$STORAGE_VERIFY_DIR"
+(
+  cd "$STORAGE_VERIFY_DIR"
+  find storage -type f -print0 \
+    | LC_ALL=C sort -z \
+    | xargs -0 -r sha256sum \
+    > "${WORK_DIR}/storage-files.sha256"
+)
+STORAGE_FILE_COUNT="$(find "$STORAGE_VERIFY_DIR/storage" -type f -printf '.' | wc -c)"
+printf 'storage_files=%s\n' "$STORAGE_FILE_COUNT" \
+  > "${WORK_DIR}/storage-file-count.txt"
+if (( STORAGE_FILE_COUNT > 0 )); then
+  (
+    cd "$STORAGE_VERIFY_DIR"
+    sha256sum --check "${WORK_DIR}/storage-files.sha256" >/dev/null
+  )
+elif [[ -s "${WORK_DIR}/storage-files.sha256" ]]; then
+  echo "ERROR: empty Storage archive produced a non-empty file manifest" >&2
+  exit 1
+fi
+rm -rf -- "$STORAGE_VERIFY_DIR"
+STORAGE_VERIFY_DIR=""
+
 echo "[3/6] Archiving Edge Functions source..."
 tar -C "${PROJECT_ROOT}/volumes" -czf "${WORK_DIR}/functions.tar.gz" functions
 
@@ -94,7 +122,8 @@ echo "[5/6] Recording metadata and checksums..."
 
 (
   cd "$WORK_DIR"
-  sha256sum postgres.dump storage.tar.gz functions.tar.gz config.tar.gz metadata.txt \
+  sha256sum postgres.dump storage.tar.gz storage-files.sha256 \
+    storage-file-count.txt functions.tar.gz config.tar.gz metadata.txt \
     > SHA256SUMS
 )
 

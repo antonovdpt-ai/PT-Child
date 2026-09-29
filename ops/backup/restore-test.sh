@@ -10,10 +10,14 @@ TEST_DB="fizira_restore_test_$(date -u +%Y%m%d%H%M%S)"
 CONTAINER_DUMP="/tmp/${TEST_DB}.dump"
 RESTORE_LOG=""
 RESTORE_USER=""
+STORAGE_VERIFY_DIR=""
 
 cleanup() {
   docker exec "$DB_CONTAINER" rm -f -- "$CONTAINER_DUMP" >/dev/null 2>&1 || true
   docker exec "$DB_CONTAINER" dropdb --username=postgres --if-exists --force "$TEST_DB" >/dev/null 2>&1 || true
+  if [[ -n "$STORAGE_VERIFY_DIR" && -d "$STORAGE_VERIFY_DIR" ]]; then
+    rm -rf -- "$STORAGE_VERIFY_DIR"
+  fi
   if [[ -n "$RESTORE_LOG" && -f "$RESTORE_LOG" ]]; then
     rm -f -- "$RESTORE_LOG"
   fi
@@ -30,7 +34,8 @@ if [[ -z "$BACKUP_DIR" || ! -d "$BACKUP_DIR" ]]; then
   exit 1
 fi
 
-for file in postgres.dump storage.tar.gz functions.tar.gz metadata.txt SHA256SUMS; do
+for file in postgres.dump storage.tar.gz storage-files.sha256 \
+  storage-file-count.txt functions.tar.gz metadata.txt SHA256SUMS; do
   if [[ ! -f "${BACKUP_DIR}/${file}" ]]; then
     echo "ERROR: missing backup file: ${BACKUP_DIR}/${file}" >&2
     exit 1
@@ -110,6 +115,34 @@ echo "[6/7] Checking Storage and Functions archives..."
 tar -tzf "${BACKUP_DIR}/storage.tar.gz" >/dev/null
 tar -tzf "${BACKUP_DIR}/functions.tar.gz" >/dev/null
 
+EXPECTED_STORAGE_COUNT="$(sed -n 's/^storage_files=//p' \
+  "${BACKUP_DIR}/storage-file-count.txt")"
+if [[ ! "$EXPECTED_STORAGE_COUNT" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: invalid Storage file count" >&2
+  exit 1
+fi
+
+STORAGE_VERIFY_DIR="$(mktemp -d)"
+tar -xzf "${BACKUP_DIR}/storage.tar.gz" -C "$STORAGE_VERIFY_DIR"
+ACTUAL_STORAGE_COUNT="$(find "$STORAGE_VERIFY_DIR/storage" -type f -printf '.' | wc -c)"
+MANIFEST_STORAGE_COUNT="$(wc -l < "${BACKUP_DIR}/storage-files.sha256")"
+if [[ "$ACTUAL_STORAGE_COUNT" != "$EXPECTED_STORAGE_COUNT" || \
+      "$MANIFEST_STORAGE_COUNT" != "$EXPECTED_STORAGE_COUNT" ]]; then
+  echo "ERROR: Storage file count does not match its checksum manifest" >&2
+  exit 1
+fi
+if (( EXPECTED_STORAGE_COUNT > 0 )); then
+  (
+    cd "$STORAGE_VERIFY_DIR"
+    sha256sum --check "${BACKUP_DIR}/storage-files.sha256" >/dev/null
+  )
+elif [[ -s "${BACKUP_DIR}/storage-files.sha256" ]]; then
+  echo "ERROR: empty Storage archive has a non-empty file manifest" >&2
+  exit 1
+fi
+rm -rf -- "$STORAGE_VERIFY_DIR"
+STORAGE_VERIFY_DIR=""
+
 echo "[7/7] Checking disaster-recovery configuration archive..."
 if [[ -f "${BACKUP_DIR}/config.tar.gz" ]]; then
   tar -tzf "${BACKUP_DIR}/config.tar.gz" >/dev/null
@@ -121,4 +154,5 @@ printf '%s\n' "$RESTORED_COUNTS"
 echo
 echo "RESTORE_TEST_OK"
 echo "backup=${BACKUP_DIR}"
+echo "storage_files_verified=${EXPECTED_STORAGE_COUNT}"
 echo "The temporary database will now be removed automatically."
