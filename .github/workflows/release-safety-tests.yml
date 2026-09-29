@@ -1,0 +1,58 @@
+name: Fizira release safety tests
+
+on:
+  pull_request:
+    paths:
+      - "app.js"
+      - "security-utils.mjs"
+      - "ops/account-deletion/**"
+      - "ops/ai-evaluation/**"
+      - "ops/schedule/**"
+      - "ops/security/**"
+      - "supabase/functions/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/release-safety-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app.js"
+      - "security-utils.mjs"
+      - "ops/account-deletion/**"
+      - "ops/ai-evaluation/**"
+      - "ops/schedule/**"
+      - "ops/security/**"
+      - "supabase/functions/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/release-safety-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fizira-release-safety-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use supported Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run security, AI, deletion and schedule checks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mapfile -d '' tests < <(
+            find ops supabase -type f \
+              \( -name '*.test.mjs' -o -name '*.test.js' \) \
+              -print0 | sort -z
+          )
+          (( ${#tests[@]} > 0 ))
+          node --test "${tests[@]}"
