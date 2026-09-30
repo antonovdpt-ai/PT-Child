@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PROJECT_ROOT="/root/supabase-project"
-SOURCE_COMMIT="06a5deb0b0e86a6056d930f71437ab47d315a0f8"
+SOURCE_COMMIT="ce6c70a55deb7c86309bc08a68da7d1b716c8276"
 RAW_BASE="https://raw.githubusercontent.com/antonovdpt-ai/PT-Child/${SOURCE_COMMIT}"
 FOLDER_ID="b1g9eenholug08hjppmp"
 KEY_FILE="/etc/fizira/yandex-ai-api-key"
@@ -92,7 +92,7 @@ curl -fsSL "${RAW_BASE}/supabase/functions/ptchild-ai/index.ts" -o "${TMP_DIR}/p
 
 printf '%s  %s\n' \
   "4c96d0c10bcd50cd5b07bd511790a28960a29bff250ac743584da398a60e1451" "${TMP_DIR}/_shared/ai-helpers.ts" \
-  "1402e684d699e8bc6e1c79db3dbbd82dd4c97641cd04214515444d4914c92f9f" "${TMP_DIR}/ptchild-ai/index.ts" \
+  "e2d83fea5b7c7b4cb2516f34d6e9235333f143fd4d5df9b4419e23eed1d9ba64" "${TMP_DIR}/ptchild-ai/index.ts" \
   | sha256sum --check --status
 
 install -d -m 755 "${PROJECT_ROOT}/volumes/functions/_shared" "${PROJECT_ROOT}/volumes/functions/ptchild-ai"
