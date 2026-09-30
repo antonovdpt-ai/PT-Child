@@ -5,21 +5,49 @@ import {
   bytesToBase64,
   extractOcrText,
   extractResponseText,
+  normalizeAiOperation,
+  normalizePatientId,
   normalizeStoragePaths,
   parseJsonLines,
 } from './ai-helpers.ts';
 
-test('accepts only own storage paths', () => {
-  assert.deepEqual(normalizeStoragePaths([{ storage_path: 'user-1/patient/file.pdf' }], 'user-1'), ['user-1/patient/file.pdf']);
-  assert.throws(() => normalizeStoragePaths([{ storage_path: 'user-2/patient/file.pdf' }], 'user-1'));
-  assert.throws(() => normalizeStoragePaths([{ storage_path: 'user-1/../file.pdf' }], 'user-1'));
+const patientId = '10000000-0000-4000-8000-000000000001';
+
+test('accepts only storage paths for the authenticated user and selected patient', () => {
+  assert.deepEqual(
+    normalizeStoragePaths([{ storage_path: `user-1/${patientId}/file.pdf` }], 'user-1', patientId),
+    [`user-1/${patientId}/file.pdf`],
+  );
+  assert.throws(() => normalizeStoragePaths(
+    [{ storage_path: `user-2/${patientId}/file.pdf` }],
+    'user-1',
+    patientId,
+  ));
+  assert.throws(() => normalizeStoragePaths(
+    [{ storage_path: 'user-1/20000000-0000-4000-8000-000000000002/file.pdf' }],
+    'user-1',
+    patientId,
+  ));
+  assert.throws(() => normalizeStoragePaths(
+    [{ storage_path: `user-1/${patientId}/../file.pdf` }],
+    'user-1',
+    patientId,
+  ));
 });
 
 test('rejects duplicate paths', () => {
   assert.throws(() => normalizeStoragePaths([
-    { storage_path: 'user-1/a.pdf' },
-    { storage_path: 'user-1/a.pdf' },
-  ], 'user-1'));
+    { storage_path: `user-1/${patientId}/a.pdf` },
+    { storage_path: `user-1/${patientId}/a.pdf` },
+  ], 'user-1', patientId));
+});
+
+test('accepts only known AI operations and UUID patient ids', () => {
+  assert.equal(normalizeAiOperation('patient_analysis'), 'patient_analysis');
+  assert.equal(normalizeAiOperation('parent_report_draft'), 'parent_report_draft');
+  assert.throws(() => normalizeAiOperation('arbitrary_prompt'));
+  assert.equal(normalizePatientId(patientId), patientId);
+  assert.throws(() => normalizePatientId('not-a-uuid'));
 });
 
 test('encodes bytes without argument overflow', () => {

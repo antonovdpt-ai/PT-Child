@@ -4,14 +4,52 @@ export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 export const MAX_PDF_BYTES = 10 * 1024 * 1024;
 export const MAX_OCR_CHARS = 70_000;
 
-export function normalizeStoragePaths(files: unknown, userId: string): string[] {
+export const AI_OPERATIONS = [
+  "patient_analysis",
+  "session_draft",
+  "next_session_plan",
+  "parent_report_draft",
+  "dynamics_analysis",
+] as const;
+
+export type AiOperation = (typeof AI_OPERATIONS)[number];
+
+export function normalizeAiOperation(value: unknown): AiOperation {
+  if (typeof value !== "string" || !AI_OPERATIONS.includes(value as AiOperation)) {
+    throw new Error("Invalid AI operation");
+  }
+  return value as AiOperation;
+}
+
+export function normalizePatientId(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  ) {
+    throw new Error("Invalid patient id");
+  }
+  return value;
+}
+
+export function normalizeStoragePaths(
+  files: unknown,
+  userId: string,
+  patientId: string,
+): string[] {
   if (!Array.isArray(files)) throw new Error("files must be an array");
   if (files.length > MAX_FILES) throw new Error(`At most ${MAX_FILES} files are allowed`);
+
+  const expectedPrefix = `${userId}/${patientId}/`;
 
   const paths = files.map((file) => {
     if (!file || typeof file !== "object") throw new Error("Invalid file descriptor");
     const path = (file as Record<string, unknown>).storage_path;
-    if (typeof path !== "string" || !path.startsWith(`${userId}/`) || path.includes("..")) {
+    if (
+      typeof path !== "string" ||
+      !path.startsWith(expectedPrefix) ||
+      path.length <= expectedPrefix.length ||
+      path.includes("..")
+    ) {
       throw new Error("Invalid storage path");
     }
     return path;

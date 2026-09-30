@@ -185,8 +185,14 @@ function plannedSessionHtml(plan) {
 
 function flash(type, msg) { const el = document.getElementById('flash'); if (el) el.innerHTML = `<div class="${type}">${esc(msg)}</div>` }
 
-async function callAI(prompt, files = []) {
+async function callAI(operation, patientId, prompt, files = []) {
+  const cleanOperation = String(operation || "").trim();
+  const cleanPatientId = String(patientId || "").trim();
   const cleanPrompt = String(prompt || "").trim();
+
+  if (!cleanOperation || !cleanPatientId) {
+    throw new Error("Не указан контекст запроса к ИИ");
+  }
 
   if (!cleanPrompt) {
     throw new Error("Пустой запрос к ИИ");
@@ -194,6 +200,8 @@ async function callAI(prompt, files = []) {
 
   const { data, error } = await sb.functions.invoke("ptchild-ai", {
   body: {
+    operation: cleanOperation,
+    patient_id: cleanPatientId,
     prompt: cleanPrompt,
     files: files
   }
@@ -211,6 +219,7 @@ async function callAI(prompt, files = []) {
 }
 
 async function analyzeSessionDraft({
+  patientId,
   transcript,
   goals = [],
   recentSessions = []
@@ -260,7 +269,7 @@ ${JSON.stringify(recentSessions)}
 }
 `;
 
-  const text = await callAI(prompt);
+  const text = await callAI("session_draft", patientId, prompt);
 
   const cleaned = String(text)
     .replace(/```json/gi, "")
@@ -270,7 +279,7 @@ ${JSON.stringify(recentSessions)}
   return JSON.parse(cleaned);
 }
 
-async function prepareNextSessionPlan(context = {}) {
+async function prepareNextSessionPlan(patientId, context = {}) {
   const prompt = `
 Ты помогаешь специалисту подготовить следующее занятие ребёнка.
 
@@ -324,7 +333,7 @@ ${JSON.stringify(context)}
 }
 `;
 
-  const text = await callAI(prompt);
+  const text = await callAI("next_session_plan", patientId, prompt);
 
   const cleaned = String(text)
     .replace(/```json/gi, "")
@@ -487,7 +496,7 @@ function buildGeneralAnalysisContext(
   };
 }
 
-async function prepareParentReportDraft(context = {}) {
+async function prepareParentReportDraft(patientId, context = {}) {
   const prompt = `
 Ты помогаешь физическому терапевту подготовить
 понятную обратную связь для родителей ребёнка.
@@ -524,7 +533,7 @@ ${JSON.stringify(context)}
 }
 `;
 
-  const text = await callAI(prompt);
+  const text = await callAI("parent_report_draft", patientId, prompt);
 
   const cleaned = String(text)
     .replace(/```json/gi, '')
@@ -3991,7 +4000,7 @@ ${JSON.stringify(patientData, null, 2)}
 **Уверенность анализа:** высокая / средняя / низкая — и коротко почему.
 `;
 
-     const aiAnswer = await callAI(prompt, aiFiles);
+     const aiAnswer = await callAI("patient_analysis", p.id, prompt, aiFiles);
 
 const usedDocumentsText = aiFiles.length
   ? aiFiles
@@ -5300,7 +5309,7 @@ if (generateParentReportBtn) {
         buildParentReportContext(p);
 
       const draft =
-        await prepareParentReportDraft(context);
+        await prepareParentReportDraft(p.id, context);
 
       document.getElementById('reportComplaint').value =
         draft.complaint || '';
@@ -7773,6 +7782,7 @@ analyzeSessionBtn.onclick = async () => {
       }));
 
     const result = await analyzeSessionDraft({
+      patientId: p.id,
       transcript,
       goals: activeGoals,
       recentSessions
@@ -8090,7 +8100,7 @@ if (prepareNextSessionBtn) {
       const context = buildNextSessionContext(p);
 
       const result =
-        await prepareNextSessionPlan(context);
+        await prepareNextSessionPlan(p.id, context);
 
       const workBlocks =
         Array.isArray(result.work_blocks)
@@ -8955,7 +8965,7 @@ ${JSON.stringify(dynamicsData, null, 2)}
 
 `;
 
-      const answer = await callAI(prompt);
+      const answer = await callAI("dynamics_analysis", p.id, prompt);
       const aiDynamicsUpdatedAt = new Date().toISOString();
 
       const { error: saveDynamicsError } = await sb
