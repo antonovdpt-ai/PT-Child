@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 PROJECT_ROOT="/root/supabase-project"
-SOURCE_COMMIT="949badc7f9abc540318a72d98ae9b1cd10a7421f"
+SOURCE_COMMIT="06a5deb0b0e86a6056d930f71437ab47d315a0f8"
 RAW_BASE="https://raw.githubusercontent.com/antonovdpt-ai/PT-Child/${SOURCE_COMMIT}"
 FOLDER_ID="b1g9eenholug08hjppmp"
 KEY_FILE="/etc/fizira/yandex-ai-api-key"
@@ -91,8 +91,8 @@ curl -fsSL "${RAW_BASE}/supabase/functions/_shared/ai-helpers.ts" -o "${TMP_DIR}
 curl -fsSL "${RAW_BASE}/supabase/functions/ptchild-ai/index.ts" -o "${TMP_DIR}/ptchild-ai/index.ts"
 
 printf '%s  %s\n' \
-  "5579a668fb7ac4f28edac3724dcd0c65338d4eb2121cb159d09ee4e0a73323ad" "${TMP_DIR}/_shared/ai-helpers.ts" \
-  "83d4d88a7f173b1d019c8b22800f0391314a7ec6cb8d6fa814fe5bb88147a780" "${TMP_DIR}/ptchild-ai/index.ts" \
+  "4c96d0c10bcd50cd5b07bd511790a28960a29bff250ac743584da398a60e1451" "${TMP_DIR}/_shared/ai-helpers.ts" \
+  "1402e684d699e8bc6e1c79db3dbbd82dd4c97641cd04214515444d4914c92f9f" "${TMP_DIR}/ptchild-ai/index.ts" \
   | sha256sum --check --status
 
 install -d -m 755 "${PROJECT_ROOT}/volumes/functions/_shared" "${PROJECT_ROOT}/volumes/functions/ptchild-ai"
@@ -107,6 +107,7 @@ printf '%s\n' \
   '    environment:' \
   "      YANDEX_FOLDER_ID: ${FOLDER_ID}" \
   '      FIZIRA_ALLOWED_ORIGINS: https://app.fizira.com' \
+  '      FIZIRA_ALLOW_IMAGE_AI: "no"' \
   '      FIZIRA_ALLOW_PDF_OCR: "no"' \
   > "${PROJECT_ROOT}/${OVERRIDE_NAME}"
 chmod 600 "${PROJECT_ROOT}/${OVERRIDE_NAME}"
@@ -162,5 +163,6 @@ trap - ERR
 echo "YANDEX_EDGE_STAGING_INSTALL_OK"
 echo "functions_status=${status}"
 echo "preflight_http=${http_code}"
+echo "image_ai=disabled"
 echo "pdf_ocr=disabled"
 echo "backup=${BACKUP_DIR}"
