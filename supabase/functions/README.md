@@ -6,10 +6,11 @@ have passed isolated tests.
 
 ## `ptchild-ai`
 
-The browser sends an allowlisted `operation`, the selected `patient_id`, the
-clinical prompt and private Storage descriptors shaped as
-`{ "storage_path": "<user-id>/<patient-id>/..." }`. It never creates a signed
-URL for an AI provider. The function:
+The browser sends an allowlisted `operation`, the selected `patient_id`,
+private Storage descriptors shaped as
+`{ "storage_path": "<user-id>/<patient-id>/..." }` and, only for
+`session_draft`, a bounded transcript. It never creates a signed URL or sends
+a free-form prompt to an AI provider. The function:
 
 1. authenticates the caller;
 2. accepts only the five known operations and a UUID patient id;
@@ -17,21 +18,22 @@ URL for an AI provider. The function:
 4. rejects paths outside the exact `<user-id>/<patient-id>/` prefix;
 5. verifies every `patient_media` row belongs to that patient through the
    caller's RLS session;
-6. downloads the object from the private `patient-media` bucket;
-7. keeps images and PDFs fail-closed unless their server-only feature flag is
+6. loads an allowlisted clinical context through the caller's RLS session,
+   removes the known patient name, email addresses, phone numbers, URLs and
+   UUIDs, and constructs the operation-specific prompt on the server;
+7. downloads the object from the private `patient-media` bucket;
+8. keeps images and PDFs fail-closed unless their server-only feature flag is
    explicitly enabled;
-8. sends approved content to Yandex AI Studio with request logging disabled and
+9. sends approved content to Yandex AI Studio with request logging disabled and
    Responses API persistence disabled;
-9. returns the existing `{ "text": "..." }` response contract.
+10. returns the existing `{ "text": "..." }` response contract.
 
-The current boundary hardening does not yet construct the clinical prompt from
-allowlisted database fields on the server. The browser still supplies free-form
-clinical text, so C11 is only partially complete until prompt construction and
-field selection move behind the Edge Function boundary.
-
-Direct identifiers such as `patients.display_name` must not be included in AI
-prompts. Clinical text remains sensitive health data even after removing the
-name; this is data minimization, not anonymization.
+Direct identifiers such as `patients.display_name` are not included in AI
+prompts. C11 remains partially open because deterministic scrubbing cannot
+reliably detect every third-party name or indirect identifier in narrative
+clinical text. Clinical text remains sensitive health data after minimization;
+this is not anonymization and still requires an approved provider, independent
+review and synthetic-marker/DLP acceptance tests.
 
 Required server-only environment variables:
 

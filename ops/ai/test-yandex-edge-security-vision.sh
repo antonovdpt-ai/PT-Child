@@ -223,7 +223,7 @@ with open(sys.argv[1], "w") as output:
     json.dump({
         "operation": "patient_analysis",
         "patient_id": sys.argv[2],
-        "prompt": "Synthetic prefix-isolation test. This request must be rejected before any AI call.",
+        "input": {},
         "files": [{"storage_path": sys.argv[3]}],
     }, output)
 PY
@@ -255,7 +255,7 @@ with open(sys.argv[1], "w") as output:
     json.dump({
         "operation": "session_draft",
         "patient_id": sys.argv[2],
-        "prompt": "Synthetic patient-isolation test. This request must be rejected before any AI call.",
+        "input": {"transcript": "Synthetic patient-isolation test."},
         "files": [],
     }, output)
 PY
@@ -314,7 +314,7 @@ with open(sys.argv[1], "w") as output:
     json.dump({
         "operation": "patient_analysis",
         "patient_id": sys.argv[2],
-        "prompt": "Synthetic cross-patient metadata test. Reject before any AI call.",
+        "input": {},
         "files": [{"storage_path": sys.argv[3]}],
     }, output)
 PY
@@ -405,10 +405,7 @@ with open(sys.argv[1], "w") as output:
     json.dump({
         "operation": "patient_analysis",
         "patient_id": sys.argv[2],
-        "prompt": (
-            "Синтетический тест изображения. Опиши только основные цвета и геометрическую форму. "
-            "Не делай медицинских выводов."
-        ),
+        "input": {},
         "files": [{"storage_path": sys.argv[3]}],
     }, output, ensure_ascii=False)
 PY
