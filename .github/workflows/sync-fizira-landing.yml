@@ -92,9 +92,10 @@ jobs:
             "set -eu
              root='/root/supabase-project/volumes/proxy/app'
              target=\"\$root/landing\"
-             archive=\"\$HOME/$remote_cache/$SHA.tar.gz\"
+             release_sha='$SHA'
+             archive=\"\$HOME/$remote_cache/\$release_sha.tar.gz\"
              stage=\"\$(mktemp -d \"\$root/.landing-stage.XXXXXX\")\"
-             previous=\"\$root/.landing-previous-\$SHA\"
+             previous=\"\$root/.landing-previous-\$release_sha\"
              backup_root='/root/fizira-deploy-backups/landing'
              mkdir -p \"\$backup_root\"
              tar -xzf \"\$archive\" -C \"\$stage\"
@@ -102,7 +103,7 @@ jobs:
                test -s \"\$stage/\$asset\"
              done
              if test -d \"\$target\"; then
-               tar -czf \"\$backup_root/landing-before-\$SHA.tar.gz\" -C \"\$target\" .
+               tar -czf \"\$backup_root/landing-before-\$release_sha.tar.gz\" -C \"\$target\" .
                mv \"\$target\" \"\$previous\"
              fi
              if ! mv \"\$stage\" \"\$target\"; then

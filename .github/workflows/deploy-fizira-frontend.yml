@@ -116,9 +116,10 @@ jobs:
             "$USER@$HOST" \
             "set -eu
              target='/root/supabase-project/volumes/proxy/app'
-             archive=\"\$HOME/$remote_cache/$SHA.tar.gz\"
+             release_sha='$SHA'
+             archive=\"\$HOME/$remote_cache/\$release_sha.tar.gz\"
              backup_root=\"\$HOME/$remote_cache/backups\"
-             backup=\"\$backup_root/frontend-$SHA-before.tar.gz\"
+             backup=\"\$backup_root/frontend-\$release_sha-before.tar.gz\"
              stage=''
              cleanup_stage() {
                if [ -n \"\$stage\" ] && [ -d \"\$stage\" ]; then
@@ -174,7 +175,8 @@ jobs:
             "$USER@$HOST" \
             "set -eu
              target='/root/supabase-project/volumes/proxy/app'
-             backup=\"\$HOME/.cache/fizira-frontend/backups/frontend-$SHA-before.tar.gz\"
+             release_sha='$SHA'
+             backup=\"\$HOME/.cache/fizira-frontend/backups/frontend-\$release_sha-before.tar.gz\"
              test -f \"\$backup\" || exit 0
              rollback=''
              cleanup_rollback() {
