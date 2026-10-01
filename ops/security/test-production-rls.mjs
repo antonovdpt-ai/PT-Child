@@ -99,6 +99,31 @@ async function insertRow(table, token, body) {
   return result.body[0];
 }
 
+async function recordLegalAcceptance(token) {
+  const version = `synthetic-${runId}`;
+  const recorded = await request('/rest/v1/rpc/record_legal_acceptances', {
+    method: 'POST',
+    headers: userHeaders(token),
+    body: JSON.stringify({
+      p_documents: [{
+        document_type: 'terms',
+        document_version: version,
+        document_hash: null,
+      }],
+      p_source: 'synthetic-production-test',
+    }),
+  });
+  assert.equal(recorded.response.status, 200, JSON.stringify(recorded.body));
+
+  const selected = await request(
+    `/rest/v1/user_consents?select=*&document_type=eq.terms&document_version=eq.${encodeURIComponent(version)}`,
+    { headers: userHeaders(token) },
+  );
+  assert.equal(selected.response.status, 200, JSON.stringify(selected.body));
+  assert.equal(selected.body.length, 1, JSON.stringify(selected.body));
+  return selected.body[0];
+}
+
 async function selectById(table, id, token) {
   const result = await request(
     `/rest/v1/${table}?select=id&id=eq.${encodeURIComponent(id)}`,
@@ -234,11 +259,7 @@ try {
   );
   rows.set(
     'user_consents',
-    await insertRow('user_consents', specialistA.token, {
-      user_id: specialistA.id,
-      terms_version: `synthetic-${runId}`,
-      privacy_version: `synthetic-${runId}`,
-    }),
+    await recordLegalAcceptance(specialistA.token),
   );
 
   for (const [table, row] of rows) {

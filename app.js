@@ -1735,157 +1735,78 @@ function renderUpdatePassword() {
     };
   };
 }
-const LEGAL_TERMS_VERSION = 'pre-release-v1';
-const PRIVACY_POLICY_VERSION = 'pre-release-v1';
+const LEGAL_DOCUMENTS = Object.freeze({
+  terms: Object.freeze({
+    type: 'terms',
+    version: '1.0',
+    hash: 'fdbab5aa8ba0fe7a9d453659a7723231ab0193ce93cf43128c974f75e5bf9f26'
+  }),
+  privacy: Object.freeze({
+    type: 'privacy',
+    version: '1.0',
+    hash: '422ebcc1a8af520320cf5cd415dc3426ce471ba75d0a4bdb6395adb0d1ac86dd'
+  }),
+  personalDataConsent: Object.freeze({
+    type: 'personal_data_consent',
+    version: '1.0',
+    hash: '7bb19b50f9e9c190b8a46b87624fa9e300e794b0dbde2fbe73fe2ec9ecf8cd41'
+  })
+});
+
+const LEGAL_ACCEPTANCE_SOURCE = 'web-registration-v1';
 
 async function ensureUserConsentRecord() {
   if (!user) {
     return;
   }
 
-  const termsVersion =
-    user.user_metadata?.terms_version;
+  const metadataDocuments = Array.isArray(user.user_metadata?.legal_documents)
+    ? user.user_metadata.legal_documents
+    : [];
 
-  const privacyVersion =
-    user.user_metadata?.privacy_version;
-
-  const acceptedAt =
-    user.user_metadata?.legal_accepted_at;
-
-  if (!termsVersion || !privacyVersion) {
-    return;
-  }
-
-  const { data: existing, error: selectError } =
-    await sb
-      .from('user_consents')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('terms_version', termsVersion)
-      .eq('privacy_version', privacyVersion)
-      .maybeSingle();
-
-  if (selectError) {
-    console.error(
-      'Ошибка проверки согласия:',
-      selectError
-    );
-    return;
-  }
-
-  if (existing) {
-    return;
-  }
-
-  const { error: insertError } = await sb
-    .from('user_consents')
-    .insert({
-      user_id: user.id,
-      terms_version: termsVersion,
-      privacy_version: privacyVersion,
-      accepted_at:
-        acceptedAt || new Date().toISOString()
+  const legacyDocuments = [];
+  if (user.user_metadata?.terms_version) {
+    legacyDocuments.push({
+      type: 'terms',
+      version: user.user_metadata.terms_version
     });
+  }
+  if (user.user_metadata?.privacy_version) {
+    legacyDocuments.push({
+      type: 'privacy',
+      version: user.user_metadata.privacy_version
+    });
+  }
 
-  if (insertError) {
+  const documents = metadataDocuments.length
+    ? metadataDocuments
+    : legacyDocuments;
+
+  if (!documents.length) {
+    return;
+  }
+
+  const normalizedDocuments = documents
+    .filter(document => document?.type && document?.version)
+    .map(document => ({
+      document_type: String(document.type),
+      document_version: String(document.version),
+      document_hash: document.hash ? String(document.hash) : null
+    }));
+
+  if (!normalizedDocuments.length) return;
+
+  const { error } = await sb.rpc('record_legal_acceptances', {
+    p_documents: normalizedDocuments,
+    p_source: user.user_metadata?.legal_acceptance_source || 'legacy-auth-metadata'
+  });
+
+  if (error) {
     console.error(
       'Ошибка сохранения согласия:',
-      insertError
+      error
     );
   }
-}
-
-function showLegalDocument(type) {
-  const isTerms = type === 'terms';
-
-  const title = isTerms
-    ? 'Условия использования'
-    : 'Политика конфиденциальности';
-
-  const content = isTerms
-    ? `
-      <p>
-        Fizira предназначена для использования специалистами
-        в области физической терапии и реабилитации.
-      </p>
-
-      <p>
-        Пользователь самостоятельно отвечает за корректность
-        внесённых данных и профессиональные решения,
-        принимаемые на основании информации в приложении.
-      </p>
-
-      <p>
-        Функции искусственного интеллекта Fizira являются
-        вспомогательным инструментом и не заменяют
-        профессиональное клиническое решение специалиста.
-      </p>
-
-      <p>
-        Предрелизная версия документа:
-        ${LEGAL_TERMS_VERSION}.
-      </p>
-    `
-    : `
-      <p>
-        Fizira обрабатывает данные, которые специалист
-        вносит в приложение для ведения своей профессиональной работы.
-      </p>
-
-      <p>
-        Доступ к данным пациентов ограничивается учётной записью
-        специалиста и защищается механизмами авторизации
-        и разграничения доступа.
-      </p>
-
-      <p>
-        Пользователь обязан иметь законные основания
-        для внесения и обработки персональных данных пациентов.
-      </p>
-
-      <p>
-        Предрелизная версия документа:
-        ${PRIVACY_POLICY_VERSION}.
-      </p>
-    `;
-
-  const overlay = document.createElement('div');
-  overlay.className = 'legal-overlay';
-
-  overlay.innerHTML = `
-    <section class="card legal-dialog" role="dialog" aria-modal="true" aria-label="${title}">
-      <header>
-        <div class="workspace-eyebrow">Fizira</div>
-        <h2>${title}</h2>
-      </header>
-
-      <div class="legal-content">
-        ${content}
-      </div>
-
-      <button
-        type="button"
-        class="btn primary full"
-        id="closeLegalDocumentBtn"
-      >
-        Понятно
-      </button>
-    </section>
-  `;
-
-  document.body.appendChild(overlay);
-
-  document
-    .getElementById('closeLegalDocumentBtn')
-    .onclick = () => {
-      overlay.remove();
-    };
-
-  overlay.onclick = e => {
-    if (e.target === overlay) {
-      overlay.remove();
-    }
-  };
 }
 
 function renderRegister() {
@@ -1931,14 +1852,14 @@ function renderRegister() {
           </label>
 
           <label class="auth-consent">
-            <input type="checkbox" name="legal_consent" required>
-            <span>Я принимаю Условия использования и Политику конфиденциальности Fizira</span>
+            <input type="checkbox" name="terms_accepted" required>
+            <span>Я принимаю <a href="https://fizira.com/terms" target="_blank" rel="noopener noreferrer">Пользовательское соглашение Fizira</a></span>
           </label>
 
-          <div class="auth-legal-links">
-            <button type="button" class="link" id="showTermsBtn">Условия использования</button>
-            <button type="button" class="link" id="showPrivacyBtn">Политика конфиденциальности</button>
-          </div>
+          <label class="auth-consent">
+            <input type="checkbox" name="personal_data_consent" required>
+            <span>Я даю <a href="https://fizira.com/consent" target="_blank" rel="noopener noreferrer">согласие на обработку моих персональных данных</a> и подтверждаю ознакомление с <a href="https://fizira.com/privacy" target="_blank" rel="noopener noreferrer">Политикой обработки персональных данных</a></span>
+          </label>
 
           <div class="auth-actions">
             <button
@@ -1982,10 +1903,21 @@ registerForm.onsubmit = async e => {
   const passwordConfirm =
     String(fd.get('password_confirm') || '');
 
+  const termsAccepted = fd.get('terms_accepted') === 'on';
+  const personalDataConsent = fd.get('personal_data_consent') === 'on';
+
   if (password !== passwordConfirm) {
     flash(
       'error',
       'Пароли не совпадают.'
+    );
+    return;
+  }
+
+  if (!termsAccepted || !personalDataConsent) {
+    flash(
+      'error',
+      'Для регистрации необходимо отдельно принять соглашение и дать согласие на обработку персональных данных.'
     );
     return;
   }
@@ -1995,30 +1927,24 @@ registerForm.onsubmit = async e => {
     'Создаю аккаунт...'
   );
 
-  const legalAcceptedAt =
-  new Date().toISOString();
+  const { data, error } =
+    await sb.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          terms_version: LEGAL_DOCUMENTS.terms.version,
+          privacy_version: LEGAL_DOCUMENTS.privacy.version,
+          personal_data_consent_version: LEGAL_DOCUMENTS.personalDataConsent.version,
+          legal_documents: Object.values(LEGAL_DOCUMENTS),
+          legal_acceptance_source: LEGAL_ACCEPTANCE_SOURCE
+        },
 
-const { data, error } =
-  await sb.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        terms_version:
-          LEGAL_TERMS_VERSION,
-
-        privacy_version:
-          PRIVACY_POLICY_VERSION,
-
-        legal_accepted_at:
-          legalAcceptedAt
-      },
-
-      emailRedirectTo:
-        window.location.origin +
-        window.location.pathname
-    }
-  });
+        emailRedirectTo:
+          window.location.origin +
+          window.location.pathname
+      }
+    });
 
   if (error) {
     setButtonError(
@@ -2058,18 +1984,6 @@ const { data, error } =
     'Мы отправили письмо для подтверждения email. Перейдите по ссылке из письма, затем войдите в Fizira.'
   );
 };
-
-document
-  .getElementById('showTermsBtn')
-  .onclick = () => {
-    showLegalDocument('terms');
-  };
-
-document
-  .getElementById('showPrivacyBtn')
-  .onclick = () => {
-    showLegalDocument('privacy');
-  };
 
   document
     .getElementById('backToLoginBtn')

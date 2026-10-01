@@ -31,6 +31,26 @@ jobs:
           npm ci
           npm test
 
+      - name: Require production legal recorder before registration deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Fq "record_legal_acceptances" app.js; then
+            publishable_key="$(sed -n 's/^const SUPABASE_PUBLISHABLE_KEY = "\([^"]*\)";.*/\1/p' app.js)"
+            test -n "$publishable_key"
+            status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+              --request POST \
+              --header "apikey: $publishable_key" \
+              --header "Authorization: Bearer $publishable_key" \
+              --header 'Content-Type: application/json' \
+              --data '{"p_documents":[{"document_type":"terms","document_version":"schema-check"}],"p_source":"deployment-check"}' \
+              https://auth.fizira.com/rest/v1/rpc/record_legal_acceptances)"
+            case "$status" in
+              400|401|403) ;;
+              *) echo "Legal recorder production gate failed with HTTP $status" >&2; exit 1 ;;
+            esac
+          fi
+
       - name: Package public frontend assets
         shell: bash
         run: |

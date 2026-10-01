@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/sync-fizira-landing.yml"
-      - "ops/landing/mobile.css"
+      - "landing/**"
   workflow_dispatch:
 
 permissions:
@@ -23,59 +23,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch public landing assets
+      - name: Validate committed landing and legal pages
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p landing/assets
-          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
-            -A "Mozilla/5.0 (compatible; FiziraLandingMigration/1.0)" \
-            https://fizira.com/ \
-            -o landing/index.html
-          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
-            -A "Mozilla/5.0 (compatible; FiziraLandingMigration/1.0)" \
-            https://fizira.com/styles.css \
-            -o landing/styles.css
-          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
-            -A "Mozilla/5.0 (compatible; FiziraLandingMigration/1.0)" \
-            https://fizira.com/script.js \
-            -o landing/script.js
-          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
-            -A "Mozilla/5.0 (compatible; FiziraLandingMigration/1.0)" \
-            https://fizira.com/assets/fizira-logo-black.png \
-            -o landing/assets/fizira-logo-black.png
-          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
-            -A "Mozilla/5.0 (compatible; FiziraLandingMigration/1.0)" \
-            https://fizira.com/favicon.ico \
-            -o landing/favicon.ico
-          node - <<'NODE'
-          const fs = require("node:fs");
-          const path = "landing/index.html";
-          const html = fs.readFileSync(path, "utf8").replace(
-            /<script>\(function\(\)\{function c\(\)[\s\S]*?<\/script>/,
-            ""
-          );
-          fs.writeFileSync(path, html);
-          NODE
-          node - <<'NODE'
-          const fs = require("node:fs");
-          const cssPath = "landing/styles.css";
-          const patchPath = "ops/landing/mobile.css";
-          const start = "/* FIZIRA_MOBILE_FIX_START */";
-          const end = "/* FIZIRA_MOBILE_FIX_END */";
-          const css = fs.readFileSync(cssPath, "utf8");
-          const patch = fs.readFileSync(patchPath, "utf8").trim();
-          let cleanCss = css;
-          const startAt = cleanCss.indexOf(start);
-          if (startAt !== -1) {
-            const endAt = cleanCss.indexOf(end, startAt);
-            if (endAt === -1) {
-              throw new Error("Responsive patch start marker has no end marker");
-            }
-            cleanCss = cleanCss.slice(0, startAt) + cleanCss.slice(endAt + end.length);
-          }
-          fs.writeFileSync(cssPath, cleanCss.trimEnd() + "\n\n" + patch + "\n");
-          NODE
           grep -Fq "<title>Fizira" landing/index.html
           grep -Fq "app.fizira.com" landing/index.html
           test -s landing/styles.css
@@ -83,6 +34,13 @@ jobs:
           test -s landing/script.js
           test -s landing/assets/fizira-logo-black.png
           test -s landing/favicon.ico
+          for route in privacy terms consent data-processing delete-account; do
+            test -s "landing/$route/index.html"
+            grep -Fq "support@fizira.com" "landing/$route/index.html" || \
+              grep -Fq "privacy@fizira.com" "landing/$route/index.html"
+          done
+          test -s landing/legal.css
+          ! grep -R -E "будет создан позднее|\[УКАЗАТЬ|\[ОТЧЕСТВО|no-reply@fizira.com" landing
           tar -czf fizira-landing.tar.gz -C landing .
 
       - name: Export landing snapshot for responsive review
@@ -136,14 +94,35 @@ jobs:
              target=\"\$root/landing\"
              archive=\"\$HOME/$remote_cache/$SHA.tar.gz\"
              stage=\"\$(mktemp -d \"\$root/.landing-stage.XXXXXX\")\"
+             previous=\"\$root/.landing-previous-\$SHA\"
+             backup_root='/root/fizira-deploy-backups/landing'
+             mkdir -p \"\$backup_root\"
              tar -xzf \"\$archive\" -C \"\$stage\"
-             for asset in index.html styles.css script.js favicon.ico assets/fizira-logo-black.png; do
+             for asset in index.html styles.css script.js legal.css favicon.ico assets/fizira-logo-black.png privacy/index.html terms/index.html consent/index.html data-processing/index.html delete-account/index.html; do
                test -s \"\$stage/\$asset\"
              done
-             mkdir -p \"\$target/assets\"
-             for asset in index.html styles.css script.js favicon.ico assets/fizira-logo-black.png; do
-               install -m 644 \"\$stage/\$asset\" \"\$target/\$asset\"
-             done
-             rm -rf \"\$stage\"
+             if test -d \"\$target\"; then
+               tar -czf \"\$backup_root/landing-before-\$SHA.tar.gz\" -C \"\$target\" .
+               mv \"\$target\" \"\$previous\"
+             fi
+             if ! mv \"\$stage\" \"\$target\"; then
+               test ! -d \"\$previous\" || mv \"\$previous\" \"\$target\"
+               exit 1
+             fi
+             if test -d \"\$previous\"; then rm -rf -- \"\$previous\"; fi
              rm -f \"\$archive\"
-             test -s \"\$target/index.html\""
+             test -s \"\$target/index.html\"
+             test -s \"\$target/privacy/index.html\""
+
+      - name: Verify landing and public legal routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 5 --retry-delay 2 \
+            "https://fizira.com/?release=${{ github.sha }}" | grep -F "Политика конфиденциальности"
+          curl --fail --location --silent --show-error --retry 5 --retry-delay 2 \
+            "https://fizira.com/privacy?release=${{ github.sha }}" | grep -F "Версия 1.0"
+          curl --fail --location --silent --show-error --retry 5 --retry-delay 2 \
+            "https://fizira.com/terms?release=${{ github.sha }}" | grep -F "Пользовательское соглашение"
+          curl --fail --location --silent --show-error --retry 5 --retry-delay 2 \
+            "https://fizira.com/delete-account?release=${{ github.sha }}" | grep -F "Удаление аккаунта Fizira"

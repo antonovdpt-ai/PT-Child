@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7faf9">
+  <meta name="description" content="Fizira — рабочее пространство специалиста по физической терапии: пациенты, оценка, цели, занятия, расписание, отчёты и ИИ-инструменты.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://fizira.com/">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="stylesheet" href="/styles.css">
+  <title>Fizira — рабочее пространство физического терапевта</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">К содержанию</a>
+  <header class="site-header" data-header>
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="Fizira — на главную">
+        <img src="/assets/fizira-logo-black.png" alt="Fizira" width="151" height="47">
+      </a>
+      <button class="menu-toggle" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="site-nav" data-menu-toggle>
+        <span></span><span></span>
+      </button>
+      <nav class="nav" id="site-nav" aria-label="Основная навигация" data-nav>
+        <a href="#possibilities">Возможности</a>
+        <a href="#ai">ИИ</a>
+        <a href="#security">Данные</a>
+        <a href="#for-whom">Для кого</a>
+      </nav>
+      <div class="header-actions">
+        <a class="button button-ghost" href="https://app.fizira.com">Войти</a>
+        <a class="button button-primary button-small" href="https://app.fizira.com">Попробовать</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="container hero-grid">
+        <div class="hero-copy" data-reveal>
+          <div class="eyebrow"><span></span> Платформа для специалистов по реабилитации</div>
+          <h1>Вся практика физического терапевта — <em>в одной системе</em></h1>
+          <p>Пациенты, функциональная оценка, терапевтические цели, занятия, расписание и интеллектуальные инструменты — в едином рабочем пространстве.</p>
+          <div class="hero-actions">
+            <a class="button button-primary button-large" href="https://app.fizira.com">
+              Попробовать Fizira
+              <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M4 10h11M11 6l4 4-4 4"/></svg>
+            </a>
+            <a class="button button-secondary button-large" href="https://app.fizira.com">Войти</a>
+          </div>
+          <p class="release-note">Сейчас Fizira проходит закрытое тестирование. Используйте только демонстрационные данные.</p>
+        </div>
+
+        <div class="hero-product" data-reveal data-delay="1">
+          <div class="orbit orbit-one" aria-hidden="true"></div>
+          <div class="orbit orbit-two" aria-hidden="true"></div>
+          <div class="browser-shell" aria-label="Демонстрация интерфейса Fizira">
+            <div class="browser-top">
+              <div class="browser-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+              <div class="browser-address"><span class="lock"></span>app.fizira.com</div>
+              <div class="browser-user">АК</div>
+            </div>
+            <div class="app-shell">
+              <aside class="app-sidebar">
+                <div class="app-brand"><span class="app-mark">F</span><strong>Fizira</strong></div>
+                <div class="side-label">Рабочее пространство</div>
+                <div class="side-item active"><span class="side-icon"></span>Пациенты</div>
+                <div class="side-item"><span class="side-icon calendar"></span>Расписание</div>
+                <div class="side-item"><span class="side-icon chart"></span>Показатели</div>
+                <div class="side-spacer"></div>
+                <div class="specialist-mini"><span>АК</span><div><b>Анна Крылова</b><small>Физический терапевт</small></div></div>
+              </aside>
+              <div class="app-main">
+                <div class="app-title-row"><div><span class="kicker">Сегодня, 26 сентября</span><h2>Добрый день, Анна</h2></div><button>+ Новый пациент</button></div>
+                <div class="stat-row">
+                  <div class="stat"><small>Пациенты</small><strong>24</strong><span>+3 за месяц</span></div>
+                  <div class="stat"><small>Сегодня</small><strong>6</strong><span>занятий</span></div>
+                  <div class="stat"><small>Неделя</small><strong>31</strong><span>занятие</span></div>
+                </div>
+                <div class="app-content-grid">
+                  <div class="patients-panel">
+                    <div class="panel-head"><strong>Ближайшие пациенты</strong><span>Все пациенты</span></div>
+                    <div class="patient-row"><i class="avatar mint">МС</i><div><b>Михаил Соколов</b><small>10:00 · повторное занятие</small></div><span class="tag">Сегодня</span></div>
+                    <div class="patient-row"><i class="avatar blue">ЕЛ</i><div><b>Ева Лебедева</b><small>12:00 · функциональная оценка</small></div><span class="tag soft">Оценка</span></div>
+                    <div class="patient-row"><i class="avatar sand">АМ</i><div><b>Артём Миронов</b><small>15:00 · повторное занятие</small></div><span class="tag">Сегодня</span></div>
+                  </div>
+                  <div class="day-panel">
+                    <div class="panel-head"><strong>Динамика недели</strong><span>7 дней</span></div>
+                    <div class="mini-chart" aria-label="Динамика занятий за неделю">
+                      <span style="--h:42%"></span><span style="--h:67%"></span><span style="--h:54%"></span><span style="--h:84%"></span><span style="--h:68%"></span><span class="current" style="--h:93%"></span><span style="--h:36%"></span>
+                    </div>
+                    <div class="chart-labels"><i>Пн</i><i>Вт</i><i>Ср</i><i>Чт</i><i>Пт</i><i>Сб</i><i>Вс</i></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="floating-card float-one"><span class="pulse-icon">↗</span><div><strong>Динамика сохранена</strong><small>Цель обновлена после занятия</small></div></div>
+          <div class="floating-card float-two"><span class="ai-spark">✦</span><div><strong>ИИ-черновик готов</strong><small>Проверьте перед сохранением</small></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="problem section-pad">
+      <div class="container problem-grid">
+        <div class="section-heading" data-reveal>
+          <span class="section-index">01</span>
+          <h2>Работа не должна распадаться на пять приложений</h2>
+        </div>
+        <div class="problem-content" data-reveal data-delay="1">
+          <p class="lead">Заметки, мессенджеры, бумажные документы, таблицы и календарь создают разрозненную картину. Важная информация остаётся в голове специалиста.</p>
+          <div class="chaos-to-system">
+            <div class="chaos-list" aria-label="Разрозненные инструменты">
+              <span>Заметки</span><span>Мессенджеры</span><span>Документы</span><span>Excel</span><span>Календарь</span>
+            </div>
+            <div class="flow-line" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><b></b></div>
+            <div class="system-card"><span class="system-mark">F</span><div><strong>Единая система</strong><small>Полная картина работы</small></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="capabilities section-pad" id="possibilities">
+      <div class="container">
+        <div class="section-intro" data-reveal>
+          <span class="eyebrow"><span></span> Возможности</span>
+          <h2>От первого приёма до понятного отчёта</h2>
+          <p>Fizira сохраняет клинический контекст и помогает специалисту продолжать работу без потери деталей.</p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card feature-wide" data-reveal>
+            <div class="feature-copy"><span class="feature-number">01</span><h3>Карточка пациента и функциональная оценка</h3><p>Анамнез, осмотр, документы, контакты представителей и стандартизированные показатели собраны в одной структуре.</p><div class="micro-tags"><span>MACS</span><span>CFCS</span><span>EDACS</span><span>HINE</span><span>GMFM-66</span></div></div>
+            <div class="patient-card-demo">
+              <div class="patient-head"><span class="avatar large mint">МС</span><div><strong>Михаил Соколов</strong><small>Демонстрационная карточка</small></div><button aria-label="Дополнительные действия">•••</button></div>
+              <div class="patient-tabs"><span class="active">Обзор</span><span>Оценка</span><span>Цели</span><span>Занятия</span></div>
+              <div class="patient-info"><div><small>Причина обращения</small><p>Трудности контроля позы и самостоятельного передвижения</p></div><div class="score-box"><small>GMFCS</small><strong>III</strong></div></div>
+              <div class="progress-line"><span><i style="width:68%"></i></span><small>Последняя оценка · 18.09.2026</small></div>
+            </div>
+          </article>
+
+          <article class="feature-card" data-reveal>
+            <div class="feature-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 18V8m5 10V4m6 14v-7m5 7V6"/></svg></div>
+            <h3>Цели и динамика</h3>
+            <p>Фиксируйте приоритеты, отслеживайте изменения и связывайте каждое занятие с планом терапии.</p>
+            <div class="goal-demo"><div><span>Самостоятельный переход в сидя</span><b>68%</b></div><i><em></em></i><small>Прогресс обновлён после занятия</small></div>
+          </article>
+
+          <article class="feature-card dark-card" data-reveal data-delay="1">
+            <div class="feature-icon inverted"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 3v4M5 5h4m8 12v4m-2-2h4M13 5l1.3 3.7L18 10l-3.7 1.3L13 15l-1.3-3.7L8 10l3.7-1.3L13 5Z"/></svg></div>
+            <h3>Документы и отчёты</h3>
+            <p>Храните материалы пациента и готовьте понятный родителю отчёт, который специалист проверяет перед выдачей.</p>
+            <div class="report-demo"><div class="report-top"><span>Отчёт после консультации</span><b>PDF</b></div><i></i><i></i><i class="short"></i><button>Подготовить черновик</button></div>
+          </article>
+
+          <article class="feature-card feature-wide schedule-feature" data-reveal>
+            <div class="feature-copy"><span class="feature-number">04</span><h3>Расписание и рабочие показатели</h3><p>Записи, статусы посещений, стоимость занятий и оплата — в рабочем календаре специалиста.</p><div class="feature-proof"><span><b>6</b> занятий сегодня</span><span><b>18 000 ₽</b> заработано</span></div></div>
+            <div class="week-demo">
+              <div class="week-head"><strong>21–27 сентября</strong><div><button>‹</button><button>›</button></div></div>
+              <div class="week-grid">
+                <div><b>Пн</b><small>21</small><i style="--top:22%;--size:25%">10:00<br><strong>Михаил</strong></i></div>
+                <div><b>Вт</b><small>22</small><i class="teal" style="--top:43%;--size:26%">12:00<br><strong>Ева</strong></i></div>
+                <div class="today"><b>Ср</b><small>23</small><i style="--top:12%;--size:25%">09:00<br><strong>Артём</strong></i><i class="teal" style="--top:58%;--size:23%">14:00<br><strong>София</strong></i></div>
+                <div><b>Чт</b><small>24</small><i style="--top:35%;--size:30%">11:00<br><strong>Полина</strong></i></div>
+                <div><b>Пт</b><small>25</small><i class="teal" style="--top:51%;--size:24%">13:00<br><strong>Михаил</strong></i></div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="product-tour section-pad" aria-labelledby="tour-title">
+      <div class="container">
+        <div class="section-intro split" data-reveal>
+          <div><span class="eyebrow"><span></span> Продукт</span><h2 id="tour-title">Сильный клинический контекст — без лишней рутины</h2></div>
+          <p>Интерфейс построен вокруг реального рабочего процесса специалиста. Все показанные данные — вымышленные.</p>
+        </div>
+        <div class="tour" data-tour data-reveal>
+          <div class="tour-tabs" role="tablist" aria-label="Экраны продукта">
+            <button class="active" role="tab" aria-selected="true" aria-controls="panel-evaluation" id="tab-evaluation" data-tab="evaluation"><span>01</span>Оценка</button>
+            <button role="tab" aria-selected="false" aria-controls="panel-goals" id="tab-goals" data-tab="goals"><span>02</span>Цели</button>
+            <button role="tab" aria-selected="false" aria-controls="panel-ai" id="tab-ai" data-tab="ai"><span>03</span>ИИ-анализ</button>
+            <button role="tab" aria-selected="false" aria-controls="panel-schedule" id="tab-schedule" data-tab="schedule"><span>04</span>Расписание</button>
+          </div>
+          <div class="tour-screen">
+            <div class="tour-chrome"><i></i><i></i><i></i><span>app.fizira.com / patient / demo</span></div>
+            <section class="tour-panel active" id="panel-evaluation" role="tabpanel" aria-labelledby="tab-evaluation" data-panel="evaluation">
+              <div class="demo-sidebar"><span class="demo-logo">F</span><i></i><i></i><i></i><i></i></div>
+              <div class="demo-content"><div class="demo-top"><div><small>Пациент / Михаил Соколов</small><h3>Первичная функциональная оценка</h3></div><button>Сохранить</button></div><div class="form-grid"><label>Основная жалоба<textarea>Трудности поддержания позы и самостоятельных переходов</textarea></label><label>Двигательное развитие<textarea>Самостоятельно сидит с опорой, выполняет переход через бок</textarea></label><label>Положение стоя<textarea>Встаёт у опоры с помощью взрослого</textarea></label><label>Передвижение<textarea>Передвигается с поддержкой на короткие расстояния</textarea></label></div></div>
+            </section>
+            <section class="tour-panel" id="panel-goals" role="tabpanel" aria-labelledby="tab-goals" data-panel="goals" hidden>
+              <div class="demo-sidebar"><span class="demo-logo">F</span><i></i><i></i><i></i><i></i></div>
+              <div class="demo-content"><div class="demo-top"><div><small>Пациент / Михаил Соколов</small><h3>Цели и приоритеты терапии</h3></div><button>+ Добавить цель</button></div><div class="goals-board"><article><span class="status-dot"></span><div><small>Основная цель</small><h4>Переход в положение сидя без физической помощи</h4><p>Критерий: 4 из 5 попыток в привычной среде</p><i><em style="width:68%"></em></i></div><b>68%</b></article><article><span class="status-dot blue-dot"></span><div><small>Функциональная цель</small><h4>Удержание положения стоя у опоры</h4><p>Критерий: 60 секунд с контролем таза</p><i><em style="width:44%"></em></i></div><b>44%</b></article></div></div>
+            </section>
+            <section class="tour-panel" id="panel-ai" role="tabpanel" aria-labelledby="tab-ai" data-panel="ai" hidden>
+              <div class="demo-sidebar"><span class="demo-logo">F</span><i></i><i></i><i></i><i></i></div>
+              <div class="demo-content"><div class="demo-top"><div><small>Интеллектуальные инструменты</small><h3>Анализ информации пациента</h3></div><button>Сохранить в историю</button></div><div class="ai-layout"><div class="ai-summary"><div class="ai-label"><span>✦</span> Черновик Fizira AI</div><h4>Ключевые наблюдения</h4><ul><li>Главное ограничение связано с контролем позы при переходах.</li><li>Сильная сторона — самостоятельная инициация движения.</li><li>Для проверки гипотезы нужны дополнительные функциональные пробы.</li></ul><div class="ai-warning">Проверьте текст. ИИ помогает структурировать данные, но не принимает клиническое решение.</div></div><aside><small>Источники</small><strong>Первичная оценка</strong><strong>2 записи занятий</strong><strong>3 активные цели</strong></aside></div></div>
+            </section>
+            <section class="tour-panel" id="panel-schedule" role="tabpanel" aria-labelledby="tab-schedule" data-panel="schedule" hidden>
+              <div class="demo-sidebar"><span class="demo-logo">F</span><i></i><i></i><i></i><i></i></div>
+              <div class="demo-content"><div class="demo-top"><div><small>Личный кабинет</small><h3>Расписание на сегодня</h3></div><button>Неделя</button></div><div class="schedule-list"><div class="time">09:00</div><article><div><small>Проведено</small><h4>Артём Миронов</h4><p>Повторное занятие · 3 000 ₽</p></div><span class="paid">Оплачено</span></article><div class="time">11:00</div><article><div><small>Запланировано</small><h4>Ева Лебедева</h4><p>Функциональная оценка · 3 500 ₽</p></div><span>Не оплачено</span></article><div class="time">14:00</div><article class="empty-slot"><div><h4>Свободное время</h4><p>Нажмите, чтобы записать пациента</p></div></article></div></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ai-section section-pad" id="ai">
+      <div class="ai-backdrop" aria-hidden="true"></div>
+      <div class="container ai-grid">
+        <div class="ai-copy" data-reveal>
+          <span class="eyebrow light"><span></span> Fizira AI</span>
+          <h2>Быстрее работать с информацией. Решение всегда за специалистом.</h2>
+          <p>ИИ помогает разобрать большой объём записей, увидеть связи и подготовить структурированный черновик. Он не ставит диагноз и не назначает лечение.</p>
+          <ul class="check-list">
+            <li>Выделение проблем и приоритетов</li>
+            <li>Помощь в формулировании целей</li>
+            <li>Черновик плана терапии</li>
+            <li>Анализ записи занятия и следующий план</li>
+            <li>Черновик понятного отчёта</li>
+          </ul>
+          <div class="ai-provider"><span>AI</span><div><small>Инфраструктура</small><strong>Yandex AI через сервер Fizira</strong></div></div>
+        </div>
+        <div class="ai-conversation" data-reveal data-delay="1">
+          <div class="conversation-top"><div><span class="spark">✦</span><div><strong>Анализ пациента</strong><small>Черновик для проверки специалистом</small></div></div><span class="secure-dot">Защищённый контур</span></div>
+          <div class="context-row"><span>Оценка</span><span>Цели</span><span>3 занятия</span><span>Динамика</span></div>
+          <div class="analysis-block"><small>ПРИОРИТЕТ</small><h3>Контроль позы при функциональных переходах</h3><p>По предоставленным данным наиболее значимым ограничением выглядит недостаточная стабильность туловища при переходах из положения лёжа в сидя.</p></div>
+          <div class="analysis-columns"><div><small>СИЛЬНАЯ СТОРОНА</small><p>Инициирует движение и использует опору руками.</p></div><div><small>ПРОВЕРИТЬ</small><p>Устойчивость результата в разных условиях.</p></div></div>
+          <div class="human-check"><span>✓</span><p><strong>Контроль специалиста</strong><br>Проверьте выводы перед сохранением в историю пациента.</p><button>Подтвердить</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="security section-pad" id="security">
+      <div class="container security-grid">
+        <div class="section-intro" data-reveal>
+          <span class="eyebrow"><span></span> Работа с данными</span>
+          <h2>Архитектура с вниманием к чувствительной информации</h2>
+          <p>Fizira создаётся для профессиональной работы с данными пациентов, поэтому безопасность рассматривается как часть продукта, а не как дополнительная функция.</p>
+        </div>
+        <div class="security-list" data-reveal data-delay="1">
+          <article><span>RU</span><div><h3>Инфраструктура в России</h3><p>Основная база данных и файлы приложения размещаются на российской серверной инфраструктуре.</p></div></article>
+          <article><span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3m-11 0h12v10H6V10Z"/></svg></span><div><h3>Авторизованный доступ</h3><p>Доступ к рабочим данным предоставляется после входа и ограничивается правами учётной записи.</p></div></article>
+          <article><span>AI</span><div><h3>Контролируемый ИИ-контур</h3><p>Запросы идут через сервер Fizira; хранение запросов у ИИ-провайдера отключено. Механизмы минимизации и обезличивания продолжают проверяться перед публичным запуском.</p></div></article>
+        </div>
+      </div>
+      <div class="container security-note" data-reveal><strong>Без громких обещаний</strong><p>Мы не заявляем неподтверждённые сертификации. Технические и организационные меры проходят последовательную проверку по мере подготовки Fizira к релизу.</p></div>
+    </section>
+
+    <section class="audiences section-pad" id="for-whom">
+      <div class="container">
+        <div class="section-intro centered" data-reveal><span class="eyebrow"><span></span> Для кого</span><h2>Одна система — разные форматы практики</h2></div>
+        <div class="audience-grid">
+          <article data-reveal><span class="audience-index">01</span><h3>Частный специалист</h3><p>Пациенты, расписание, оценки, занятия и рабочие показатели в одном месте.</p><ul><li>Быстрый доступ к истории</li><li>Меньше ручной рутины</li><li>Контроль расписания и оплат</li></ul></article>
+          <article class="accent" data-reveal data-delay="1"><span class="audience-index">02</span><div class="audience-label">Основной фокус</div><h3>Детская реабилитация</h3><p>Структурированная оценка, динамика, терапевтические цели и понятная коммуникация с родителями.</p><ul><li>Стандартизированные показатели</li><li>Отчёт после консультации</li><li>История функциональных изменений</li></ul></article>
+          <article data-reveal data-delay="2"><span class="audience-index">03</span><div class="audience-label muted-label">Направление развития</div><h3>Центры и клиники</h3><p>Многопользовательская работа и управление командой рассматриваются как следующий этап развития продукта.</p><ul><li>Пока не входит в текущую версию</li><li>Будет развиваться по запросам практик</li></ul></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="early-access section-pad" id="pricing">
+      <div class="container">
+        <div class="access-card" data-reveal>
+          <div class="access-copy"><span class="eyebrow light"><span></span> Ранний доступ</span><h2>Попробуйте Fizira в своей практике</h2><p>Сейчас продукт проходит закрытое тестирование. Финальные тарифы ещё формируются — мы не будем придумывать цену до проверки продукта специалистами.</p></div>
+          <div class="access-action"><a class="button button-light button-large" href="https://app.fizira.com">Перейти в Fizira <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M4 10h11M11 6l4 4-4 4"/></svg></a><small>Тестовая версия · только вымышленные данные</small></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-main">
+      <div class="footer-brand"><img src="/assets/fizira-logo-black.png" alt="Fizira" width="151" height="47"><p>Рабочее пространство специалиста по физической терапии и реабилитации.</p></div>
+      <div class="footer-links"><div><strong>Продукт</strong><a href="#possibilities">Возможности</a><a href="#ai">ИИ-инструменты</a><a href="#security">Работа с данными</a></div><div><strong>Доступ</strong><a href="https://app.fizira.com">Попробовать Fizira</a><a href="https://app.fizira.com">Войти</a></div><div><strong>Документы</strong><a href="/privacy">Политика конфиденциальности</a><a href="/terms">Пользовательское соглашение</a><a href="/delete-account">Удаление аккаунта</a><a href="mailto:support@fizira.com">Поддержка</a></div></div>
+    </div>
+    <div class="container footer-bottom"><span>© <span data-year>2026</span> Fizira</span><p>ИИ помогает работать с информацией, но не заменяет профессиональное решение специалиста.</p></div>
+  </footer>
+
+  <script src="/script.js" defer></script>
+</body>
+</html>
