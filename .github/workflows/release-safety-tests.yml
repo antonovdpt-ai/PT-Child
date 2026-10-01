@@ -9,8 +9,10 @@ on:
       - "ops/ai-evaluation/**"
       - "ops/schedule/**"
       - "ops/security/**"
+      - "ops/release/**"
       - "supabase/functions/**"
       - "supabase/migrations/**"
+      - ".github/workflows/production-smoke.yml"
       - ".github/workflows/release-safety-tests.yml"
   push:
     branches: [main]
@@ -21,8 +23,10 @@ on:
       - "ops/ai-evaluation/**"
       - "ops/schedule/**"
       - "ops/security/**"
+      - "ops/release/**"
       - "supabase/functions/**"
       - "supabase/migrations/**"
+      - ".github/workflows/production-smoke.yml"
       - ".github/workflows/release-safety-tests.yml"
 
 permissions:
@@ -56,3 +60,11 @@ jobs:
           )
           (( ${#tests[@]} > 0 ))
           node --test "${tests[@]}"
+
+      - name: Check release shell scripts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mapfile -d '' scripts < <(find ops/release -type f -name '*.sh' -print0 | sort -z)
+          (( ${#scripts[@]} > 0 ))
+          bash -n "${scripts[@]}"
