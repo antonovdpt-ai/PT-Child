@@ -99,10 +99,20 @@ test('only session drafts accept caller text and direct identifiers are scrubbed
 });
 
 test('AI file transfer is fail-closed unless each file class is explicitly enabled', () => {
+  assert.match(edge, /Deno\.env\.get\("FIZIRA_AI_ENABLED"\) !== "yes"/);
+  assert.match(edge, /throw new PublicError\(503, "AI is not enabled"\)/);
   assert.match(edge, /Deno\.env\.get\("FIZIRA_ALLOW_IMAGE_AI"\) !== "yes"/);
   assert.match(edge, /throw new PublicError\(503, "Image analysis is not enabled"\)/);
   assert.match(edge, /Deno\.env\.get\("FIZIRA_ALLOW_PDF_OCR"\) !== "yes"/);
   assert.match(edge, /throw new PublicError\(503, "PDF analysis is not enabled"\)/);
   assert.match(edge, /"x-data-logging-enabled": "false"/);
   assert.match(edge, /store: false/);
+});
+
+test('global AI kill switch is checked before provider secrets are loaded', () => {
+  const enabledCheck = edge.indexOf('Deno.env.get("FIZIRA_AI_ENABLED")');
+  const providerSecret = edge.indexOf('requiredSecret(', enabledCheck);
+  assert.notEqual(enabledCheck, -1);
+  assert.notEqual(providerSecret, -1);
+  assert.ok(enabledCheck < providerSecret);
 });
