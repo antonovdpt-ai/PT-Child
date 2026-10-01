@@ -96,7 +96,7 @@ jobs:
              archive=\"\$HOME/$remote_cache/\$release_sha.tar.gz\"
              stage=\"\$(mktemp -d \"\$root/.landing-stage.XXXXXX\")\"
              previous=\"\$root/.landing-previous-\$release_sha\"
-             backup_root='/root/fizira-deploy-backups/landing'
+             backup_root="\$HOME/.cache/fizira-landing/backups"
              mkdir -p \"\$backup_root\"
              tar -xzf \"\$archive\" -C \"\$stage\"
              for asset in index.html styles.css script.js legal.css favicon.ico assets/fizira-logo-black.png privacy/index.html terms/index.html consent/index.html data-processing/index.html delete-account/index.html; do
