@@ -44,6 +44,9 @@ Required server-only environment variables:
 - `YANDEX_FOLDER_ID`
 - `FIZIRA_ALLOWED_ORIGINS`, comma-separated; defaults to
   `https://app.fizira.com`
+- `FIZIRA_AI_ENABLED=yes` enables AI requests globally. Any other value keeps
+  the endpoint fail-closed with HTTP 503; production must remain disabled until
+  provider, legal, security/DLP, and clinical acceptance are complete
 
 Optional model and file-processing settings:
 

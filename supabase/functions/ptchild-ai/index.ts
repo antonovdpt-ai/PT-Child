@@ -307,6 +307,9 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) throw new PublicError(401, "Unauthorized");
+    if (Deno.env.get("FIZIRA_AI_ENABLED") !== "yes") {
+      throw new PublicError(503, "AI is not enabled");
+    }
 
     const supabaseUrl = requiredEnv("SUPABASE_URL");
     const anonKey = requiredEnv("SUPABASE_ANON_KEY", "ANON_KEY");
