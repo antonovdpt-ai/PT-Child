@@ -3,6 +3,7 @@ name: Fizira frontend tests
 on:
   pull_request:
     paths:
+      - "index.html"
       - "app.js"
       - "cabinet.js"
       - "auth-domain.mjs"
@@ -16,6 +17,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "index.html"
       - "app.js"
       - "cabinet.js"
       - "auth-domain.mjs"
