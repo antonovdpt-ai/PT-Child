@@ -51,8 +51,17 @@ if grep -Eiq 'https://[^/]+\.supabase\.co' \
 fi
 grep -F 'https://auth.fizira.com' "$tmp_dir/app.js" >/dev/null
 
+publishable_key="$(sed -nE \
+  's/^const SUPABASE_PUBLISHABLE_KEY = "([^"]+)";$/\1/p' \
+  app.js | head -n 1)"
+[[ -n "$publishable_key" ]] || {
+  echo "ERROR: Supabase publishable key was not found in app.js" >&2
+  exit 1
+}
+
 auth_status="$(curl --silent --show-error --output "$tmp_dir/auth-health.json" \
   --write-out '%{http_code}' --connect-timeout 10 --max-time 30 \
+  -H "apikey: $publishable_key" \
   "$AUTH_ORIGIN/auth/v1/health")"
 [[ "$auth_status" == "200" ]] || {
   echo "ERROR: Auth health returned HTTP $auth_status" >&2
