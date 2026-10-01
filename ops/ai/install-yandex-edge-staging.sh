@@ -2,10 +2,11 @@
 set -Eeuo pipefail
 
 PROJECT_ROOT="/root/supabase-project"
-SOURCE_COMMIT="ce6c70a55deb7c86309bc08a68da7d1b716c8276"
+SOURCE_COMMIT="e8b76035de0c0dcbdacdbeae9eda7ddf65d174e3"
 RAW_BASE="https://raw.githubusercontent.com/antonovdpt-ai/PT-Child/${SOURCE_COMMIT}"
 FOLDER_ID="b1g9eenholug08hjppmp"
 KEY_FILE="/etc/fizira/yandex-ai-api-key"
+AI_ENABLED="${FIZIRA_AI_ENABLED:-no}"
 CONTAINER_ENV_FILE="/etc/fizira/yandex-ai.env"
 OVERRIDE_NAME="docker-compose.yandex-ai.yml"
 BACKUP_ROOT="/root/fizira-deploy-backups"
@@ -61,6 +62,10 @@ trap rollback ERR
 [[ "$(id -u)" == "0" ]] || { echo "ERROR: run as root" >&2; exit 1; }
 [[ -d "${PROJECT_ROOT}/volumes/functions" ]] || { echo "ERROR: Functions directory not found" >&2; exit 1; }
 [[ -f "${PROJECT_ROOT}/.env" ]] || { echo "ERROR: .env not found" >&2; exit 1; }
+[[ "${AI_ENABLED}" == "yes" || "${AI_ENABLED}" == "no" ]] || {
+  echo "ERROR: FIZIRA_AI_ENABLED must be yes or no" >&2
+  exit 1
+}
 [[ -s "${KEY_FILE}" ]] || { echo "ERROR: Yandex API key file is missing or empty" >&2; exit 1; }
 [[ "$(stat -c '%a' "${KEY_FILE}")" == "600" ]] || { echo "ERROR: Yandex API key file must have mode 600" >&2; exit 1; }
 
@@ -92,7 +97,7 @@ curl -fsSL "${RAW_BASE}/supabase/functions/ptchild-ai/index.ts" -o "${TMP_DIR}/p
 
 printf '%s  %s\n' \
   "4c96d0c10bcd50cd5b07bd511790a28960a29bff250ac743584da398a60e1451" "${TMP_DIR}/_shared/ai-helpers.ts" \
-  "e2d83fea5b7c7b4cb2516f34d6e9235333f143fd4d5df9b4419e23eed1d9ba64" "${TMP_DIR}/ptchild-ai/index.ts" \
+  "7050d95cca53769a1433f73443d553a80a2b9d824f5688299747e8bf5a81d4c9" "${TMP_DIR}/ptchild-ai/index.ts" \
   | sha256sum --check --status
 
 install -d -m 755 "${PROJECT_ROOT}/volumes/functions/_shared" "${PROJECT_ROOT}/volumes/functions/ptchild-ai"
@@ -107,6 +112,7 @@ printf '%s\n' \
   '    environment:' \
   "      YANDEX_FOLDER_ID: ${FOLDER_ID}" \
   '      FIZIRA_ALLOWED_ORIGINS: https://app.fizira.com' \
+  "      FIZIRA_AI_ENABLED: \"${AI_ENABLED}\"" \
   '      FIZIRA_ALLOW_IMAGE_AI: "no"' \
   '      FIZIRA_ALLOW_PDF_OCR: "no"' \
   > "${PROJECT_ROOT}/${OVERRIDE_NAME}"
@@ -163,6 +169,7 @@ trap - ERR
 echo "YANDEX_EDGE_STAGING_INSTALL_OK"
 echo "functions_status=${status}"
 echo "preflight_http=${http_code}"
+echo "ai_enabled=${AI_ENABLED}"
 echo "image_ai=disabled"
 echo "pdf_ocr=disabled"
 echo "backup=${BACKUP_DIR}"
