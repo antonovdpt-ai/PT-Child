@@ -97,8 +97,15 @@ jobs:
             "set -eu
              target='/root/supabase-project/volumes/proxy/app'
              archive=\"\$HOME/$remote_cache/$SHA.tar.gz\"
-             backup_root='/root/fizira-deploy-backups'
+             backup_root=\"\$HOME/$remote_cache/backups\"
              backup=\"\$backup_root/frontend-$SHA-before.tar.gz\"
+             stage=''
+             cleanup_stage() {
+               if [ -n \"\$stage\" ] && [ -d \"\$stage\" ]; then
+                 rm -rf -- \"\$stage\"
+               fi
+             }
+             trap cleanup_stage EXIT HUP INT TERM
              stage=\"\$(mktemp -d \"\$target/.fizira-stage.XXXXXX\")\"
              tar -xzf \"\$archive\" -C \"\$stage\"
              for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png index.html; do
@@ -115,6 +122,7 @@ jobs:
              done
              mv \"\$stage/index.html\" \"\$target/index.html\"
              rmdir \"\$stage\"
+             stage=''
              rm -f \"\$archive\"
              echo \"backup=\$backup\""
 
@@ -146,8 +154,15 @@ jobs:
             "$USER@$HOST" \
             "set -eu
              target='/root/supabase-project/volumes/proxy/app'
-             backup=\"/root/fizira-deploy-backups/frontend-$SHA-before.tar.gz\"
+             backup=\"\$HOME/.cache/fizira-frontend/backups/frontend-$SHA-before.tar.gz\"
              test -f \"\$backup\" || exit 0
+             rollback=''
+             cleanup_rollback() {
+               if [ -n \"\$rollback\" ] && [ -d \"\$rollback\" ]; then
+                 rm -rf -- \"\$rollback\"
+               fi
+             }
+             trap cleanup_rollback EXIT HUP INT TERM
              rollback=\"\$(mktemp -d \"\$target/.fizira-rollback.XXXXXX\")\"
              tar -xzf \"\$backup\" -C \"\$rollback\"
              for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png index.html; do
@@ -158,4 +173,5 @@ jobs:
              done
              mv \"\$rollback/index.html\" \"\$target/index.html\"
              rmdir \"\$rollback\"
+             rollback=''
              echo \"rollback=\$backup\""
