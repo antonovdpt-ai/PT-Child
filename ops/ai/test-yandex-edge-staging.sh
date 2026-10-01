@@ -7,8 +7,17 @@ TMP_DIR="$(mktemp -d)"
 TEST_EMAIL="fizira-ai-test-$(date -u +%s)@example.com"
 TEST_PASSWORD="$(openssl rand -base64 32 | tr -d '\n')"
 TEST_USER_ID=""
+TEST_PATIENT_ID=""
 
 cleanup() {
+  if [[ -n "${TEST_PATIENT_ID}" && -n "${SERVICE_ROLE_KEY:-}" ]]; then
+    curl -sS --max-time 30 \
+      -X DELETE \
+      -H "apikey: ${SERVICE_ROLE_KEY}" \
+      -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+      "${PUBLIC_URL}/rest/v1/patients?id=eq.${TEST_PATIENT_ID}" \
+      >/dev/null || true
+  fi
   if [[ -n "${TEST_USER_ID}" && -n "${SERVICE_ROLE_KEY:-}" ]]; then
     curl -sS --max-time 30 \
       -X DELETE \
@@ -114,14 +123,48 @@ PY
 )"
 [[ -n "${ACCESS_TOKEN}" ]] || { echo "ERROR: access token is missing" >&2; exit 1; }
 
-python3 > "${TMP_DIR}/request.json" <<'PY'
+python3 - "${TEST_USER_ID}" > "${TMP_DIR}/patient.json" <<'PY'
 import json
+import sys
 print(json.dumps({
-    "prompt": (
-        "Синтетический тест. Ребёнок без имени прошёл 10 метров самостоятельно, "
-        "затем в другой записи указано, что он ходит только с поддержкой. "
-        "Назови только подтверждённые факты и противоречие. Не ставь диагноз."
-    ),
+    "therapist_id": sys.argv[1],
+    "display_name": "SYNTHETIC AI STAGING TEST",
+    "sex": "unspecified",
+    "primary_complaint": "Synthetic test data only",
+}))
+PY
+
+patient_status="$(curl -sS --max-time 30 \
+  -o "${TMP_DIR}/patient.response" \
+  -w '%{http_code}' \
+  -X POST \
+  -H "apikey: ${ANON_KEY}" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -H 'Prefer: return=representation' \
+  --data-binary "@${TMP_DIR}/patient.json" \
+  "${PUBLIC_URL}/rest/v1/patients")"
+[[ "${patient_status}" == "201" ]] || {
+  echo "ERROR: synthetic patient creation returned HTTP ${patient_status}" >&2
+  exit 1
+}
+TEST_PATIENT_ID="$(python3 - "${TMP_DIR}/patient.response" <<'PY'
+import json
+import sys
+with open(sys.argv[1]) as source:
+    payload = json.load(source)
+print(payload[0].get("id", "") if payload else "")
+PY
+)"
+[[ -n "${TEST_PATIENT_ID}" ]] || { echo "ERROR: synthetic patient id is missing" >&2; exit 1; }
+
+python3 - "${TEST_PATIENT_ID}" > "${TMP_DIR}/request.json" <<'PY'
+import json
+import sys
+print(json.dumps({
+    "operation": "patient_analysis",
+    "patient_id": sys.argv[1],
+    "input": {},
     "files": [],
 }, ensure_ascii=False))
 PY
@@ -172,4 +215,5 @@ delete_status="$(curl -sS --max-time 30 \
   exit 1
 }
 TEST_USER_ID=""
+TEST_PATIENT_ID=""
 echo "temporary_user_deleted=yes"

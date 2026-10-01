@@ -13,6 +13,8 @@ USER_A_ID=""
 USER_B_ID=""
 TOKEN_A=""
 TOKEN_B=""
+PATIENT_A_ID=""
+PATIENT_A2_ID=""
 PATIENT_B_ID=""
 STORAGE_PATH_B=""
 
@@ -46,13 +48,15 @@ PY
       --data-binary "@${TMP_DIR}/remove-storage.json" \
       "${PUBLIC_URL}/storage/v1/object/patient-media"
   fi
-  if [[ -n "${PATIENT_B_ID}" && -n "${SERVICE_ROLE_KEY:-}" ]]; then
-    curl -sS --max-time 30 -o /dev/null \
-      -X DELETE \
-      -H "apikey: ${SERVICE_ROLE_KEY}" \
-      -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
-      "${PUBLIC_URL}/rest/v1/patients?id=eq.${PATIENT_B_ID}"
-  fi
+  for patient_id in "${PATIENT_A_ID}" "${PATIENT_A2_ID}" "${PATIENT_B_ID}"; do
+    if [[ -n "${patient_id}" && -n "${SERVICE_ROLE_KEY:-}" ]]; then
+      curl -sS --max-time 30 -o /dev/null \
+        -X DELETE \
+        -H "apikey: ${SERVICE_ROLE_KEY}" \
+        -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
+        "${PUBLIC_URL}/rest/v1/patients?id=eq.${patient_id}"
+    fi
+  done
   for user_id in "${USER_A_ID}" "${USER_B_ID}"; do
     if [[ -n "${user_id}" && -n "${SERVICE_ROLE_KEY:-}" ]]; then
       curl -sS --max-time 30 -o /dev/null \
@@ -171,37 +175,56 @@ login_user "${EMAIL_B}" "${PASSWORD_B}" "${TMP_DIR}/login-b.json"
 TOKEN_B="$(json_value "${TMP_DIR}/login-b.json" access_token)"
 [[ -n "${TOKEN_B}" ]] || { echo "ERROR: user B token is missing" >&2; exit 1; }
 
-python3 - "${TMP_DIR}/patient.json" "${USER_B_ID}" <<'PY'
+create_patient() {
+  local user_id="$1" token="$2" label="$3" response_file="$4"
+  python3 - "${TMP_DIR}/patient.json" "${user_id}" "${label}" <<'PY'
 import json
 import sys
 with open(sys.argv[1], "w") as output:
     json.dump({
         "therapist_id": sys.argv[2],
-        "display_name": "SYNTHETIC VISION TEST",
+        "display_name": sys.argv[3],
         "sex": "unspecified",
         "primary_complaint": "Synthetic test data only",
     }, output)
 PY
-patient_status="$(curl -sS --max-time 30 -o "${TMP_DIR}/patient.response" -w '%{http_code}' \
-  -X POST \
-  -H "apikey: ${ANON_KEY}" \
-  -H "Authorization: Bearer ${TOKEN_B}" \
-  -H 'Content-Type: application/json' \
-  -H 'Prefer: return=representation' \
-  --data-binary "@${TMP_DIR}/patient.json" \
-  "${PUBLIC_URL}/rest/v1/patients")"
-[[ "${patient_status}" == "201" ]] || { echo "ERROR: synthetic patient creation returned HTTP ${patient_status}" >&2; exit 1; }
-PATIENT_B_ID="$(json_value "${TMP_DIR}/patient.response" 0.id)"
+  local status
+  status="$(curl -sS --max-time 30 -o "${response_file}" -w '%{http_code}' \
+    -X POST \
+    -H "apikey: ${ANON_KEY}" \
+    -H "Authorization: Bearer ${token}" \
+    -H 'Content-Type: application/json' \
+    -H 'Prefer: return=representation' \
+    --data-binary "@${TMP_DIR}/patient.json" \
+    "${PUBLIC_URL}/rest/v1/patients")"
+  [[ "${status}" == "201" ]] || {
+    echo "ERROR: synthetic patient creation returned HTTP ${status}" >&2
+    exit 1
+  }
+}
+
+create_patient "${USER_A_ID}" "${TOKEN_A}" "SYNTHETIC AI TEST A" "${TMP_DIR}/patient-a.response"
+PATIENT_A_ID="$(json_value "${TMP_DIR}/patient-a.response" 0.id)"
+[[ -n "${PATIENT_A_ID}" ]] || { echo "ERROR: patient A id is missing" >&2; exit 1; }
+
+create_patient "${USER_A_ID}" "${TOKEN_A}" "SYNTHETIC AI TEST A2" "${TMP_DIR}/patient-a2.response"
+PATIENT_A2_ID="$(json_value "${TMP_DIR}/patient-a2.response" 0.id)"
+[[ -n "${PATIENT_A2_ID}" ]] || { echo "ERROR: patient A2 id is missing" >&2; exit 1; }
+
+create_patient "${USER_B_ID}" "${TOKEN_B}" "SYNTHETIC AI TEST B" "${TMP_DIR}/patient-b.response"
+PATIENT_B_ID="$(json_value "${TMP_DIR}/patient-b.response" 0.id)"
 [[ -n "${PATIENT_B_ID}" ]] || { echo "ERROR: synthetic patient id is missing" >&2; exit 1; }
 
 FOREIGN_PREFIX_PATH="${USER_B_ID}/${PATIENT_B_ID}/not-owned-by-a.png"
-python3 - "${TMP_DIR}/prefix-request.json" "${FOREIGN_PREFIX_PATH}" <<'PY'
+python3 - "${TMP_DIR}/prefix-request.json" "${PATIENT_A_ID}" "${FOREIGN_PREFIX_PATH}" <<'PY'
 import json
 import sys
 with open(sys.argv[1], "w") as output:
     json.dump({
-        "prompt": "Synthetic prefix-isolation test. This request must be rejected before any AI call.",
-        "files": [{"storage_path": sys.argv[2]}],
+        "operation": "patient_analysis",
+        "patient_id": sys.argv[2],
+        "input": {},
+        "files": [{"storage_path": sys.argv[3]}],
     }, output)
 PY
 prefix_status="$(curl -sS --max-time 60 -o "${TMP_DIR}/prefix.response" -w '%{http_code}' \
@@ -225,37 +248,15 @@ if payload.get("error") != "Invalid file selection":
     raise SystemExit("ERROR: foreign user prefix was not rejected by path validation")
 PY
 
-FORGED_PATH="${USER_A_ID}/${PATIENT_B_ID}/forged-owned-by-b.png"
-python3 - "${TMP_DIR}/forged-media.json" "${PATIENT_B_ID}" "${USER_B_ID}" "${FORGED_PATH}" <<'PY'
+python3 - "${TMP_DIR}/isolation-request.json" "${PATIENT_B_ID}" <<'PY'
 import json
 import sys
 with open(sys.argv[1], "w") as output:
     json.dump({
+        "operation": "session_draft",
         "patient_id": sys.argv[2],
-        "therapist_id": sys.argv[3],
-        "storage_path": sys.argv[4],
-        "media_type": "photo",
-        "category": "other",
-        "note": "Synthetic isolation test",
-    }, output)
-PY
-forged_status="$(curl -sS --max-time 30 -o "${TMP_DIR}/forged-media.response" -w '%{http_code}' \
-  -X POST \
-  -H "apikey: ${ANON_KEY}" \
-  -H "Authorization: Bearer ${TOKEN_B}" \
-  -H 'Content-Type: application/json' \
-  -H 'Prefer: return=minimal' \
-  --data-binary "@${TMP_DIR}/forged-media.json" \
-  "${PUBLIC_URL}/rest/v1/patient_media")"
-[[ "${forged_status}" == "201" ]] || { echo "ERROR: isolation fixture creation returned HTTP ${forged_status}" >&2; exit 1; }
-
-python3 - "${TMP_DIR}/isolation-request.json" "${FORGED_PATH}" <<'PY'
-import json
-import sys
-with open(sys.argv[1], "w") as output:
-    json.dump({
-        "prompt": "Synthetic isolation test. This request must be rejected before any AI call.",
-        "files": [{"storage_path": sys.argv[2]}],
+        "input": {"transcript": "Synthetic patient-isolation test."},
+        "files": [],
     }, output)
 PY
 isolation_status="$(curl -sS --max-time 60 -o "${TMP_DIR}/isolation.response" -w '%{http_code}' \
@@ -267,7 +268,7 @@ isolation_status="$(curl -sS --max-time 60 -o "${TMP_DIR}/isolation.response" -w
   --data-binary "@${TMP_DIR}/isolation-request.json" \
   "${PUBLIC_URL}/functions/v1/ptchild-ai")"
 [[ "${isolation_status}" == "403" ]] || {
-  echo "ERROR: cross-user path returned HTTP ${isolation_status}, expected 403" >&2
+  echo "ERROR: cross-user patient returned HTTP ${isolation_status}, expected 403" >&2
   exit 1
 }
 python3 - "${TMP_DIR}/isolation.response" <<'PY'
@@ -275,8 +276,67 @@ import json
 import sys
 with open(sys.argv[1]) as source:
     payload = json.load(source)
+if payload.get("error") != "Patient is unavailable":
+    raise SystemExit("ERROR: cross-user patient ownership was not rejected")
+PY
+
+CROSS_PATIENT_PATH="${USER_A_ID}/${PATIENT_A2_ID}/belongs-to-patient-a.png"
+python3 - "${TMP_DIR}/cross-patient-media.json" "${PATIENT_A_ID}" "${USER_A_ID}" "${CROSS_PATIENT_PATH}" <<'PY'
+import json
+import sys
+with open(sys.argv[1], "w") as output:
+    json.dump({
+        "patient_id": sys.argv[2],
+        "therapist_id": sys.argv[3],
+        "storage_path": sys.argv[4],
+        "media_type": "photo",
+        "category": "other",
+        "note": "Synthetic cross-patient metadata test",
+    }, output)
+PY
+cross_media_status="$(curl -sS --max-time 30 -o "${TMP_DIR}/cross-patient-media.response" -w '%{http_code}' \
+  -X POST \
+  -H "apikey: ${ANON_KEY}" \
+  -H "Authorization: Bearer ${TOKEN_A}" \
+  -H 'Content-Type: application/json' \
+  -H 'Prefer: return=minimal' \
+  --data-binary "@${TMP_DIR}/cross-patient-media.json" \
+  "${PUBLIC_URL}/rest/v1/patient_media")"
+[[ "${cross_media_status}" == "201" ]] || {
+  echo "ERROR: cross-patient fixture creation returned HTTP ${cross_media_status}" >&2
+  exit 1
+}
+
+python3 - "${TMP_DIR}/cross-patient-request.json" "${PATIENT_A2_ID}" "${CROSS_PATIENT_PATH}" <<'PY'
+import json
+import sys
+with open(sys.argv[1], "w") as output:
+    json.dump({
+        "operation": "patient_analysis",
+        "patient_id": sys.argv[2],
+        "input": {},
+        "files": [{"storage_path": sys.argv[3]}],
+    }, output)
+PY
+cross_patient_status="$(curl -sS --max-time 60 -o "${TMP_DIR}/cross-patient.response" -w '%{http_code}' \
+  -X POST \
+  -H "apikey: ${ANON_KEY}" \
+  -H "Authorization: Bearer ${TOKEN_A}" \
+  -H 'Origin: https://app.fizira.com' \
+  -H 'Content-Type: application/json' \
+  --data-binary "@${TMP_DIR}/cross-patient-request.json" \
+  "${PUBLIC_URL}/functions/v1/ptchild-ai")"
+[[ "${cross_patient_status}" == "403" ]] || {
+  echo "ERROR: cross-patient metadata returned HTTP ${cross_patient_status}, expected 403" >&2
+  exit 1
+}
+python3 - "${TMP_DIR}/cross-patient.response" <<'PY'
+import json
+import sys
+with open(sys.argv[1]) as source:
+    payload = json.load(source)
 if payload.get("error") != "A selected file is unavailable":
-    raise SystemExit("ERROR: cross-user rejection did not occur at the RLS verification step")
+    raise SystemExit("ERROR: cross-patient media relation was not rejected")
 PY
 
 python3 - "${TMP_DIR}/synthetic.png" <<'PY'
@@ -338,16 +398,15 @@ media_status="$(curl -sS --max-time 30 -o "${TMP_DIR}/media.response" -w '%{http
   "${PUBLIC_URL}/rest/v1/patient_media")"
 [[ "${media_status}" == "201" ]] || { echo "ERROR: synthetic media row creation returned HTTP ${media_status}" >&2; exit 1; }
 
-python3 - "${TMP_DIR}/vision-request.json" "${STORAGE_PATH_B}" <<'PY'
+python3 - "${TMP_DIR}/vision-request.json" "${PATIENT_B_ID}" "${STORAGE_PATH_B}" <<'PY'
 import json
 import sys
 with open(sys.argv[1], "w") as output:
     json.dump({
-        "prompt": (
-            "Синтетический тест изображения. Опиши только основные цвета и геометрическую форму. "
-            "Не делай медицинских выводов."
-        ),
-        "files": [{"storage_path": sys.argv[2]}],
+        "operation": "patient_analysis",
+        "patient_id": sys.argv[2],
+        "input": {},
+        "files": [{"storage_path": sys.argv[3]}],
     }, output, ensure_ascii=False)
 PY
 vision_status="$(curl -sS --max-time 180 -o "${TMP_DIR}/vision.response" -w '%{http_code}' \
@@ -358,8 +417,8 @@ vision_status="$(curl -sS --max-time 180 -o "${TMP_DIR}/vision.response" -w '%{h
   -H 'Content-Type: application/json' \
   --data-binary "@${TMP_DIR}/vision-request.json" \
   "${PUBLIC_URL}/functions/v1/ptchild-ai")"
-[[ "${vision_status}" == "200" ]] || {
-  echo "ERROR: synthetic vision request returned HTTP ${vision_status}" >&2
+[[ "${vision_status}" == "503" ]] || {
+  echo "ERROR: disabled image analysis returned HTTP ${vision_status}, expected 503" >&2
   python3 - "${TMP_DIR}/vision.response" <<'PY' >&2
 import json
 import sys
@@ -380,15 +439,13 @@ import json
 import sys
 with open(sys.argv[1]) as source:
     payload = json.load(source)
-text = payload.get("text")
-if not isinstance(text, str) or not text.strip():
-    raise SystemExit("ERROR: vision request returned no text")
-compact = " ".join(text.split())
-print("AI_EDGE_SECURITY_VISION_TEST_OK")
+if payload.get("error") != "Image analysis is not enabled":
+    raise SystemExit("ERROR: image analysis was not rejected by the fail-closed gate")
+print("AI_EDGE_SECURITY_FILE_GATE_OK")
 print("foreign_user_prefix_http=400")
-print("cross_user_path_http=403")
-print("vision_http=200")
-print("vision_preview=" + compact[:300])
+print("cross_user_patient_http=403")
+print("cross_patient_media_http=403")
+print("image_gate_http=503")
 PY
 
 cleanup

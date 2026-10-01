@@ -185,16 +185,19 @@ function plannedSessionHtml(plan) {
 
 function flash(type, msg) { const el = document.getElementById('flash'); if (el) el.innerHTML = `<div class="${type}">${esc(msg)}</div>` }
 
-async function callAI(prompt, files = []) {
-  const cleanPrompt = String(prompt || "").trim();
+async function callAI(operation, patientId, input = {}, files = []) {
+  const cleanOperation = String(operation || "").trim();
+  const cleanPatientId = String(patientId || "").trim();
 
-  if (!cleanPrompt) {
-    throw new Error("Пустой запрос к ИИ");
+  if (!cleanOperation || !cleanPatientId) {
+    throw new Error("Не указан контекст запроса к ИИ");
   }
 
   const { data, error } = await sb.functions.invoke("ptchild-ai", {
   body: {
-    prompt: cleanPrompt,
+    operation: cleanOperation,
+    patient_id: cleanPatientId,
+    input,
     files: files
   }
 });
@@ -211,56 +214,10 @@ async function callAI(prompt, files = []) {
 }
 
 async function analyzeSessionDraft({
-  transcript,
-  goals = [],
-  recentSessions = []
+  patientId,
+  transcript
 }) {
-  const prompt = `
-Ты помогаешь специалисту структурировать запись проведённого занятия.
-
-ВАЖНЫЕ ПРАВИЛА:
-- Не придумывай факты, которых нет в исходном тексте.
-- Если переносимость не указана, используй null.
-- Если динамику нельзя определить, используй null.
-- Если функциональные изменения не описаны, используй null.
-- Изменение прогресса цели — только предложение.
-- Не предлагай уменьшение прогресса цели.
-- За одно занятие не увеличивай прогресс цели более чем на 20 процентных пунктов.
-- Никогда не предлагай значение выше 90%.
-- 100% означает подтверждённое достижение цели и может быть установлено только специалистом.
-- Если по описанию кажется, что критерий цели уже выполнен, не ставь 100%. В reason укажи: "Возможно, цель достигнута — специалисту стоит проверить критерий."
-- Если данных для изменения прогресса недостаточно, не добавляй эту цель в goal_updates.
-- Верни ТОЛЬКО JSON без пояснений и markdown.
-
-Расшифровка специалиста:
-${transcript}
-
-Активные цели:
-${JSON.stringify(goals)}
-
-Последние занятия:
-${JSON.stringify(recentSessions)}
-
-Верни JSON строго такого вида:
-
-{
-  "session_note": "краткая структурированная запись занятия",
-  "tolerance": "good | medium | low | unclear | null",
-  "dynamics_status": "improved | stable | worse | unclear | null",
-  "function_changes": "краткое описание изменений или null",
-  "goal_updates": [
-    {
-      "goal_id": "id цели",
-      "current_progress": 0,
-      "suggested_progress": 0,
-      "reason": "краткое основание"
-    }
-  ],
-  "needs_review": false
-}
-`;
-
-  const text = await callAI(prompt);
+  const text = await callAI("session_draft", patientId, { transcript });
 
   const cleaned = String(text)
     .replace(/```json/gi, "")
@@ -270,61 +227,8 @@ ${JSON.stringify(recentSessions)}
   return JSON.parse(cleaned);
 }
 
-async function prepareNextSessionPlan(context = {}) {
-  const prompt = `
-Ты помогаешь специалисту подготовить следующее занятие ребёнка.
-
-ВАЖНЫЕ ПРАВИЛА:
-- Используй только данные из переданного контекста.
-- Не придумывай диагнозы, симптомы, ограничения или достижения.
-- Основная задача занятия должна быть связана с активными целями ребёнка.
-- Учитывай динамику последних занятий.
-- Не повторяй механически прошлое занятие, если есть основания для следующего шага.
-- Не назначай конкретную дозировку, количество повторений, интенсивность или нагрузку без оснований в данных.
-- Если данных недостаточно, прямо укажи это.
-- Отделяй то, что нужно проверить, от того, что предлагается попробовать.
-- План должен быть коротким и пригодным для реальной работы.
-- Верни ТОЛЬКО JSON без markdown и пояснений.
-
-Контекст ребёнка:
-${JSON.stringify(context)}
-
-Верни JSON строго такого вида:
-
-{
-  "main_task": "главная задача следующего занятия",
-
-  "start_check": {
-    "action": "что проверить в начале занятия",
-    "why": "зачем это проверить"
-  },
-
-  "work_blocks": [
-    {
-      "title": "название блока",
-      "action": "что предложить сделать",
-      "why": "почему это связано с текущей целью или динамикой",
-      "progress_if": "по какому признаку можно усложнить задачу"
-    }
-  ],
-
-  "what_to_track": [
-    "что наблюдать во время занятия"
-  ],
-
-  "session_success_criteria": [
-    "по каким признакам считать, что на занятии есть прогресс"
-  ],
-
-  "cautions": [
-    "важные моменты из имеющихся данных, которые нельзя игнорировать"
-  ],
-
-  "needs_review": false
-}
-`;
-
-  const text = await callAI(prompt);
+async function prepareNextSessionPlan(patientId) {
+  const text = await callAI("next_session_plan", patientId);
 
   const cleaned = String(text)
     .replace(/```json/gi, "")
@@ -487,44 +391,8 @@ function buildGeneralAnalysisContext(
   };
 }
 
-async function prepareParentReportDraft(context = {}) {
-  const prompt = `
-Ты помогаешь физическому терапевту подготовить
-понятную обратную связь для родителей ребёнка.
-
-ВАЖНЫЕ ПРАВИЛА:
-- Используй только данные из переданного контекста.
-- Ничего не выдумывай и не добавляй фактов от себя.
-- Не ставь медицинские диагнозы.
-- Не назначай лечение и лекарства.
-- Не придумывай упражнения, которых нет в данных.
-- Пиши спокойным, профессиональным и понятным
-  родителю языком.
-- Избегай сложного медицинского жаргона.
-- Сначала отмечай возможности и сильные стороны ребёнка,
-  затем трудности.
-- Если для какого-либо раздела данных недостаточно,
-  верни для него пустую строку.
-- Не используй markdown.
-- Верни только JSON без пояснений.
-
-Данные ребёнка:
-
-${JSON.stringify(context)}
-
-Верни JSON строго такого вида:
-
-{
-  "complaint": "с чем обратились",
-  "strengths": "что ребёнок сейчас умеет и его сильные стороны",
-  "observations": "на что специалист обратил внимание",
-  "goals": "над чем планируется работать",
-  "progress": "какая динамика отмечается",
-  "recommendations": "рекомендации родителям, только если они следуют из имеющихся данных"
-}
-`;
-
-  const text = await callAI(prompt);
+async function prepareParentReportDraft(patientId) {
+  const text = await callAI("parent_report_draft", patientId);
 
   const cleaned = String(text)
     .replace(/```json/gi, '')
@@ -3991,7 +3859,7 @@ ${JSON.stringify(patientData, null, 2)}
 **Уверенность анализа:** высокая / средняя / низкая — и коротко почему.
 `;
 
-     const aiAnswer = await callAI(prompt, aiFiles);
+     const aiAnswer = await callAI("patient_analysis", p.id, {}, aiFiles);
 
 const usedDocumentsText = aiFiles.length
   ? aiFiles
@@ -5296,11 +5164,8 @@ if (generateParentReportBtn) {
     setParentReportStatus('loading', 'ИИ подготавливает черновик отчёта…');
 
     try {
-      const context =
-        buildParentReportContext(p);
-
       const draft =
-        await prepareParentReportDraft(context);
+        await prepareParentReportDraft(p.id);
 
       document.getElementById('reportComplaint').value =
         draft.complaint || '';
@@ -7773,6 +7638,7 @@ analyzeSessionBtn.onclick = async () => {
       }));
 
     const result = await analyzeSessionDraft({
+      patientId: p.id,
       transcript,
       goals: activeGoals,
       recentSessions
@@ -8087,10 +7953,8 @@ if (prepareNextSessionBtn) {
     nextSessionPlan.innerHTML = '';
 
     try {
-      const context = buildNextSessionContext(p);
-
       const result =
-        await prepareNextSessionPlan(context);
+        await prepareNextSessionPlan(p.id);
 
       const workBlocks =
         Array.isArray(result.work_blocks)
@@ -8955,7 +8819,7 @@ ${JSON.stringify(dynamicsData, null, 2)}
 
 `;
 
-      const answer = await callAI(prompt);
+      const answer = await callAI("dynamics_analysis", p.id);
       const aiDynamicsUpdatedAt = new Date().toISOString();
 
       const { error: saveDynamicsError } = await sb

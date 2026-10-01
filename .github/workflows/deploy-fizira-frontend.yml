@@ -1,21 +1,8 @@
 name: Deploy Fizira frontend to Timeweb
 
+# Manual only: app.js and ptchild-ai are a coupled production contract.
+# Deploy them together after the production/source preflight passes.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "index.html"
-      - "app.js"
-      - "cabinet.js"
-      - "styles.css"
-      - "media-fallback.css"
-      - "auth-domain.mjs"
-      - "schedule-domain.mjs"
-      - "schedule-editor.js"
-      - "security-utils.mjs"
-      - "favicon.ico"
-      - "fizira-symbol.png"
-      - ".github/workflows/deploy-fizira-frontend.yml"
   workflow_dispatch:
 
 permissions:
