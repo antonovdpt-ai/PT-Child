@@ -60,7 +60,6 @@ The work is one security boundary, not several independent subsystems: a partial
 **Files:**
 - Create: parent-domain.mjs
 - Create: tests/parent-domain.test.mjs
-- Modify: package.json
 
 **Interfaces:**
 - Consumes: no feature code; existing security-utils.mjs remains the escaping/URL primitive.
@@ -99,7 +98,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ~~~bash
-git add parent-domain.mjs tests/parent-domain.test.mjs package.json
+git add parent-domain.mjs tests/parent-domain.test.mjs
 git commit -m "test: add parent portal domain contract"
 ~~~
 
@@ -118,7 +117,7 @@ git commit -m "test: add parent portal domain contract"
   - parent_has_active_access(p_parent_user_id uuid, p_patient_id uuid) returns boolean
   - parent_invitation_state(p_token text) returns jsonb
   - accept_parent_invitation(p_token text, p_accepted_documents jsonb) returns uuid
-- Produces service-only record procedures for Tasks 4–5: issue_parent_invitation_record(...), revoke_parent_access_record(...), and record_parent_publication_failure(...); direct browser grants are forbidden.
+- Produces service-only record procedures for Task 4: issue_parent_invitation_record(...) and revoke_parent_access_record(...); direct browser grants are forbidden. Task 3 supplies publication state-transition helpers for Task 5.
 
 - [ ] **Step 1: Write the failing PGlite identity/security test**
 
@@ -208,7 +207,7 @@ Expected: FAIL because migration 009 and parent RPCs are absent.
 Create one idempotent transaction that:
 
 1. Extends parent_reports with publication_status, published_at, published_by, published_snapshot, pdf_storage_path, pdf_generated_at, publication_error and a publication revision; backfill every existing row to draft.
-2. Adds the separate session-report, selected-media, goal-publication and notification tables with patient/therapist FKs, constraints, indexes and specialist RLS. Do not copy sessions.note, AI data, planned_session, tolerance or assessment notes into them.
+2. Adds the separate session-report, selected-media, goal-publication and notification tables with patient/therapist FKs, constraints, indexes, specialist RLS and the restrictive account_is_active policy. Do not copy sessions.note, AI data, planned_session, tolerance or assessment notes into them.
 3. Rejects mutation of a published report’s content. The specialist UI must create a new draft version for a material revision; the old published snapshot/PDF remains immutable.
 4. Adds same-child/same-therapist validation for selected media, and no parent Storage policy.
 5. Adds notification triggers for transition to published and for only appointments INSERT or actual changes to starts_at, ends_at or status. Notification templates contain no finance or clinical-source field.
@@ -295,7 +294,7 @@ git commit -m "feat: add parent invitation edge functions"
 
 - [ ] **Step 1: Write the failing PDF/file contract tests**
 
-Create supabase/functions/_shared/parent-pdf.test.mjs with a Cyrillic snapshot containing Артём Смирнов. Assert the output begins with %PDF-, is non-empty, embeds the chosen font name, and is deterministic for identical snapshot/version input. Add source-contract tests that generate-parent-report-pdf creates the snapshot server-side before Storage upload, records publication_error on upload/render failure, and that parent-report-file obtains a record-selected path only after parent access + publication + selected-media checks and creates a URL for no more than 300 seconds.
+Create supabase/functions/_shared/parent-pdf.test.mjs with a Cyrillic snapshot containing Артём Смирнов. Assert the output begins with %PDF-, is non-empty, embeds the chosen font name, and preserves the exact fixed snapshot/revision content. Add source-contract tests that generate-parent-report-pdf creates the snapshot server-side before Storage upload, records publication_error on upload/render failure, and that parent-report-file obtains a record-selected path only after parent access + publication + selected-media checks and creates a URL for no more than 300 seconds.
 
 - [ ] **Step 2: Run the test to verify it fails**
 
@@ -450,7 +449,7 @@ Create ops/security/parent-portal-rls-contract.test.mjs and ops/release/parent-p
 parent.html parent.js parent.css parent-domain.mjs parent-specialist.js
 ~~~
 
-and audits/deploys the five new Edge functions, shared helpers and font before the frontend becomes public.
+and verifies the Edge source list for the five new functions, shared helpers and font; the runbook must require their deployment and synthetic verification before the frontend becomes public.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
