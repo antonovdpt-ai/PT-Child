@@ -231,3 +231,41 @@ body:not(.is-authenticated) .header,body:not(.is-authenticated) .warning{display
 .parent-active-access { margin-top:20px; }
 .parent-active-access .parent-contact { margin-top:10px; }
 @media(max-width:600px) { .parent-report-versions .btn { width:100%; text-align:left; } }
+
+/* Parent access workflow and patient layout: constrain intrinsic content widths. */
+#app, #tabContent, .patient-hero, .patient-hero-identity,
+.parent-specialist, .parent-contact, .parent-specialist-editor { min-width:0; }
+.patient-hero-identity { flex:1; }
+.patient-hero h1, .patient-complaint-summary p, .parent-contact,
+.parent-specialist > p, .parent-specialist-editor { overflow-wrap:anywhere; }
+.patient-hero-actions > *, .parent-contact-fields > *,
+.parent-specialist-actions > * { min-width:0; max-width:100%; }
+.patient-hero-actions .btn, .patient-tabs .tab { white-space:normal; }
+.patient-tabs { flex-wrap:wrap; overflow:visible; }
+.parent-contacts-heading { display:flex; flex-wrap:wrap; align-items:center; gap:12px; justify-content:space-between; }
+.parent-contacts-heading h3 { margin:0; }
+.parent-contacts-heading .btn { width:auto; }
+.parent-contact-form { margin:16px 0; padding:16px; border:1px solid var(--line); border-radius:12px; background:var(--surface-muted); }
+.parent-contact-form[hidden] { display:none; }
+.parent-contact-form h4, .parent-contact h4 { margin:0 0 8px; }
+.parent-contact-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 16px; }
+.parent-contact-fields input, .parent-contact input { min-width:0; }
+.parent-specialist-contacts { grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); }
+.parent-specialist-actions .btn { width:auto; flex:1 1 160px; white-space:normal; }
+.parent-access-state { font-weight:700; color:var(--brand); }
+.parent-specialist-editor fieldset { min-width:0; }
+@media(max-width:700px) {
+  body.is-authenticated .app-sidebar { padding-right:58px; }
+  .sidebar-brand { flex:0 0 28px; padding:0; }
+  .sidebar-nav { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); width:100%; }
+  .sidebar-nav-item { width:100%; min-width:0; padding:8px 4px; justify-content:center; font-size:12px; }
+  .sidebar-nav-item span:last-child { white-space:normal; overflow-wrap:anywhere; }
+  .patient-hero-actions { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:stretch; }
+  .patient-hero-actions .btn { height:100%; }
+  .patient-hero-actions .ai-documents-panel { grid-column:1/-1; }
+  .patient-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); margin:0 0 18px; padding:0; }
+  .patient-tabs .tab { min-width:0; width:100%; overflow-wrap:anywhere; }
+  .patient-tabs .tab:last-child:nth-child(odd) { grid-column:1/-1; }
+  .parent-contact-fields { grid-template-columns:minmax(0,1fr); }
+  .parent-contacts-heading .btn { width:100%; }
+}

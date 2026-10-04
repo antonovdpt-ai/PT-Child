@@ -56,17 +56,28 @@ test('specialist UI executes migrated schema and retained-access/version/lease c
  try {
   // Complete only source columns omitted by the minimal shared fixture, using001 declarations verbatim.
   const baseline=await readFile(new URL('../supabase/migrations/20260920_001_app_schema.sql',import.meta.url),'utf8');
-  for(const [table,names] of [['goals',['created_at']],['sessions',['created_at','session_date']],['patient_media',['captured_at','created_at']]]) {
+  for(const [table,names] of [['patient_contacts',['relation','phone','created_at']],['goals',['created_at']],['sessions',['created_at','session_date']],['patient_media',['captured_at','created_at']]]) {
    const body=baseline.split('CREATE TABLE public.'+table+' (')[1].split('\n);')[0];
    for(const name of names){const declaration=body.split('\n').find(line=>line.trim().startsWith(name+' ')).trim().replace(/,$/,'');await h.db.exec('alter table '+table+' add column '+declaration);}
   }
   for(const name of ['20261003_011_parent_role_boundaries.sql','20261003_012_parent_publication_archive.sql'])await h.db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+  await h.db.exec('alter table patient_contacts alter column id set default gen_random_uuid()');
   const client=databaseClient(h);
   await t.test('every portal query compiles against actual schema even with empty access and reports',async()=>{
    await h.query('delete from parent_child_access');const v=surface(h,client);await renderParentPortalSpecialist(v.options);await client.idle();
    assert.match(v.root.textContent,/Кабинет родителя/);assert.doesNotMatch(v.root.textContent,/Не удалось загрузить/);
    assert.deepEqual(client.calls.filter(x=>x.error).map(x=>[x.sql,x.error.code]),[]);
    assert.deepEqual(client.calls.find(x=>x.table==='parent_child_access').orders,[['granted_at',false]]);
+  });
+  await t.test('portal saves the real contact model and the database keeps parent role from reading it',async()=>{
+   const v=surface(h,client);await renderParentPortalSpecialist(v.options);await act(v.root,'[data-add-parent]');
+   const f=v.root.querySelector('[data-parent-contact-form]');f.elements.full_name.value='Анна Вымышленная';f.elements.relation.value='Мать';f.elements.email.value='ANNA@example.test';
+   await f.onsubmit({preventDefault(){}});await client.idle();
+   const write=client.calls.find(x=>x.table==='patient_contacts'&&x.op==='insert');assert.ok(write);assert.equal(write.error,undefined);
+   const rows=await h.as('authenticated',h.specialist,()=>h.query('select * from patient_contacts where patient_id=$1',[h.childA]));
+   assert.equal(rows.length,1);assert.equal(rows[0].email,'anna@example.test');assert.equal(rows[0].relation,'Мать');
+   v.options.contacts=rows;await renderParentPortalSpecialist(v.options);assert.ok(v.root.querySelector('[data-invite]'));assert.match(v.root.textContent,/Анна Вымышленная/);
+   assert.deepEqual(await h.as('authenticated',h.parentA,()=>h.query('select id from patient_contacts where id=$1',[rows[0].id])),[]);
   });
   await t.test('actual deleted contact retains active access, visible confirmed revoke, and stale revoke cannot refresh',async()=>{
    const [{id:contact}]=await h.query("insert into patient_contacts(id,patient_id,therapist_id,full_name,email) values(gen_random_uuid(),$1,$2,'Анна Смирнова','anna@example.test') returning id",[h.childA,h.specialist]);

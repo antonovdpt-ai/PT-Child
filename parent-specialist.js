@@ -18,13 +18,14 @@ function scope(o) {
   const status = message => { if (current()) { const el=o.root.querySelector('[data-status]'); if(el) el.textContent=message; } };
   const refresh = async () => { if (current()) await o.refresh?.(); };
   let busy=false;
-  const action = (button, operation) => {
-    button.onclick = async () => {
+  const action = (button, operation, disabledAfter = () => false) => {
+    button.onclick = async event => {
+      event?.preventDefault();
       if (!current() || busy) return;
       busy=true; button.disabled=true;
-      try { await operation(); }
+      try { await operation(event); }
       catch { status('Не удалось выполнить действие. Повторите попытку.'); }
-      finally { if(current()) { busy=false; button.disabled=false; } }
+      finally { if(current()) { busy=false; button.disabled=disabledAfter(); } }
     };
   };
   return {current,status,refresh,action};
@@ -176,8 +177,8 @@ export async function renderParentPortalSpecialist(o) {
   o.root.innerHTML='<p data-status role="status">Загружаем кабинет родителя…</p>';
   try {
     const [invitations,access,initial,reports,publications,goals,sessions]=await Promise.all([
-      result(query(o,'parent_invitations','id,contact_id,patient_id,therapist_id,created_at,expires_at,accepted_at,revoked_at').order('created_at',{ascending:false})),
-      result(query(o,'parent_child_access','id,contact_id,patient_id,therapist_id,status,granted_at').order('granted_at',{ascending:false})),
+      result(query(o,'parent_invitations','id,contact_id,patient_id,therapist_id,created_at,expires_at,accepted_at,revoked_at,email_normalized,accepted_by').order('created_at',{ascending:false})),
+      result(query(o,'parent_child_access','id,contact_id,patient_id,therapist_id,status,granted_at,parent_user_id').order('granted_at',{ascending:false})),
       result(query(o,'parent_reports',reportColumns('initial')).order('created_at',{ascending:false})),
       result(query(o,'parent_session_reports',reportColumns('session')).order('created_at',{ascending:false})),
       result(query(o,'parent_goal_publications','id,goal_id,patient_id,therapist_id,title,description,status,published_at,unpublished_at')),
@@ -193,35 +194,102 @@ export async function renderParentPortalSpecialist(o) {
     if(!s.current()) return;
     const photoCount=safe(selections).filter(m=>published.some(r=>r.id===m.parent_session_report_id)).length;
     o.root.innerHTML=`<section class="card parent-specialist"><h2>Кабинет родителя</h2><p>Видимость: первичный отчёт — ${safe(initial).some(r=>r.publication_status==='published')?'опубликован':'не опубликован'}; отчёт занятия — ${published.length?'опубликован':'не опубликован'}; цели — ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}; фото — ${photoCount}.</p>
-      <p data-status role="status"></p><div class="parent-specialist-contacts">${contacts.map(c=>{
-        const a=safe(access).find(x=>x.contact_id===c.id&&x.status==='active');
+      <p data-status role="status" aria-live="polite"></p>
+      <section aria-label="Родители и представители"><div class="parent-contacts-heading"><h3>Родители и представители</h3><button type="button" class="btn" data-add-parent>Добавить родителя / представителя</button><button type="button" class="btn" data-refresh-parent>Обновить статус</button></div>
+      <p>Сохраните имя, родство и email представителя, затем отправьте ему приглашение.</p>
+      <form data-parent-contact-form class="parent-contact-form" hidden>
+        <h4>Новый родитель / представитель</h4>
+        <div class="parent-contact-fields">
+          <label>Имя<input name="full_name" required maxlength="200" autocomplete="name"></label>
+          <label>Родство / роль<input name="relation" required maxlength="100" placeholder="Мать, отец, законный представитель"></label>
+          <label>Email<input type="email" name="email" required maxlength="254" autocomplete="email"></label>
+          <label>Телефон (необязательно)<input type="tel" name="phone" maxlength="50" autocomplete="tel"></label>
+        </div>
+        <div class="parent-specialist-actions"><button type="submit" class="btn primary" data-save-parent>Сохранить контакт</button><button type="button" class="btn" data-cancel-parent>Отмена</button></div>
+        <p data-contact-status role="status" aria-live="polite"></p>
+      </form>
+      <div class="parent-specialist-contacts">${contacts.map(c=>{
+        const activeAccess=safe(access).filter(x=>x.contact_id===c.id&&x.status==='active');
+        const a=activeAccess[0];
         const i=safe(invitations).find(x=>x.contact_id===c.id&&!x.accepted_at&&!x.revoked_at);
+        const accepted=safe(invitations).find(x=>x.contact_id===c.id&&x.accepted_at&&(!a||x.accepted_by===a.parent_user_id));
         const revoked=safe(access).some(x=>x.contact_id===c.id&&x.status==='revoked')||safe(invitations).some(x=>x.contact_id===c.id&&x.revoked_at);
-        const label=a?'Активирован':i?'Приглашение отправлено':revoked?'Доступ отозван':'Не приглашён';
-        return `<article class="parent-contact" data-contact="${esc(c.id)}"><h3>${esc(c.full_name)}</h3><p>${label}</p><p>${esc(c.email||'Email не указан')}</p><label>Email<input type="email" name="email" value="${esc(c.email||'')}"></label><div class="parent-specialist-actions"><button class="btn" data-save-email>Сохранить email</button>${a?'<span>Доступом можно управлять ниже</span>':i?`<button class="btn" data-resend="${esc(i.id)}">Повторить приглашение</button>`:`<button class="btn" data-invite ${emailValid(c.email||'')?'':'disabled'}>Пригласить</button>`}</div></article>`;
-      }).join('')||'<p>Добавьте контакт в обзоре карточки.</p>'}</div>
-      <section class="parent-active-access"><h3>Активные доступы</h3><p>Удаление контакта не отключает доступ родителя.</p>${safe(access).filter(a=>a.status==='active').map((a,i)=>{
-        const c=contacts.find(c=>c.id===a.contact_id);
-        return `<article class="parent-contact"><h4>Доступ ${i+1} · ${esc(c?.full_name||'Контакт удалён')}</h4><p>Активирован · ${esc(a.granted_at?new Date(a.granted_at).toLocaleString('ru-RU'):'Дата не указана')}</p><button type="button" class="btn" data-revoke="${esc(a.id)}">Отключить доступ</button></article>`;
-      }).join('')||'<p>Активных доступов нет.</p>'}</section></section>
+        const expired=i && (!Number.isFinite(Date.parse(i.expires_at)) || Date.parse(i.expires_at)<=Date.now());
+        const label=a?'Доступ активен':i?(expired?'Срок приглашения истёк':'Приглашение создано'):revoked?'Доступ отозван':accepted?'Приглашение принято; доступ не подтверждён':'Не приглашён';
+        return `<article class="parent-contact" data-contact="${esc(c.id)}"><h4>${esc(c.full_name)}</h4><p>${esc(c.relation||'Родство не указано')}</p><p class="parent-access-state">${label}</p><p>${esc(c.email||'Email не указан')}</p>${c.phone?`<p>Телефон: ${esc(c.phone)}</p>`:''}
+        ${activeAccess.map((entry,index)=>{
+          const invitation=safe(invitations).find(x=>x.contact_id===c.id&&x.accepted_at&&x.accepted_by===entry.parent_user_id);
+          return `<div class="parent-contact-access"><h5>Доступ ${index+1}</h5><p>Активирован · ${esc(entry.granted_at?new Date(entry.granted_at).toLocaleString('ru-RU'):'Дата не указана')}</p><p>Email доступа: ${esc(invitation?.email_normalized||'Не подтверждён в приглашениях')}</p><button type="button" class="btn danger" data-revoke="${esc(entry.id)}">Отозвать доступ</button></div>`;
+        }).join('')}
+        ${i?`<p>Email приглашения: ${esc(i.email_normalized||c.email||'Не указан')}</p><p>Действует до: ${esc(i.expires_at&&Number.isFinite(Date.parse(i.expires_at))?new Date(i.expires_at).toLocaleString('ru-RU'):'Срок не подтверждён')}</p><p class="muted">Проверьте получение письма: запись приглашения не подтверждает его доставку. Повторная отправка заменяет прежнюю ссылку.</p>`:''}
+        <label>Email контакта<input type="email" name="email" maxlength="254" value="${esc(c.email||'')}"></label>
+        ${a?'<p class="muted">Изменение email контакта не меняет аккаунт с доступом. Для замены родителя сначала отзовите доступ.</p>':''}
+        <div class="parent-specialist-actions"><button type="button" class="btn" data-save-email>Сохранить email</button>${a?'':i?`<button type="button" class="btn" data-resend="${esc(i.id)}" ${emailValid(c.email||'')?'':'disabled'}>Отправить повторно</button>`:accepted&&!revoked?'<span>Обновите статус доступа</span>':`<button type="button" class="btn primary" data-invite ${emailValid(c.email||'')?'':'disabled'}>Отправить приглашение</button>`}</div>${!emailValid(c.email||'')?'<p class="muted">Укажите и сохраните корректный email перед отправкой приглашения.</p>':''}</article>`;
+      }).join('')||'<p>Контактов пока нет. Добавьте родителя / представителя выше.</p>'}</div></section>
+      <section class="parent-active-access"><h3>Доступы без сохранённого контакта</h3><p>Удаление контакта не отключает доступ родителя.</p>${safe(access).filter(a=>a.status==='active'&&!contacts.some(c=>c.id===a.contact_id)).map((a,i)=>
+        `<article class="parent-contact"><h4>Доступ ${i+1} · Контакт удалён</h4><p>Доступ активен · Активирован ${esc(a.granted_at?new Date(a.granted_at).toLocaleString('ru-RU'):'Дата не указана')}</p><button type="button" class="btn danger" data-revoke="${esc(a.id)}">Отозвать доступ</button></article>`
+      ).join('')||'<p>Таких доступов нет.</p>'}</section></section>
       <section class="card"><h3>Первичные отчёты</h3><button class="btn" data-create-initial>Новый черновик</button>${safe(initial).map(r=>`<p>${esc(publicationLabel(r.publication_status))} <button class="btn" data-open-initial="${esc(r.id)}">Открыть отчёт</button></p>`).join('')}<div data-initial-editor></div></section>
       <section class="card"><h3>Отчёты занятий</h3>${safe(sessions).map((r,i)=>`<button class="btn" data-session="${esc(r.id)}">Отчёт занятия ${esc(r.session_date||String(i+1))}</button>`).join('')}<div data-session-editor></div></section>
       <section class="card"><h3>Цели для родителя</h3>${safe(goals).map((g,i)=>{
         const p=safe(publications).find(x=>x.goal_id===g.id)||{};
         return `<form data-goal-form="${esc(g.id)}"><h4>Цель ${i+1}</h4><label>Название для родителя<input name="title" maxlength="500" required value="${esc(p.title||'')}"></label><label>Описание для родителя<textarea name="description">${esc(p.description||'')}</textarea></label><label>Статус<select name="status">${[['new','Новая'],['in_progress','В работе'],['achieved','Достигнута'],['revised','Пересмотрена']].map(([v,l])=>`<option value="${v}" ${p.status===v?'selected':''}>${l}</option>`).join('')}</select></label><p>${p.published_at&&!p.unpublished_at?'Опубликовано для родителя':'Не опубликовано'}</p><div class="parent-specialist-actions"><button type="button" class="btn" data-publish-goal>Опубликовать цель</button>${p.published_at&&!p.unpublished_at?'<button type="button" class="btn" data-withdraw-goal>Убрать из кабинета родителя</button>':''}</div></form>`;
       }).join('')||'<p>Добавьте рабочую цель во вкладке «Цели».</p>'}</section>`;
+    let savedContactId=null;
+    const contactForm=o.root.querySelector('[data-parent-contact-form]');
+    const contactStatus=message=>{if(s.current())contactForm.querySelector('[data-contact-status]').textContent=message;};
+    s.action(o.root.querySelector('[data-add-parent]'),()=>{if(savedContactId){s.status('Контакт сохранён. Не удалось обновить список; нажмите «Обновить статус».');return;}contactForm.hidden=false;contactForm.elements.full_name.focus();});
+    s.action(o.root.querySelector('[data-refresh-parent]'),()=>s.refresh());
+    s.action(o.root.querySelector('[data-cancel-parent]'),()=>{contactForm.hidden=true;contactForm.reset();contactStatus('');});
+    const saveContact=o.root.querySelector('[data-save-parent]');
+    s.action(saveContact,async event=>{
+      event?.preventDefault();
+      if(savedContactId){s.status('Контакт сохранён. Не удалось обновить список; нажмите «Обновить статус».');return;}
+      const value=name=>contactForm.elements[name].value.trim();
+      const payload={patient_id:o.patient.id,therapist_id:o.user.id,full_name:value('full_name'),relation:value('relation'),email:value('email').toLowerCase(),phone:value('phone')||null};
+      if(!payload.full_name||payload.full_name.length>200||!payload.relation||payload.relation.length>100||!emailValid(payload.email)||(payload.phone?.length||0)>50){contactStatus('Заполните имя, родство и корректный email.');return;}
+      contactStatus('Сохраняем контакт…');
+      try {
+        const row=await result(o.sb.from('patient_contacts').insert(payload).select('id').single());
+        if(!s.current())return;
+        if(!row?.id)throw new Error();
+        savedContactId=row.id;
+        contactForm.hidden=true;contactForm.reset();
+        s.status('Контакт сохранён. Теперь можно отправить приглашение.');
+        try{await s.refresh();}catch{s.status('Контакт сохранён. Не удалось обновить список; нажмите «Обновить статус».');}
+      }catch{contactStatus('Не удалось сохранить контакт. Проверьте данные и повторите попытку.');}
+    });
+    contactForm.onsubmit=saveContact.onclick;
+    async function sendInvitation(name,body) {
+      s.status('Отправляем приглашение…');
+      try {
+        const data=await invoke(o,name,body);
+        if(!s.current())return;
+        if(data?.ok!==true||!Number.isFinite(Date.parse(data.expires_at)))throw new Error();
+      }catch{s.status('Не удалось подтвердить отправку письма. Приглашение могло быть создано; нажмите «Обновить статус».');return;}
+      s.status('Приглашение отправлено. Проверьте получение письма родителем.');
+      try{await s.refresh();}catch{s.status('Приглашение отправлено. Не удалось обновить список; нажмите «Обновить статус».');}
+    }
     contacts.forEach(c=>{
       const el=[...o.root.querySelectorAll('[data-contact]')].find(x=>x.dataset.contact===c.id);
       s.action(el.querySelector('[data-save-email]'),async()=>{
         const email=el.querySelector('[name=email]').value.trim().toLowerCase();
         if(email&&!emailValid(email)) {s.status('Введите корректный email');return;}
-        await result(o.sb.from('patient_contacts').update({email:email||null}).eq('id',c.id).eq('patient_id',o.patient.id).eq('therapist_id',o.user.id));
+        await result(o.sb.from('patient_contacts').update({email:email||null}).eq('id',c.id).eq('patient_id',o.patient.id).eq('therapist_id',o.user.id).select('id').single());
         if(!s.current()) return;
         await s.refresh();
       });
       const invite=el.querySelector('[data-invite]'),resend=el.querySelector('[data-resend]');
-      if(invite)s.action(invite,async()=>{if(!emailValid(c.email||''))return;await invoke(o,'create-parent-invitation',{patient_id:o.patient.id,contact_id:c.id});if(!s.current())return;await s.refresh();});
-      if(resend)s.action(resend,async()=>{await invoke(o,'resend-parent-invitation',{invitation_id:resend.dataset.resend});if(!s.current())return;await s.refresh();});
+      const emailInput=el.querySelector('[name=email]');
+      const emailUnchanged=()=>emailInput.value.trim().toLowerCase()===(c.email||'').trim().toLowerCase();
+      const savedEmailReady=()=>{if(!emailUnchanged()){s.status('Сохраните email контакта перед отправкой приглашения.');return false;}return emailValid(c.email||'');};
+      emailInput.oninput=()=>{
+        if(!s.current())return;
+        for(const button of [invite,resend].filter(Boolean))button.disabled=!emailUnchanged()||!emailValid(c.email||'');
+        if(invite||resend)s.status(emailUnchanged()?'':'Сохраните email контакта перед отправкой приглашения.');
+      };
+      if(invite)s.action(invite,async()=>{if(!savedEmailReady())return;await sendInvitation('create-parent-invitation',{patient_id:o.patient.id,contact_id:c.id});},()=>!emailUnchanged()||!emailValid(c.email||''));
+      if(resend)s.action(resend,async()=>{if(!savedEmailReady())return;await sendInvitation('resend-parent-invitation',{invitation_id:resend.dataset.resend});},()=>!emailUnchanged()||!emailValid(c.email||''));
 
     });
     o.root.querySelectorAll('[data-revoke]').forEach(button=>s.action(button,async()=>{

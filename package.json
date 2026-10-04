@@ -3,12 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "TZ=UTC node --test --test-concurrency=2 tests/*.test.mjs supabase/functions/_shared/*.test.mjs ops/security/*.test.mjs ops/release/*.test.mjs ops/schedule/*.test.mjs ops/ai-evaluation/*.test.mjs"
+    "test": "TZ=UTC node --test --test-concurrency=2 tests/*.test.mjs supabase/functions/_shared/*.test.mjs ops/security/*.test.mjs ops/release/*.test.mjs ops/schedule/*.test.mjs ops/ai-evaluation/*.test.mjs",
+    "test:responsive": "node --test tests/responsive.browser.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
     "@pdf-lib/fontkit": "1.1.1",
     "happy-dom": "20.8.4",
-    "pdf-lib": "1.17.1"
+    "pdf-lib": "1.17.1",
+    "playwright-core": "1.63.0"
   }
 }

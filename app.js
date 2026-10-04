@@ -3,7 +3,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
 import { shouldRenderAuthEvent } from './auth-domain.mjs?v=1';
 import { createSpecialistRoleGate } from './role-gate.mjs';
-import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=2';
+import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=3';
 import { publicationLabel } from './parent-domain.mjs';
 import { renderCabinet } from './cabinet.js?v=7';
 
