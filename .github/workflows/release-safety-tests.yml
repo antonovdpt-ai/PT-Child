@@ -43,6 +43,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Provision and validate reviewed parent cache baseline
+        shell: bash
+        run: bash ops/release/ensure-parent-portal-baseline.sh
 
       - name: Use supported Node.js
         uses: actions/setup-node@v4

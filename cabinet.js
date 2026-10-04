@@ -1,12 +1,13 @@
 import { rub, dayKey, localDate, addDays, periodBounds, periodRows, totals, scheduleError } from './schedule-domain.mjs?v=2';
-import { openScheduleEditor } from './schedule-editor.js?v=6';
+import { openScheduleEditor } from './schedule-editor.js?v=7';
 
 const dateLabel = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
 const monthLabel = new Intl.DateTimeFormat('ru-RU', { month: 'long' });
 const statuses = { planned: 'Запланировано', completed: 'Проведено', cancelled: 'Отменено', no_show: 'Неявка' };
 const modes = { day: 'День', week: 'Неделя', month: 'Месяц', year: 'Год' };
 
-export async function renderCabinet({ app, sb, state, user, esc, renderPatients, renderProfile }) {
+export async function renderCabinet({ app, sb, state, user, esc, renderPatients, renderProfile, isCurrent = () => true }) {
+    if (!isCurrent()) return;
   let appointments = [], patients = [], date = new Date(), mode = 'week', loaded = false, loading = false;
   let page, notice = '', metricsMode = 'week';
   const expanded = new Set([dayKey(date)]), hours = new Map();
@@ -24,6 +25,7 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
   }
   function bindNav(root) {
     root.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => {
+      if (!isCurrent()) return;
       if (b.dataset.nav === 'patients') return renderPatients();
       if (b.dataset.nav === 'profile') {
         renderProfile();
@@ -34,9 +36,11 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     });
   }
   async function allRows(table, fields) {
+    if (!isCurrent()) return;
     const rows = [];
     for (let offset = 0; ; offset += 500) {
       const { data, error } = await sb.from(table).select(fields).eq('therapist_id', user.id).order('id').range(offset, offset + 499);
+    if (!isCurrent()) return;
       if (error) throw error;
       rows.push(...data);
       if (data.length < 500) return rows;
@@ -48,14 +52,17 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     return entry;
   };
   async function completeDueAppointments(rows) {
+    if (!isCurrent()) return;
     const today = dayKey(new Date());
     const due = rows.filter(row => row.kind === 'appointment' && row.status === 'planned' && dayKey(row.starts_at) <= today);
     if (!due.length) return rows;
     const { error } = await sb.rpc('save_schedule_entries', { entries: due.map(row => statusEntry(row, 'completed')), save_tariff: false });
+    if (!isCurrent()) return;
     if (error) throw error;
     return allRows('appointments', 'id,patient_id,starts_at,ends_at,kind,status,price_kopecks,paid_kopecks,note,initial_name,updated_at');
   }
   async function refresh() {
+    if (!isCurrent()) return;
     if (loading) return;
     loading = true; const owner = page;
     if (page?.isConnected) page.querySelector('[data-refresh]')?.setAttribute('disabled', '');
@@ -64,12 +71,16 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
         allRows('appointments', 'id,patient_id,starts_at,ends_at,kind,status,price_kopecks,paid_kopecks,note,initial_name,updated_at'),
         allRows('patients', 'id,display_name,schedule_price_kopecks')
       ]);
+    if (!isCurrent()) return;
       a = await completeDueAppointments(a);
+    if (!isCurrent()) return;
       appointments = a.sort((x, y) => x.starts_at.localeCompare(y.starts_at)); patients = p; loaded = true; notice = '';
-    } catch (error) { notice = scheduleError(error); }
-    finally { loading = false; if (owner?.isConnected) draw(); }
+    } catch (error) {
+    if (!isCurrent()) return; notice = scheduleError(error); }
+    finally { loading = false; if (isCurrent() && owner?.isConnected) draw(); }
   }
   function showSchedule() {
+    if (!isCurrent()) return;
     app.innerHTML = '<div class="cabinet-page"></div>'; page = app.firstElementChild; draw(); refresh();
   }
   function dayHtml(day) {
@@ -107,16 +118,18 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
       if (from > to) { window.alert('Первый час должен быть раньше последнего.'); return fillDay(details); }
       hours.set(key, [from, to]);
       // Display preferences only: no patient data is stored in the browser.
-      try { localStorage.setItem(`fizira-hours:${user.id}`, JSON.stringify([...hours])); } catch {}
+      try { localStorage.setItem(`fizira-hours:${user.id}`, JSON.stringify([...hours])); } catch {
+    if (!isCurrent()) return;}
       fillDay(details);
     };
     body.querySelector('[data-hour-from]').onchange = changeHours;
     body.querySelector('[data-hour-to]').onchange = changeHours;
   }
   function edit(row, key = dayKey(new Date()), hour = new Date().getHours()) {
-    openScheduleEditor({ app: page, sb, user, patients, appointments, row, date: key, hour, esc: safe, onSaved: refresh });
+    openScheduleEditor({ app: page, sb, user, patients, appointments, row, date: key, hour, esc: safe, onSaved: refresh, isCurrent });
   }
   async function togglePayment(row, button) {
+    if (!isCurrent()) return;
     if (!row || button.disabled || row.kind !== 'appointment' || row.price_kopecks <= 0) return;
     const wasPaid = row.paid_kopecks >= row.price_kopecks;
     button.disabled = true;
@@ -125,9 +138,12 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
       const entry = { ...row, paid_kopecks: wasPaid ? 0 : row.price_kopecks, expected_updated_at: row.updated_at };
       delete entry.updated_at;
       const { error } = await sb.rpc('save_schedule_entries', { entries: [entry], save_tariff: false });
+    if (!isCurrent()) return;
       if (error) throw error;
       await refresh();
+    if (!isCurrent()) return;
     } catch (error) {
+    if (!isCurrent()) return;
       notice = scheduleError(error);
       button.disabled = false;
       button.textContent = wasPaid ? 'Оплачено' : 'Не оплачено';
@@ -135,14 +151,18 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     }
   }
   async function changeStatus(row, select) {
+    if (!isCurrent()) return;
     if (!row || row.kind !== 'appointment' || !statuses[select.value] || select.value === row.status) return;
     const previous = row.status;
     select.disabled = true;
     try {
       const { error } = await sb.rpc('save_schedule_entries', { entries: [statusEntry(row, select.value)], save_tariff: false });
+    if (!isCurrent()) return;
       if (error) throw error;
       await refresh();
+    if (!isCurrent()) return;
     } catch (error) {
+    if (!isCurrent()) return;
       notice = scheduleError(error);
       select.disabled = false;
       select.value = previous;
@@ -150,6 +170,7 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     }
   }
   function draw() {
+    if (!isCurrent()) return;
     if (!page?.isConnected) return;
     const { from, to } = periodBounds(date, mode), rows = periodRows(appointments, date, mode);
     const days = []; for (let d = new Date(from); d < to; d = addDays(d, 1)) days.push(d);
@@ -191,20 +212,25 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     page.querySelector('[data-metric-values]').innerHTML = `<p class="help calendar-metrics-period">${from.toLocaleDateString('ru-RU')} — ${addDays(to, -1).toLocaleDateString('ru-RU')}</p><div class="calendar-metric-grid"><div><span>Стоимость занятия</span><strong>${price}</strong></div><div><span>Заработано</span><strong>${rub(t.earned)}</strong></div></div><p class="calendar-metrics-summary">Занятий: <b>${t.count}</b> · проведено: <b>${t.completed}</b></p>`;
   }
   async function copyWeek(button) {
+    if (!isCurrent()) return;
     const source = periodRows(appointments, date, 'week').filter(r => ['planned', 'completed'].includes(r.status));
     if (!source.length) return window.alert('В этой неделе нет записей для копирования.');
     if (!window.confirm(`Скопировать ${source.length} записей на следующую неделю? Стоимость сохранится, отметки оплаты и проведения будут сброшены. При занятом времени ничего не скопируется.`)) return;
     button.disabled = true;
     try {
       const entries = source.map(r => ({ ...r, id: undefined, updated_at: undefined, starts_at: addDays(r.starts_at, 7).toISOString(), ends_at: addDays(r.ends_at, 7).toISOString(), status: 'planned', paid_kopecks: 0 }));
-      const { error } = await sb.rpc('save_schedule_entries', { entries, save_tariff: false }); if (error) throw error;
+      const { error } = await sb.rpc('save_schedule_entries', { entries, save_tariff: false });
+    if (!isCurrent()) return; if (error) throw error;
       date = addDays(date, 7); await refresh();
-    } catch (error) { notice = scheduleError(error); draw(); }
+    if (!isCurrent()) return;
+    } catch (error) {
+    if (!isCurrent()) return; notice = scheduleError(error); draw(); }
     finally { button.disabled = false; }
   }
   try {
     const stored = JSON.parse(localStorage.getItem(`fizira-hours:${user.id}`) || '[]');
     if (Array.isArray(stored)) for (const [key, range] of stored) if (/^\d{4}-\d{2}-\d{2}$/.test(key) && Array.isArray(range) && range.length === 2 && range.every(n => Number.isInteger(n) && n >= 0 && n <= 23) && range[0] <= range[1]) hours.set(key, range);
-  } catch {}
+  } catch {
+    if (!isCurrent()) return;}
   showSchedule();
 }

@@ -2,7 +2,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/+esm';
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
 import { shouldRenderAuthEvent } from './auth-domain.mjs?v=1';
-import { renderCabinet } from './cabinet.js?v=6';
+import { createSpecialistRoleGate } from './role-gate.mjs';
+import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=2';
+import { publicationLabel } from './parent-domain.mjs';
+import { renderCabinet } from './cabinet.js?v=7';
 
 const SUPABASE_URL = "https://auth.fizira.com";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5NjU2NzI5LCJleHAiOjE5NDczMzY3Mjl9.gWkGsKODazY419TdwTGoSL9InQK3Yzt5YYC7UGVFllo";
@@ -43,6 +46,20 @@ const sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 const app = document.getElementById('app');
 const headerActions = document.getElementById('headerActions');
 let session = null, user = null;
+let currentRoles = new Set();
+const roleGate = createSpecialistRoleGate({
+  sb,
+  setReady(ready) {
+    document.body.dataset.specialistReady = ready ? 'true' : 'false';
+    document.body.classList.toggle('is-authenticated', ready);
+    document.querySelectorAll('.sidebar-nav-item').forEach(button => { button.disabled = !ready; });
+  },
+  redirect: route => window.location.replace(route)
+});
+async function loadCurrentRoles() {
+  currentRoles = await roleGate.loadCurrentRoles();
+  return currentRoles;
+}
 const createEmptyState = () => ({
   patientId: null,
   tab: 'overview',
@@ -769,17 +786,23 @@ function renderHeader() {
 `;
 
 function openSchedule() {
-  renderCabinet({ app, sb, state, user, esc, renderPatients, renderProfile }).catch(error => {
+  if (!roleGate.canNavigate()) return;
+  const revision = authViewRevision, userId = user?.id;
+  const isCurrent = () => revision === authViewRevision && userId === user?.id && roleGate.canNavigate();
+  renderCabinet({ app, sb, state, user, esc, renderPatients, renderProfile, isCurrent }).catch(error => {
+    if (!isCurrent()) return;
     console.error('Ошибка личного кабинета:', error);
     flash('error', error.message || 'Не удалось открыть личный кабинет.');
   });
 }
 
 function openProfile() {
+  if (!roleGate.canNavigate()) return;
   renderProfile();
 }
 
 window.fiziraNavigate = route => {
+  if (!roleGate.canNavigate()) return;
   if (route === 'schedule') return openSchedule();
   if (route === 'profile') return openProfile();
   return renderPatients();
@@ -1228,6 +1251,7 @@ function enableAssessmentFloatingSave(form, btn, status) {
 }
 
 async function loadProfile() {
+  const revision = authViewRevision;
   if (!user) {
     state.profile = null;
     return;
@@ -1247,6 +1271,7 @@ async function loadProfile() {
     .eq('id', user.id)
     .maybeSingle();
 
+  if (revision !== authViewRevision) return;
   if (error) {
     console.error(
       'Ошибка загрузки профиля:',
@@ -1316,6 +1341,30 @@ async function renderAuthView(revision) {
     return;
   }
 
+  try {
+    await loadCurrentRoles();
+  } catch (_) {
+    if (stale()) return;
+    headerActions.replaceChildren();
+    app.innerHTML = '<div class="card"><h1>Не удалось проверить доступ</h1><p>Обновите страницу и попробуйте ещё раз.</p><button class="btn" id="roleLogout">Выйти</button></div>';
+    document.getElementById('roleLogout').onclick = () => sb.auth.signOut();
+    return;
+  }
+  if (stale()) return;
+  if (!roleGate.canNavigate()) {
+    headerActions.replaceChildren();
+    app.innerHTML = '<div class="card"><h1>Доступ не предоставлен</h1><p>Для нового аккаунта специалиста требуется предоставление доступа. Обратитесь в поддержку Fizira.</p><button class="btn" id="roleLogout">Выйти</button></div>';
+    document.getElementById('roleLogout').onclick = () => sb.auth.signOut();
+    return;
+  }
+  renderHeader();
+  if (currentRoles.has('parent')) {
+    const link = document.createElement('a');
+    link.href = 'parent.html';
+    link.textContent = 'Кабинет родителя';
+    link.className = 'link';
+    headerActions.appendChild(link);
+  }
   await ensureUserConsentRecord();
   if (stale()) return;
 
@@ -1333,8 +1382,26 @@ async function renderAuthView(revision) {
   await renderPatients();
 }
 
-function scheduleAuthView() {
+function scheduleAuthView(retireCurrentView = true) {
+  roleGate.reset();
+  currentRoles = new Set();
   const revision = ++authViewRevision;
+  // Retire the previous account's DOM and property handlers before role lookup.
+  if (retireCurrentView) {
+    for (const overlay of document.querySelectorAll('.media-preview-overlay, .profile-delete-overlay')) {
+      overlay.querySelector('[data-action="cancel"]')?.click();
+      overlay.querySelectorAll('img').forEach(image => { image.onerror = null; image.removeAttribute('src'); });
+      overlay.remove();
+    }
+    for (const node of app.querySelectorAll('*')) {
+      node.onclick = null;
+      node.onsubmit = null;
+      node.oninput = null;
+      node.onchange = null;
+    }
+    app.replaceChildren();
+    headerActions.replaceChildren();
+  }
 
   // Запросы выполняются после завершения обработчика Supabase.
   setTimeout(() => {
@@ -1380,7 +1447,9 @@ async function init() {
 
     // TOKEN_REFRESHED and a repeated SIGNED_IN on tab focus must not recreate
     // the current screen because that discards unsaved form fields.
-    if (shouldRenderAuthEvent(event, previousUserId, nextUserId)) scheduleAuthView();
+    if (shouldRenderAuthEvent(event, previousUserId, nextUserId)) {
+      scheduleAuthView(event !== 'PASSWORD_RECOVERY' || previousUserId !== nextUserId);
+    }
   });
 
   const { data, error } = await sb.auth.getSession();
@@ -1993,6 +2062,10 @@ registerForm.onsubmit = async e => {
 }
 
 function renderProfile() {
+  const accountRevision = authViewRevision, accountUserId = user?.id;
+  const accountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && roleGate.canNavigate();
+
+  if (!roleGate.canNavigate() || passwordRecoveryActive) return;
   const profile = state.profile || {};
 
   app.innerHTML = `
@@ -2120,6 +2193,7 @@ const profileLogoPreview =
   document.getElementById('profileLogoPreview');
 
 async function showSavedProfileLogo() {
+    if (!accountIsCurrent()) return;
   if (
     !profileLogoPreview ||
     !state.profile?.logo_path
@@ -2133,6 +2207,7 @@ async function showSavedProfileLogo() {
       state.profile.logo_path,
       3600
     );
+    if (!accountIsCurrent()) return;
 
   if (error || !data?.signedUrl) {
     console.error(
@@ -2164,6 +2239,7 @@ showSavedProfileLogo();
   document.getElementById('profileForm');
 
   const setProfileStatus = (message = '', stateName = '') => {
+    if (!accountIsCurrent()) return;
     const profileStatus = document.getElementById('profileStatus');
     if (!profileStatus) return;
     profileStatus.textContent = message;
@@ -2171,6 +2247,7 @@ showSavedProfileLogo();
   };
 
   const markProfileDirty = () => {
+  if (!accountIsCurrent()) return;
   const profileSaveBtn =
     document.getElementById('profileSaveBtn');
 
@@ -2209,6 +2286,7 @@ if (profileLogoFile) {
 
 if (profileForm) {
   profileForm.onsubmit = async e => {
+    if (!accountIsCurrent()) return;
     e.preventDefault();
 
     const profileSaveBtn =
@@ -2251,7 +2329,7 @@ if (logoFile) {
   }
 
   const storagePath =
-    `${user.id}/logo`;
+    `${accountUserId}/logo`;
 
   const { error: logoError } = await sb.storage
     .from('specialist-logos')
@@ -2264,6 +2342,7 @@ if (logoFile) {
         cacheControl: '3600'
       }
     );
+    if (!accountIsCurrent()) return;
 
   if (logoError) {
     console.error(
@@ -2284,7 +2363,7 @@ if (logoFile) {
 }
 
     const profilePayload = {
-      id: user.id,
+      id: accountUserId,
       full_name:
         String(fd.get('full_name') || '').trim(),
       profession:
@@ -2320,6 +2399,7 @@ if (logoFile) {
         updated_at
       `)
       .single();
+    if (!accountIsCurrent()) return;
 
     if (error) {
       console.error(
@@ -2353,6 +2433,7 @@ const profileBackBtn =
 
 if (profileBackBtn) {
   profileBackBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     if (!isSpecialistProfileComplete(state.profile)) {
       setProfileStatus('Сначала заполните ФИО и профессию и сохраните профиль.', 'error');
 
@@ -2360,7 +2441,9 @@ if (profileBackBtn) {
     }
 
     await loadPatients();
+    if (!accountIsCurrent()) return;
     await renderPatients();
+    if (!accountIsCurrent()) return;
   };
 }
 
@@ -2423,6 +2506,7 @@ function requestAccountDeletionPassword() {
 
 if (deleteAccountBtn) {
   deleteAccountBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     const firstConfirmed = window.confirm(
       'Удалить аккаунт Fizira?\n\n' +
       'Будут безвозвратно удалены все пациенты, занятия, оценки, ' +
@@ -2434,6 +2518,7 @@ if (deleteAccountBtn) {
     }
 
     const password = await requestAccountDeletionPassword();
+    if (!accountIsCurrent()) return;
     if (!password) return;
 
     const confirmation = window.prompt(
@@ -2464,6 +2549,7 @@ if (deleteAccountBtn) {
           body: { password }
         }
       );
+    if (!accountIsCurrent()) return;
 
     if (error || !data?.success) {
       console.error(
@@ -2485,7 +2571,9 @@ if (deleteAccountBtn) {
       await sb.auth.signOut({
         scope: 'local'
       });
+    if (!accountIsCurrent()) return;
     } catch (signOutError) {
+    if (!accountIsCurrent()) return;
       console.warn(
         'Локальный выход после удаления:',
         signOutError
@@ -2499,6 +2587,8 @@ if (deleteAccountBtn) {
 }
 
 async function loadPatients() {
+  if (!roleGate.canNavigate()) return;
+  const revision = authViewRevision;
   const { data, error } = await sb
     .from("patients")
     .select(
@@ -2508,6 +2598,7 @@ async function loadPatients() {
 
   if (error) throw new Error(error.message);
 
+  if (revision !== authViewRevision || !roleGate.canNavigate()) return;
   state.patients = data || [];
 }
 async function countsForPatients() {
@@ -2616,10 +2707,12 @@ async function loadAiDynamicsHistory(patientId) {
 }
 
 async function renderPatients() {
+  if (!roleGate.canNavigate() || passwordRecoveryActive) return;
+  const revision = authViewRevision;
   const counts = await countsForPatients();
-
-const activity = await activityForPatients();
-if (passwordRecoveryActive) return;
+  if (revision !== authViewRevision || !roleGate.canNavigate()) return;
+  const activity = await activityForPatients();
+  if (revision !== authViewRevision || !roleGate.canNavigate() || passwordRecoveryActive) return;
 
 const sortedPatients = [...state.patients].sort((a, b) => {
   const dateA = activity[a.id]
@@ -2828,7 +2921,7 @@ if (showAllPatientsBtn) {
   };
 }
 
-  document.getElementById('addPatient').onclick = renderNewPatient;
+  document.getElementById('addPatient').onclick = () => { if (revision === authViewRevision) renderNewPatient(); };
 
 const patientSearch = document.getElementById('patientSearch');
 const recentPatientsSection = document.getElementById('recentPatientsSection');
@@ -2856,19 +2949,25 @@ if (patientSearch) {
   };
 }
 
-  document.querySelectorAll('[data-pid]').forEach(b => b.onclick = async () => { state.patientId = b.dataset.pid; state.tab = 'overview'; await loadPatientData(); renderPatient() });
+  document.querySelectorAll('[data-pid]').forEach(b => b.onclick = async () => { if (revision !== authViewRevision || !roleGate.canNavigate()) return; state.patientId = b.dataset.pid; state.tab = 'overview'; await loadPatientData(); if (revision !== authViewRevision) return; renderPatient() });
 }
 
 function renderNewPatient() {
+  if (!roleGate.canNavigate() || passwordRecoveryActive) return;
+  const revision = authViewRevision;
   app.innerHTML = `<div class="topline"><h2 style="margin:0">Новый ребёнок</h2><button class="link" id="cancel">Отмена</button></div><div id="flash"></div><form class="card" id="patientForm"><label>Имя / псевдоним для теста</label><input name="display_name" required><div class="row"><div><label>Дата рождения</label><input type="date" name="date_of_birth"></div><div><label>Пол</label><select name="sex"><option value="unspecified">Не указано</option><option value="male">Мальчик</option><option value="female">Девочка</option></select></div></div><label>Основная причина обращения</label><textarea name="primary_complaint"></textarea><div class="actions"><button id="patientSaveBtn" class="btn primary full" type="submit">Сохранить в облако</button></div></form>`;
   document.getElementById('cancel').onclick = renderPatients;
   const form = document.getElementById('patientForm'), btn = document.getElementById('patientSaveBtn'); watchFormDirty(form, btn, 'Сохранить в облако');
-  form.onsubmit = async e => { e.preventDefault(); setButtonSaving(btn); const fd = new FormData(e.target); const payload = { display_name: fd.get('display_name').trim(), date_of_birth: fd.get('date_of_birth') || null, sex: fd.get('sex'), primary_complaint: fd.get('primary_complaint').trim() || null }; const { data, error } = await sb.from('patients').insert(payload).select().single(); if (error) { setButtonError(btn); return flash('error', error.message) } setButtonSaved(btn); await sleep(650); await loadPatients(); state.patientId = data.id; state.tab = 'overview'; await loadPatientData(); renderPatient() };
+  form.onsubmit = async e => { e.preventDefault(); if (revision !== authViewRevision || !roleGate.canNavigate() || !form.isConnected) return; setButtonSaving(btn); const fd = new FormData(e.target); const payload = { display_name: fd.get('display_name').trim(), date_of_birth: fd.get('date_of_birth') || null, sex: fd.get('sex'), primary_complaint: fd.get('primary_complaint').trim() || null }; const { data, error } = await sb.from('patients').insert(payload).select().single(); if (revision !== authViewRevision) return; if (error) { setButtonError(btn); return flash('error', error.message) } setButtonSaved(btn); await sleep(650); if (revision !== authViewRevision) return; await loadPatients(); if (revision !== authViewRevision) return; state.patientId = data.id; state.tab = 'overview'; await loadPatientData(); if (revision !== authViewRevision) return; renderPatient() };
 }
 
 const currentPatient = () => state.patients.find(p => p.id === state.patientId);
 
 function renderEditPatient() {
+  const accountRevision = authViewRevision, accountUserId = user?.id;
+  const accountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && roleGate.canNavigate();
+
+  if (!roleGate.canNavigate() || passwordRecoveryActive) return;
   const p = currentPatient();
 
   if (!p) return renderPatients();
@@ -2932,6 +3031,7 @@ function renderEditPatient() {
   watchFormDirty(form, btn, 'Сохранить изменения');
 
   form.onsubmit = async e => {
+    if (!accountIsCurrent()) return;
     e.preventDefault();
 
     const fd = new FormData(form);
@@ -2956,6 +3056,7 @@ function renderEditPatient() {
       .eq('id', p.id)
       .select()
       .single();
+    if (!accountIsCurrent()) return;
 
     if (error) {
       setButtonError(btn);
@@ -2964,13 +3065,17 @@ function renderEditPatient() {
 
     setButtonSaved(btn);
     await sleep(500);
+    if (!accountIsCurrent()) return;
     await loadPatients();
+    if (!accountIsCurrent()) return;
     state.patientId = data.id;
     renderPatient();
   };
 }
 
 async function loadPatientData() {
+  if (!roleGate.canNavigate()) return;
+  const revision = authViewRevision;
   const pid = state.patientId;
 
   const [g, s, a, c, r] = await Promise.all([
@@ -3003,7 +3108,7 @@ async function loadPatientData() {
 
     sb
   .from('parent_reports')
-  .select('*')
+  .select('id,patient_id,therapist_id,publication_status,published_at,created_at,updated_at,therapist_name,therapist_profession,therapist_organization,therapist_phone,therapist_logo_path,complaint,strengths,observations,goals,progress,recommendations')
   .eq('patient_id', pid)
   .order('created_at', { ascending: false })
   ]);
@@ -3019,6 +3124,7 @@ async function loadPatientData() {
     throw new Error(loadError.message);
   }
 
+  if (revision !== authViewRevision || !roleGate.canNavigate() || state.patientId !== pid) return;
   state.goals = g.data || [];
   state.sessions = s.data || [];
   state.assessment = (a.data || [])[0] || null;
@@ -3056,8 +3162,12 @@ function goalsHtml(goals, deletable = false) {
   `).join('');
 }
 function renderPatient() {
+  const accountRevision = authViewRevision, accountUserId = user?.id;
+  const accountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && roleGate.canNavigate();
+
+  if (!roleGate.canNavigate() || passwordRecoveryActive) return;
   const p = currentPatient(); if (!p) return renderPatients();
-  const tabs = [['overview', 'Обзор'], ['assessment', 'Оценка'], ['goals', 'Цели'], ['sessions', 'Занятия'], ['progress', 'Динамика'], ['media', 'Медиа']];
+  const tabs = [['overview', 'Обзор'], ['assessment', 'Оценка'], ['goals', 'Цели'], ['sessions', 'Занятия'], ['progress', 'Динамика'], ['media', 'Медиа'], ['parent', 'Кабинет родителя']];
   app.innerHTML = `
     <section class="card patient-hero">
       <div class="patient-hero-top">
@@ -3102,6 +3212,7 @@ deletePatientWrap.append(deletePatientBtn);
 app.append(deletePatientWrap);
 
 deletePatientBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
   const confirmed = confirm(
     `Удалить пациента "${p.display_name}"?\n\nБудут безвозвратно удалены карточка, оценки, цели, занятия, анализы, документы и медиа.`
   );
@@ -3126,6 +3237,7 @@ deletePatientBtn.onclick = async () => {
       .from("patient_media")
       .select("storage_path")
       .eq("patient_id", p.id);
+    if (!accountIsCurrent()) return;
 
     if (mediaError) throw mediaError;
 
@@ -3138,6 +3250,7 @@ deletePatientBtn.onclick = async () => {
       const { error: storageError } = await sb.storage
         .from("patient-media")
         .remove(paths);
+    if (!accountIsCurrent()) return;
 
       if (storageError) throw storageError;
     }
@@ -3149,6 +3262,7 @@ deletePatientBtn.onclick = async () => {
   .delete()
   .eq("id", p.id)
   .select("id");
+    if (!accountIsCurrent()) return;
 
 if (patientError) throw patientError;
 
@@ -3162,6 +3276,7 @@ if (!deletedPatients || deletedPatients.length !== 1) {
     location.reload();
 
   } catch (error) {
+    if (!accountIsCurrent()) return;
     console.error("Не удалось удалить пациента:", error);
 
     alert(
@@ -3280,6 +3395,7 @@ const aiDocumentTypeLabels = {
 };
 
 async function loadAiDocumentChoices() {
+    if (!accountIsCurrent()) return;
   const aiDocumentsList =
     document.getElementById('aiDocumentsList');
 
@@ -3294,6 +3410,7 @@ async function loadAiDocumentChoices() {
       .eq('patient_id', p.id)
       .eq('media_type', 'document')
       .order('created_at', { ascending: false });
+    if (!accountIsCurrent()) return;
 
     if (error) throw error;
 
@@ -3501,6 +3618,7 @@ if (summary) {
       });
 
   } catch (error) {
+    if (!accountIsCurrent()) return;
     console.error(error);
 
     aiDocumentsList.innerHTML =
@@ -3565,6 +3683,7 @@ aiToggleBtn.onclick = () => {
   aiResult.parentNode.insertBefore(historyPanel, aiResult);
 
   historyBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     if (historyPanel.style.display === "block") {
       historyPanel.style.display = "none";
       return;
@@ -3575,6 +3694,7 @@ aiToggleBtn.onclick = () => {
 
     try {
       const history = await loadAiAnalysisHistory(p.id);
+    if (!accountIsCurrent()) return;
 
       historyPanel.innerHTML = "";
 
@@ -3616,6 +3736,7 @@ aiToggleBtn.onclick = () => {
 
       historyPanel.style.display = "block";
     } catch (error) {
+    if (!accountIsCurrent()) return;
       console.error(error);
       historyPanel.innerHTML =
         '<div class="muted">Не удалось загрузить историю анализов.</div>';
@@ -3641,6 +3762,7 @@ aiToggleBtn.style.display = "block";
   }
 
   aiBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     aiBtn.disabled = true;
     aiBtn.textContent = "Анализируем…";
     aiResult.style.display = "block";
@@ -3653,6 +3775,7 @@ aiToggleBtn.style.display = "block";
     .eq('patient_id', p.id)
     .eq('media_type', 'document')
     .order('created_at', { ascending: false });
+    if (!accountIsCurrent()) return;
 
   if (documentsError) throw documentsError;
 
@@ -3774,6 +3897,7 @@ ${JSON.stringify(patientData, null, 2)}
 `;
 
      const aiAnswer = await callAI("patient_analysis", p.id, {}, aiFiles);
+    if (!accountIsCurrent()) return;
 
 const usedDocumentsText = aiFiles.length
   ? aiFiles
@@ -3801,6 +3925,7 @@ const answer =
           ai_analysis_updated_at: analysisUpdatedAt
         })
         .eq("id", p.id);
+    if (!accountIsCurrent()) return;
 
       if (saveAiError) {
         throw new Error(
@@ -3816,6 +3941,7 @@ const answer =
           patient_snapshot: patientData,
           created_at: analysisUpdatedAt
         });
+    if (!accountIsCurrent()) return;
 
       if (historyError) {
         throw new Error(
@@ -3836,6 +3962,7 @@ const answer =
       aiBtn.textContent = "✓ Анализ готов";
 
       setTimeout(() => {
+      if (!accountIsCurrent()) return;
         aiBtn.textContent = p.ai_analysis
           ? "Обновить анализ"
           : "Анализ пациента";
@@ -3843,6 +3970,7 @@ const answer =
       }, 1200);
 
     } catch (error) {
+    if (!accountIsCurrent()) return;
       console.error(error);
       aiResult.textContent =
         "Не удалось выполнить анализ ИИ. Попробуйте ещё раз.";
@@ -4733,13 +4861,28 @@ function structuredFromAssessmentForm(fd) {
 }
 
 function renderTab(p) {
+  const accountRevision = authViewRevision, accountUserId = user?.id;
+  const accountPatientId = p.id;
+  let box;
+  const accountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && state.patientId === accountPatientId && box?.isConnected && roleGate.canNavigate();
+
   let parentReportBtn = null;
 let parentReportEditor = null;
 let closeParentReportBtn = null;
 let generateParentReportBtn = null;
 let saveParentReportPdfBtn = null;
 let editParentReportBtn = null;
-  const box = document.getElementById('tabContent');
+  box = document.getElementById('tabContent');
+  const refreshParentControls = async () => {
+    if (!accountIsCurrent()) return;
+    await loadPatientData();
+    if (!accountIsCurrent()) return;
+    renderPatient();
+  };
+  if (state.tab === 'parent') {
+    renderParentPortalSpecialist({ root: box, sb, user: { id: accountUserId }, patient: p, contacts: state.contacts, storageOrigin: SUPABASE_URL, isCurrent: accountIsCurrent, refresh: refreshParentControls });
+    return;
+  }
 let editingContactId = null;
 let editingParentReportId = null;
 const setParentReportStatus = (status, message) => {
@@ -4755,7 +4898,7 @@ if (state.tab === 'overview') {
       <div class="parent-report-launch-copy">
         <div class="workspace-eyebrow">Обратная связь</div>
         <h3>Отчёт для родителя</h3>
-        <p>Подготовь черновик, проверь текст и сохрани PDF.</p>
+        <p>Подготовьте и сохраните черновик. Публикация PDF — во вкладке «Кабинет родителя».</p>
       </div>
       <button
         type="button"
@@ -4777,7 +4920,7 @@ if (state.tab === 'overview') {
       <header class="parent-report-editor-heading">
         <div>
           <div class="workspace-eyebrow">Отчёт для родителя</div>
-          <h3>Проверьте текст перед сохранением PDF</h3>
+          <h3>Проверьте текст перед сохранением черновика</h3>
           <p>ИИ готовит черновик, а решение о содержании всегда остаётся за специалистом.</p>
         </div>
       </header>
@@ -4859,7 +5002,7 @@ if (state.tab === 'overview') {
   class="btn full"
   id="saveParentReportPdfBtn"
 >
-  Сохранить и открыть PDF
+  Сохранить черновик
 </button>
 
         <button
@@ -4890,6 +5033,7 @@ if (state.tab === 'overview') {
           ? (state.parentReports || [])
               .map(report => `
                 <article class="item parent-report-history-item">
+                  <p>${esc(publicationLabel(report.publication_status || 'draft'))}</p>
                   <div class="item-title">
                     Отчёт от
                     ${esc(
@@ -4962,7 +5106,7 @@ if (state.tab === 'overview') {
   class="link report-history-action"
   data-pdf-parent-report="${report.id}"
 >
-  📄 PDF
+  Просмотр черновика
 </button>
 
 <button
@@ -5070,6 +5214,7 @@ if (generateParentReportBtn) {
 
 if (generateParentReportBtn) {
   generateParentReportBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     const oldText = generateParentReportBtn.textContent;
 
     generateParentReportBtn.disabled = true;
@@ -5080,6 +5225,7 @@ if (generateParentReportBtn) {
     try {
       const draft =
         await prepareParentReportDraft(p.id);
+    if (!accountIsCurrent()) return;
 
       document.getElementById('reportComplaint').value =
         draft.complaint || '';
@@ -5101,8 +5247,9 @@ if (generateParentReportBtn) {
 
       generateParentReportBtn.textContent =
         '✓ Черновик подготовлен';
-      setParentReportStatus('saved', 'Черновик готов. Проверьте текст перед сохранением PDF.');
+      setParentReportStatus('saved', 'Черновик готов. Проверьте текст перед сохранением.');
     } catch (error) {
+    if (!accountIsCurrent()) return;
       console.error(
         'Ошибка подготовки отчёта:',
         error
@@ -5122,7 +5269,12 @@ if (generateParentReportBtn) {
 
 if (saveParentReportPdfBtn) {
   saveParentReportPdfBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
 
+if (editingParentReportId) {
+  const existing = state.parentReports.find(r => r.id === editingParentReportId);
+  if (!existing || existing.published_at || !['draft','publication_error'].includes(existing.publication_status || 'draft')) return;
+}
 const therapistName =
   document.getElementById('reportTherapistName')
     ?.value.trim() || '';
@@ -5161,7 +5313,7 @@ const therapistName =
     saveParentReportPdfBtn.disabled = true;
     saveParentReportPdfBtn.textContent =
       'Сохраняю отчёт...';
-    setParentReportStatus('saving', 'Сохраняем отчёт и открываем PDF…');
+    setParentReportStatus('saving', 'Сохраняем черновик…');
 
    const reportPayload = {
   patient_id: p.id,
@@ -5195,14 +5347,18 @@ if (editingParentReportId) {
     .from('parent_reports')
     .update(reportPayload)
     .eq('id', editingParentReportId)
+    .eq('publication_status', state.parentReports.find(r => r.id === editingParentReportId)?.publication_status || 'draft')
     .eq('patient_id', p.id)
-    .eq('therapist_id', user.id);
+    .eq('therapist_id', user.id)
+    .select('id').single();
+    if (!accountIsCurrent()) return;
 } else {
   saveResult = await sb
     .from('parent_reports')
     .insert(reportPayload)
     .select('id')
     .single();
+    if (!accountIsCurrent()) return;
 
   if (!saveResult.error && saveResult.data?.id) {
     editingParentReportId = saveResult.data.id;
@@ -5227,21 +5383,14 @@ const { error } = saveResult;
       return;
     }
 
+    await loadPatientData();
+    if (!accountIsCurrent()) return;
     saveParentReportPdfBtn.textContent =
-      '✓ Отчёт сохранён';
-    setParentReportStatus('saved', 'Отчёт сохранён. Открываем версию для PDF.');
-
-   openParentReportPrintView(
-  p,
-  report,
-  therapistName,
-  state.profile?.profession || '',
-  state.profile?.organization || '',
-  state.profile?.phone || '',
-  state.profile?.logo_path || ''
-);
+      '✓ Черновик сохранён';
+    setParentReportStatus('saved', 'Черновик сохранён. Для публикации откройте «Кабинет родителя».');
 
     setTimeout(() => {
+      if (!accountIsCurrent()) return;
       saveParentReportPdfBtn.disabled = false;
       saveParentReportPdfBtn.textContent =
         oldText;
@@ -5261,6 +5410,10 @@ document
 
       if (!report || !parentReportEditor) {
         return;
+      }
+      if (!accountIsCurrent()) return;
+      if (report.published_at || !['draft', 'publication_error'].includes(report.publication_status || 'draft')) {
+        state.tab = 'parent'; renderPatient(); return;
       }
       editingParentReportId = report.id;
 
@@ -5385,6 +5538,8 @@ if (generateParentReportBtn) {
           String(pdfBtn.dataset.pdfParentReport)
       );
 
+      if (!accountIsCurrent()) return;
+      if (report?.published_at || !['draft','publication_error'].includes(report?.publication_status || 'draft')) { state.tab = 'parent'; renderPatient(); return; }
       if (!report) {
         return;
       }
@@ -5420,12 +5575,14 @@ if (generateParentReportBtn) {
   .querySelectorAll('[data-delete-parent-report]')
   .forEach(deleteBtn => {
     deleteBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
       const report = (state.parentReports || []).find(
         item =>
           String(item.id) ===
           String(deleteBtn.dataset.deleteParentReport)
       );
 
+      if (report?.published_at || !['draft','publication_error'].includes(report?.publication_status || 'draft')) { state.tab = 'parent'; renderPatient(); return; }
       if (!report) {
         return;
       }
@@ -5449,6 +5606,7 @@ if (generateParentReportBtn) {
         .eq('id', report.id)
         .eq('patient_id', p.id)
         .eq('therapist_id', user.id);
+    if (!accountIsCurrent()) return;
 
       if (error) {
         console.error(
@@ -5465,6 +5623,7 @@ if (generateParentReportBtn) {
       }
 
       await loadPatientData();
+    if (!accountIsCurrent()) return;
       renderPatient();
     };
   });
@@ -5521,6 +5680,12 @@ if (generateParentReportBtn) {
                   ${
                     contact.phone
                       ? `<div class="item-sub contact-phone">${esc(contact.phone)}</div>`
+                      : ''
+                  }
+
+                  ${
+                    contact.email
+                      ? `<div class="item-sub contact-email">${esc(contact.email)}</div>`
                       : ''
                   }
 
@@ -5640,6 +5805,9 @@ box.insertAdjacentHTML('beforeend', `
         placeholder="+7..."
       >
 
+      <label>Email</label>
+      <input name="email" type="email" maxlength="254" placeholder="anna@example.test">
+
       <label>Telegram</label>
       <input
         name="telegram"
@@ -5735,6 +5903,7 @@ if (contactCancelBtn && contactFormWrap) {
 
 if (contactForm) {
   contactForm.onsubmit = async e => {
+    if (!accountIsCurrent()) return;
     e.preventDefault();
 
     const contactSaveBtn =
@@ -5748,6 +5917,7 @@ if (contactForm) {
       full_name: String(fd.get('full_name') || '').trim(),
       relation: String(fd.get('relation') || '').trim() || null,
       phone: String(fd.get('phone') || '').trim() || null,
+      email: String(fd.get('email') || '').trim().toLowerCase() || null,
       telegram: String(fd.get('telegram') || '').trim() || null,
       is_primary: fd.get('is_primary') === 'on'
     };
@@ -5763,6 +5933,7 @@ if (contactForm) {
         .update({ is_primary: false })
         .eq('patient_id', p.id)
         .eq('therapist_id', user.id);
+    if (!accountIsCurrent()) return;
 
       if (resetPrimaryError) {
         console.error('Ошибка выбора основного контакта:', resetPrimaryError);
@@ -5784,6 +5955,7 @@ if (contactForm) {
   : await sb
       .from('patient_contacts')
       .insert(payload);
+    if (!accountIsCurrent()) return;
 
     if (error) {
       console.error('Ошибка сохранения контакта:', error);
@@ -5798,6 +5970,7 @@ if (contactForm) {
 editingContactId = null;
 
     await loadPatientData();
+    if (!accountIsCurrent()) return;
     renderPatient();
   };
 }
@@ -5885,6 +6058,8 @@ document
       contactForm.elements.phone.value =
         contact.phone || '';
 
+      contactForm.elements.email.value = contact.email || '';
+
       contactForm.elements.telegram.value =
         contact.telegram || '';
 
@@ -5919,6 +6094,7 @@ document
   .querySelectorAll('[data-delete-contact]')
   .forEach(deleteBtn => {
     deleteBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
       const contact =
         findContactById(deleteBtn.dataset.deleteContact);
 
@@ -5941,6 +6117,7 @@ document
         .eq('id', contact.id)
         .eq('patient_id', p.id)
         .eq('therapist_id', user.id);
+    if (!accountIsCurrent()) return;
 
       if (error) {
         console.error('Ошибка удаления контакта:', error);
@@ -5953,6 +6130,7 @@ document
       }
 
       await loadPatientData();
+    if (!accountIsCurrent()) return;
       renderPatient();
     };
   });
@@ -6083,6 +6261,7 @@ const documentTypeLabels = {
 };
 
 async function loadPatientDocuments() {
+    if (!accountIsCurrent()) return;
   documentList.innerHTML =
     '<div class="document-list-loading">Загружаем документы…</div>';
 
@@ -6095,6 +6274,7 @@ async function loadPatientDocuments() {
       .eq('patient_id', p.id)
       .eq('media_type', 'document')
       .order('created_at', { ascending: false });
+    if (!accountIsCurrent()) return;
 
     if (error) throw error;
 
@@ -6105,10 +6285,12 @@ async function loadPatientDocuments() {
 
     const items = await Promise.all(
       data.map(async item => {
+    if (!accountIsCurrent()) return;
         const { data: signedData, error: signedError } =
           await sb.storage
             .from('patient-media')
             .createSignedUrl(item.storage_path, 3600);
+    if (!accountIsCurrent()) return;
 
         if (signedError) {
           console.error(signedError);
@@ -6128,6 +6310,7 @@ async function loadPatientDocuments() {
         };
       })
     );
+    if (!accountIsCurrent()) return;
 
     const availableItems = items
   .filter(Boolean)
@@ -6251,6 +6434,7 @@ documentList
       .querySelectorAll('[data-delete-document]')
       .forEach(btn => {
         btn.onclick = async () => {
+    if (!accountIsCurrent()) return;
           const documentId = btn.dataset.deleteDocument;
 
           const item = availableItems.find(
@@ -6272,6 +6456,7 @@ documentList
             const { error: deleteFileError } = await sb.storage
               .from('patient-media')
               .remove([item.storage_path]);
+    if (!accountIsCurrent()) return;
 
             if (deleteFileError) throw deleteFileError;
 
@@ -6279,6 +6464,7 @@ documentList
               .from('patient_media')
               .delete()
               .eq('id', item.id);
+    if (!accountIsCurrent()) return;
 
             if (deleteRowError) throw deleteRowError;
 
@@ -6330,6 +6516,7 @@ if (!remainingSameType) {
   }
 }
           } catch (error) {
+    if (!accountIsCurrent()) return;
             console.error(error);
 
             alert('Не удалось удалить документ. Повторите попытку.');
@@ -6341,6 +6528,7 @@ if (!remainingSameType) {
       });
 
   } catch (error) {
+    if (!accountIsCurrent()) return;
     console.error(error);
 
     documentList.innerHTML =
@@ -6351,6 +6539,7 @@ if (!remainingSameType) {
 loadPatientDocuments();
 
 documentForm.onsubmit = async e => {
+    if (!accountIsCurrent()) return;
   e.preventDefault();
 
   const files = Array.from(documentFile.files);
@@ -6420,6 +6609,7 @@ documentForm.onsubmit = async e => {
           upsert: false,
           contentType: file.type
         });
+    if (!accountIsCurrent()) return;
 
       if (uploadError) throw uploadError;
 
@@ -6436,11 +6626,13 @@ documentForm.onsubmit = async e => {
             ? `${documentDate}T12:00:00`
             : null
         });
+    if (!accountIsCurrent()) return;
 
       if (documentError) {
         await sb.storage
           .from('patient-media')
           .remove([storagePath]);
+    if (!accountIsCurrent()) return;
 
         throw documentError;
       }
@@ -6456,8 +6648,10 @@ documentForm.onsubmit = async e => {
     documentForm.reset();
 
     await loadPatientDocuments();
+    if (!accountIsCurrent()) return;
 
     setTimeout(() => {
+      if (!accountIsCurrent()) return;
       documentUploadBtn.textContent =
         'Добавить документ';
 
@@ -6465,6 +6659,7 @@ documentForm.onsubmit = async e => {
     }, 1200);
 
   } catch (error) {
+    if (!accountIsCurrent()) return;
     console.error(error);
 
     setDocumentStatus(
@@ -6784,6 +6979,7 @@ const yFor = value => {
 }
 
 async function loadStandardizedHistory() {
+    if (!accountIsCurrent()) return;
   if (!standardizedHistoryList) return;
 
   standardizedHistoryList.innerHTML =
@@ -6803,6 +6999,7 @@ async function loadStandardizedHistory() {
       .order('created_at', {
         ascending: false
       });
+    if (!accountIsCurrent()) return;
 
     if (error) throw error;
 
@@ -6933,6 +7130,7 @@ standardizedHistoryList.innerHTML =
       )
       .forEach(btn => {
         btn.onclick = async () => {
+    if (!accountIsCurrent()) return;
           const id =
             btn.dataset.deleteStandardizedHistory;
 
@@ -6950,11 +7148,14 @@ standardizedHistoryList.innerHTML =
               .from('standardized_assessments')
               .delete()
               .eq('id', id);
+    if (!accountIsCurrent()) return;
 
             if (error) throw error;
 
             await loadStandardizedHistory();
+    if (!accountIsCurrent()) return;
           } catch (error) {
+    if (!accountIsCurrent()) return;
             console.error(error);
 
             alert(
@@ -6969,6 +7170,7 @@ standardizedHistoryList.innerHTML =
       });
 
   } catch (error) {
+    if (!accountIsCurrent()) return;
     console.error(error);
 
     standardizedHistoryList.innerHTML =
@@ -6980,6 +7182,7 @@ loadStandardizedHistory();
 
 if (saveStandardizedHistoryBtn) {
   saveStandardizedHistoryBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     const fd = new FormData(form);
 
     const historyDate =
@@ -7104,6 +7307,7 @@ if (saveStandardizedHistoryBtn) {
 .upsert(rows, {
   onConflict: 'patient_id,scale,assessed_at'
 });
+    if (!accountIsCurrent()) return;
 
       if (error) throw error;
 
@@ -7114,14 +7318,17 @@ if (saveStandardizedHistoryBtn) {
         '✓ Результаты добавлены';
 
       await loadStandardizedHistory();
+    if (!accountIsCurrent()) return;
 
       setTimeout(() => {
+      if (!accountIsCurrent()) return;
         saveStandardizedHistoryBtn.disabled = false;
         saveStandardizedHistoryBtn.textContent =
           '+ Добавить текущие результаты';
       }, 1200);
 
     } catch (error) {
+    if (!accountIsCurrent()) return;
       console.error(error);
 
       standardizedHistoryStatus.textContent =
@@ -7134,6 +7341,7 @@ if (saveStandardizedHistoryBtn) {
   };
 }
     form.onsubmit = async e => {
+    if (!accountIsCurrent()) return;
       e.preventDefault(); setButtonSaving(btn); status.textContent = '';
       const fd = new FormData(form);
       const payload = {
@@ -7149,6 +7357,7 @@ if (saveStandardizedHistoryBtn) {
         structured_data: structuredFromAssessmentForm(fd)
       };
       const r = state.assessment?.id ? await sb.from('assessments').update(payload).eq('id', state.assessment.id).select().single() : await sb.from('assessments').insert(payload).select().single();
+    if (!accountIsCurrent()) return;
       if (r.error) { setButtonError(btn); status.textContent = ''; return flash('error', r.error.message) }
       state.assessment = r.data; setButtonSaved(btn); status.textContent = '✓ Данные сохранены в облаке';
     };
@@ -7257,6 +7466,7 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
 });
     
     form.onsubmit = async e => {
+    if (!accountIsCurrent()) return;
   e.preventDefault();
 
   setButtonSaving(btn);
@@ -7285,6 +7495,7 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
     : await sb
         .from('goals')
         .insert(payload);
+    if (!accountIsCurrent()) return;
 
   if (error) {
     setButtonError(
@@ -7311,13 +7522,16 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
     '✓ Данные сохранены в облаке';
 
   await sleep(700);
+    if (!accountIsCurrent()) return;
   await loadPatientData();
+    if (!accountIsCurrent()) return;
   renderPatient();
 };
    document
   .querySelectorAll('[data-complete-goal]')
   .forEach(completeBtn => {
     completeBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
       const goalId =
         completeBtn.dataset.completeGoal;
 
@@ -7338,6 +7552,7 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
           progress: 100
         })
         .eq('id', goalId);
+    if (!accountIsCurrent()) return;
 
       if (error) {
         completeBtn.disabled = false;
@@ -7351,11 +7566,15 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
       }
 
       await loadPatientData();
+    if (!accountIsCurrent()) return;
       renderPatient();
     };
   });
 
-document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () => { const { error } = await sb.from('goals').delete().eq('id', b.dataset.delGoal); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
+document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () => {
+    if (!accountIsCurrent()) return; const { error } = await sb.from('goals').delete().eq('id', b.dataset.delGoal);
+    if (!accountIsCurrent()) return; if (error) return flash('error', error.message); await loadPatientData();
+    if (!accountIsCurrent()) return; renderPatient() });
   }
   if (state.tab === 'sessions') {
     box.innerHTML = `<form class="card session-form-card" id="sessionForm"><div class="form-heading"><div><h3>Новое занятие</h3><p>Зафиксируйте наблюдения, переносимость и функциональные изменения.</p></div></div>
@@ -7477,6 +7696,11 @@ ${state.sessions.map(s => `
   <button
     type="button"
     class="link"
+    data-parent-session="${s.id}"
+  >
+    Отчёт для родителя
+  </button>
+  <button type="button" class="link"
     data-edit-session="${s.id}"
   >
     Изменить
@@ -7492,6 +7716,17 @@ ${state.sessions.map(s => `
   </button>
 </div>
 </details>`).join('') || `<div class="empty compact-empty">Занятий пока нет.</div>`}</section>`;
+    const parentSessionRoot = document.createElement('div');
+    box.append(parentSessionRoot);
+    box.querySelectorAll('[data-parent-session]').forEach(button => {
+      button.onclick = () => {
+        if (!accountIsCurrent()) return;
+        const source = state.sessions.find(row => row.id === button.dataset.parentSession);
+        if (!source) return;
+        renderParentSessionReportEditor({ root: parentSessionRoot, sb, user: { id: accountUserId }, patient: p,
+          session: { id: source.id, patient_id: p.id, therapist_id: accountUserId }, storageOrigin: SUPABASE_URL, isCurrent: accountIsCurrent, refresh: refreshParentControls });
+      };
+    });
     const form = document.getElementById('sessionForm'), btn = document.getElementById('sessionSaveBtn'), status = document.getElementById('sessionStatus'); watchFormDirty(form, btn, 'Сохранить занятие');
 
     enableVoiceInput(form);
@@ -7519,6 +7754,7 @@ sessionAiStatus.insertAdjacentElement(
 let pendingGoalUpdates = [];
 
 analyzeSessionBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
   const transcript = sessionTranscript.value.trim();
 
   if (!transcript) {
@@ -7557,6 +7793,7 @@ analyzeSessionBtn.onclick = async () => {
       goals: activeGoals,
       recentSessions
     });
+    if (!accountIsCurrent()) return;
 
     form.elements.note.value =
       result.session_note || transcript;
@@ -7700,6 +7937,7 @@ if (!sessionGoalSuggestions.children.length) {
     sessionAiStatus.textContent =
       '✓ Черновик подготовлен. Проверьте данные перед сохранением.';
   } catch (error) {
+    if (!accountIsCurrent()) return;
     console.error(
       'Ошибка разбора занятия ИИ:',
       error
@@ -7857,6 +8095,7 @@ if (savedNextSessionPlan && nextSessionPlan) {
 
 if (prepareNextSessionBtn) {
   prepareNextSessionBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     prepareNextSessionBtn.disabled = true;
     prepareNextSessionBtn.textContent =
       'Готовим план…';
@@ -7869,6 +8108,7 @@ if (prepareNextSessionBtn) {
     try {
       const result =
         await prepareNextSessionPlan(p.id);
+    if (!accountIsCurrent()) return;
 
       const workBlocks =
         Array.isArray(result.work_blocks)
@@ -8043,6 +8283,7 @@ const useNextSessionPlanBtn =
 
 if (useNextSessionPlanBtn) {
   useNextSessionPlanBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     useNextSessionPlanBtn.disabled = true;
     useNextSessionPlanBtn.textContent =
       'Сохраняю план...';
@@ -8059,6 +8300,7 @@ if (useNextSessionPlanBtn) {
       })
       .eq('id', p.id)
       .eq('therapist_id', user.id);
+    if (!accountIsCurrent()) return;
 
     if (savePlanError) {
       console.error(
@@ -8087,6 +8329,7 @@ if (useNextSessionPlanBtn) {
       nextSessionPlanStatus.textContent =
         '✓ План подготовлен. Специалист принимает окончательное решение.';
     } catch (error) {
+    if (!accountIsCurrent()) return;
       console.error(
         'Ошибка подготовки следующего занятия:',
         error
@@ -8144,6 +8387,7 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
 });
 
    form.onsubmit = async e => {
+    if (!accountIsCurrent()) return;
   e.preventDefault();
 
   setButtonSaving(btn);
@@ -8173,6 +8417,7 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
     : await sb
         .from('sessions')
         .insert(payload);
+    if (!accountIsCurrent()) return;
 
   if (error) {
     setButtonError(
@@ -8201,6 +8446,7 @@ for (const update of pendingGoalUpdates) {
     .eq('status', 'active')
     .select('id')
     .single();
+    if (!accountIsCurrent()) return;
 
   if (goalError) {
     console.error(
@@ -8221,6 +8467,7 @@ if (!editingSessionId && p.next_session_plan) {
     })
     .eq('id', p.id)
     .select('id');
+    if (!accountIsCurrent()) return;
 
   if (clearPlanError) {
     console.error(
@@ -8248,12 +8495,15 @@ if (!editingSessionId && p.next_session_plan) {
   : '✓ Данные сохранены в облаке';
 
   await sleep(700);
+    if (!accountIsCurrent()) return;
   await loadPatientData();
+    if (!accountIsCurrent()) return;
   renderPatient();
 };
      
 document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
   deleteBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     const confirmed = confirm(
       'Удалить это занятие? Действие нельзя отменить.'
     );
@@ -8267,6 +8517,7 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
       .from('sessions')
       .delete()
       .eq('id', deleteBtn.dataset.delSession);
+    if (!accountIsCurrent()) return;
 
     if (error) {
       deleteBtn.disabled = false;
@@ -8279,6 +8530,7 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
     }
 
     await loadPatientData();
+    if (!accountIsCurrent()) return;
     renderPatient();
     
   };
@@ -8473,6 +8725,7 @@ if (aiDynamicsToggleBtn && aiDynamicsResult) {
 }
 if (aiDynamicsHistoryBtn && aiDynamicsHistoryPanel && aiDynamicsResult) {
   aiDynamicsHistoryBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     if (aiDynamicsHistoryPanel.style.display === 'block') {
       aiDynamicsHistoryPanel.style.display = 'none';
       return;
@@ -8483,6 +8736,7 @@ if (aiDynamicsHistoryBtn && aiDynamicsHistoryPanel && aiDynamicsResult) {
 
     try {
       const history = await loadAiDynamicsHistory(p.id);
+    if (!accountIsCurrent()) return;
 
       aiDynamicsHistoryPanel.innerHTML =
         '<h3>История анализов динамики</h3>';
@@ -8526,6 +8780,7 @@ if (aiDynamicsHistoryBtn && aiDynamicsHistoryPanel && aiDynamicsResult) {
 
       aiDynamicsHistoryPanel.style.display = 'block';
     } catch (error) {
+    if (!accountIsCurrent()) return;
       console.error(error);
 
       aiDynamicsHistoryPanel.innerHTML =
@@ -8563,6 +8818,7 @@ if (
 
 if (aiDynamicsBtn) {
   aiDynamicsBtn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     aiDynamicsBtn.disabled = true;
     aiDynamicsBtn.textContent = 'Анализируем…';
 
@@ -8734,6 +8990,7 @@ ${JSON.stringify(dynamicsData, null, 2)}
 `;
 
       const answer = await callAI("dynamics_analysis", p.id);
+    if (!accountIsCurrent()) return;
       const aiDynamicsUpdatedAt = new Date().toISOString();
 
       const { error: saveDynamicsError } = await sb
@@ -8743,6 +9000,7 @@ ${JSON.stringify(dynamicsData, null, 2)}
          ai_dynamics_updated_at: aiDynamicsUpdatedAt
        })
      .eq("id", p.id);
+    if (!accountIsCurrent()) return;
 
     if (saveDynamicsError) {
      throw new Error(
@@ -8760,6 +9018,7 @@ const { error: dynamicsHistoryError } = await sb
     analysis_type: "dynamics",
     created_at: aiDynamicsUpdatedAt
   });
+    if (!accountIsCurrent()) return;
 
 if (dynamicsHistoryError) {
   throw new Error(
@@ -8780,6 +9039,7 @@ if (dynamicsHistoryError) {
     aiDynamicsStatus.textContent = "✓ Анализ динамики готов и сохранён.";
     aiDynamicsBtn.textContent = "Обновить анализ";
     } catch (error) {
+    if (!accountIsCurrent()) return;
       console.error(error);
 
       aiDynamicsStatus.textContent =
@@ -8892,9 +9152,11 @@ const setMediaStatus = (status, message) => {
 };
 
 async function getPatientMediaSignedUrl(storagePath) {
+    if (!accountIsCurrent()) return;
   const { data, error } = await sb.storage
     .from('patient-media')
     .createSignedUrl(storagePath, 3600);
+    if (!accountIsCurrent()) return;
 
   if (error) {
     console.error('Не удалось получить временную ссылку на фотографию:', error);
@@ -8905,9 +9167,11 @@ async function getPatientMediaSignedUrl(storagePath) {
 }
 
 async function getPatientMediaObjectUrl(storagePath) {
+    if (!accountIsCurrent()) return;
   const { data, error } = await sb.storage
     .from('patient-media')
     .download(storagePath);
+    if (!accountIsCurrent()) return;
 
   if (error || !data) {
     console.error('Не удалось загрузить фотографию из приватного хранилища:', error);
@@ -8918,6 +9182,7 @@ async function getPatientMediaObjectUrl(storagePath) {
 }
 
 async function loadPatientMedia() {
+    if (!accountIsCurrent()) return;
   mediaList.innerHTML =
     '<div class="media-list-loading">Загружаю материалы...</div>';
 
@@ -8927,6 +9192,7 @@ async function loadPatientMedia() {
       .select('id, storage_path, media_type, category, note, captured_at, created_at')
       .eq('patient_id', p.id)
       .order('created_at', { ascending: false });
+    if (!accountIsCurrent()) return;
 
     if (error) throw error;
 
@@ -8938,7 +9204,9 @@ async function loadPatientMedia() {
 
 const items = await Promise.all(
   data.map(async item => {
+    if (!accountIsCurrent()) return;
     const safeUrl = await getPatientMediaSignedUrl(item.storage_path);
+    if (!accountIsCurrent()) return;
 
     if (!safeUrl) {
       console.error('Получен недопустимый URL фотографии');
@@ -8951,6 +9219,7 @@ const items = await Promise.all(
     };
   })
 );
+    if (!accountIsCurrent()) return;
 
 const availableItems = items
   .filter(Boolean)
@@ -9097,12 +9366,14 @@ mediaList.querySelectorAll('[data-media-card]').forEach(card => {
   };
 
   image.onerror = async () => {
+    if (!accountIsCurrent()) return;
     const recoveryStep = image.dataset.mediaRecoveryStep || 'refresh';
 
     if (recoveryStep === 'refresh') {
       image.dataset.mediaRecoveryStep = 'blob';
 
       const refreshedUrl = await getPatientMediaSignedUrl(item.storage_path);
+    if (!accountIsCurrent()) return;
 
       if (refreshedUrl) {
         previewButton.dataset.mediaPreview = refreshedUrl;
@@ -9116,6 +9387,7 @@ mediaList.querySelectorAll('[data-media-card]').forEach(card => {
       image.dataset.mediaRecoveryStep = 'finished';
 
       const objectUrl = await getPatientMediaObjectUrl(item.storage_path);
+    if (!accountIsCurrent()) return;
 
       if (objectUrl) {
         previewButton.dataset.mediaPreview = objectUrl;
@@ -9153,6 +9425,7 @@ mediaList.querySelectorAll('[data-media-filter]').forEach(filterBtn => {
 
 mediaList.querySelectorAll('[data-media-preview]').forEach(previewBtn => {
   previewBtn.onclick = () => {
+    if (!accountIsCurrent() || !previewBtn.isConnected) return;
     const previewSource = previewBtn.dataset.mediaPreview;
     const previewUrl =
       previewBtn.dataset.mediaPreviewKind === 'blob' &&
@@ -9194,6 +9467,7 @@ mediaList.querySelectorAll('[data-media-preview]').forEach(previewBtn => {
     const previewImage = overlay.querySelector('img');
 
     previewImage.onerror = async () => {
+    if (!accountIsCurrent()) return;
       if (!mediaItem || previewImage.dataset.mediaRecoveryAttempted) return;
 
       previewImage.dataset.mediaRecoveryAttempted = '1';
@@ -9201,6 +9475,7 @@ mediaList.querySelectorAll('[data-media-preview]').forEach(previewBtn => {
       const objectUrl = await getPatientMediaObjectUrl(
         mediaItem.storage_path
       );
+    if (!accountIsCurrent()) return;
 
       if (!objectUrl) return;
 
@@ -9230,6 +9505,7 @@ mediaList.querySelectorAll('[data-media-preview]').forEach(previewBtn => {
 
       mediaList.querySelectorAll('[data-delete-media]').forEach(btn => {
   btn.onclick = async () => {
+    if (!accountIsCurrent()) return;
     const mediaId = btn.dataset.deleteMedia;
     const item = availableItems.find(x => x.id === mediaId);
 
@@ -9250,6 +9526,7 @@ mediaList.querySelectorAll('[data-media-preview]').forEach(previewBtn => {
         .from('patient_media')
         .delete()
         .eq('id', item.id);
+    if (!accountIsCurrent()) return;
 
       if (deleteRowError) throw deleteRowError;
 
@@ -9257,6 +9534,7 @@ mediaList.querySelectorAll('[data-media-preview]').forEach(previewBtn => {
       const { error: deleteFileError } = await sb.storage
         .from('patient-media')
         .remove([item.storage_path]);
+    if (!accountIsCurrent()) return;
 
       if (deleteFileError) {
         console.error(
@@ -9279,6 +9557,7 @@ if (!mediaList.querySelector('[data-media-card]')) {
 }
 
     } catch (error) {
+    if (!accountIsCurrent()) return;
       console.error(error);
 
       alert('Не удалось удалить фото. Повторите попытку.');
@@ -9290,6 +9569,7 @@ if (!mediaList.querySelector('[data-media-card]')) {
 });
 
   } catch (error) {
+    if (!accountIsCurrent()) return;
     console.error(error);
 
     mediaList.innerHTML =
@@ -9300,6 +9580,7 @@ if (!mediaList.querySelector('[data-media-card]')) {
 loadPatientMedia();
 
 mediaForm.onsubmit = async e => {
+    if (!accountIsCurrent()) return;
   e.preventDefault();
 
   const files = Array.from(mediaFile.files);
@@ -9362,6 +9643,7 @@ mediaForm.onsubmit = async e => {
           upsert: false,
           contentType: file.type
         });
+    if (!accountIsCurrent()) return;
 
       if (uploadError) throw uploadError;
 
@@ -9378,11 +9660,13 @@ mediaForm.onsubmit = async e => {
             ? `${capturedDate}T12:00:00`
             : null
         });
+    if (!accountIsCurrent()) return;
 
       if (mediaError) {
         await sb.storage
           .from('patient-media')
           .remove([storagePath]);
+    if (!accountIsCurrent()) return;
 
         throw mediaError;
       }
@@ -9398,11 +9682,13 @@ mediaForm.onsubmit = async e => {
     mediaForm.reset();
 
     setTimeout(() => {
+      if (!accountIsCurrent()) return;
       state.tab = 'media';
       renderPatient();
     }, 900);
 
   } catch (error) {
+    if (!accountIsCurrent()) return;
     console.error(error);
 
     setMediaStatus(

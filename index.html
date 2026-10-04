@@ -9,10 +9,10 @@
   <title>Fizira</title>
   <link rel="icon" type="image/png" sizes="512x512" href="fizira-symbol.png?v=0.159-navigation" />
   <link rel="apple-touch-icon" href="fizira-symbol.png?v=0.159-navigation" />
-  <link rel="stylesheet" href="styles.css?v=0.169-legal-release" />
+  <link rel="stylesheet" href="styles.css?v=0.172-parent-release" />
   <link rel="stylesheet" href="media-fallback.css?v=0.168-media-fallback" />
 </head>
-<body>
+<body data-specialist-ready="false">
   <div class="shell">
     <aside class="app-sidebar" id="appSidebar" aria-label="Основная навигация">
       <div class="sidebar-brand">
@@ -45,11 +45,12 @@
     <div class="warning">Тестовая версия. Пока используйте только вымышленные данные пациентов.</div>
     <main id="app"><div class="card center">Загрузка…</div></main>
   </div>
-  <script type="module" src="app.js?v=0.169-legal-release"></script>
+  <script type="module" src="app.js?v=0.172-parent-release"></script>
   <script>
     (() => {
       const syncShell = () => {
-        const authenticated = Boolean(document.getElementById('logoutBtn'));
+        const authenticated = document.body.dataset.specialistReady === 'true' && Boolean(document.getElementById('logoutBtn'));
+        document.querySelectorAll('.sidebar-nav-item').forEach(button => { button.disabled = !authenticated; });
         document.body.classList.toggle('is-authenticated', authenticated);
         const section = document.querySelector('.cabinet-page')
           ? 'schedule'
@@ -64,6 +65,7 @@
       document.addEventListener('click', event => {
         const target = event.target.closest?.('#sidePatients, #sideCabinet, #sideProfile');
         if (!target) return;
+        if (document.body.dataset.specialistReady !== 'true') return;
         const route = target.id === 'sideCabinet'
           ? 'schedule'
           : target.id === 'sideProfile'

@@ -1,0 +1,5 @@
+# Local CLI identity only; this file contains no remote project linkage.
+project_id = "fizira-web"
+
+[functions.generate-parent-report-pdf]
+static_files = ["./functions/_shared/fonts/NotoSans-Regular.ttf", "./functions/_shared/fonts/OFL.txt"]

@@ -210,3 +210,24 @@ body:not(.is-authenticated) .header,body:not(.is-authenticated) .warning{display
 @media (max-width:900px){.media-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 @media (max-width:700px){.media-workspace-heading,.media-library-heading{margin-bottom:15px}.media-workspace-heading h3,.media-library-heading h3{font-size:19px}.media-field-grid{grid-template-columns:1fr;gap:0}.media-upload-button{width:100%;min-height:44px}.media-file-picker{padding:13px}.media-gallery-grid{grid-template-columns:1fr;gap:10px}.media-gallery-card{display:grid;grid-template-columns:118px minmax(0,1fr);border-radius:14px}.media-preview-button{height:100%;border-right:1px solid var(--line);border-bottom:0}.media-gallery-image{height:100%;min-height:122px;aspect-ratio:auto}.media-gallery-body{padding:12px}.media-gallery-note{min-height:0}.media-list-loading,.media-empty-state{min-height:100px;padding:16px}.media-preview-overlay{padding:12px}.media-preview-close{top:8px;right:8px;width:36px;height:36px}}
+
+/* Specialist publication authoring; scoped away from the clinical workspace. */
+.parent-specialist-contacts { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+.parent-contact { padding:16px; border:1px solid var(--line, #dde5e9); border-radius:12px; }
+.parent-specialist-actions { display:flex; flex-wrap:wrap; gap:10px; margin:12px 0; }
+.parent-specialist-editor textarea { min-height:90px; width:100%; }
+.parent-specialist-editor textarea[readonly] { background:#f3f6f7; }
+.parent-specialist-editor fieldset { border:1px solid #dde5e9; border-radius:12px; padding:12px; }
+.parent-photo-choice { display:flex; align-items:center; gap:10px; }
+.parent-photo-choice input { width:auto; }
+[data-goal-form] { margin-top:20px; padding-top:16px; border-top:1px solid #dde5e9; }
+@media(max-width:600px) { .parent-specialist-actions .btn { width:100%; } .parent-specialist-contacts { grid-template-columns:1fr; } }
+.parent-photo-choice { flex-wrap:wrap; padding:12px 0; }
+.parent-photo-choice img { width:100%; max-width:260px; max-height:180px; object-fit:contain; border-radius:8px; }
+.parent-photo-choice img[hidden] { display:none; }
+.parent-photo-choice [data-photo-status] { font-size:13px; color:#66727c; }
+.parent-report-versions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 20px; }
+.parent-report-versions [aria-current="true"] { border-color:#36756b; background:#edf6f2; }
+.parent-active-access { margin-top:20px; }
+.parent-active-access .parent-contact { margin-top:10px; }
+@media(max-width:600px) { .parent-report-versions .btn { width:100%; text-align:left; } }

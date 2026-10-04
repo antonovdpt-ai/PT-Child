@@ -1,6 +1,6 @@
 import { rub, dayKey, hourSlot, debt, appointmentPayload, repeatDates, scheduleError } from './schedule-domain.mjs?v=2';
 
-export function openScheduleEditor({ app, sb, user, patients, appointments, row, date, hour, esc, onSaved }) {
+export function openScheduleEditor({ app, sb, user, patients, appointments, row, date, hour, esc, onSaved, isCurrent = () => true }) {
   const dialog = document.createElement('dialog'); dialog.className = 'schedule-dialog';
   let selected = row?.patient_id || '', initial = !!row && !row.patient_id, busy = false, contactVersion = 0, dirty = false;
   const originalPartial = row && row.paid_kopecks > 0 && row.paid_kopecks < row.price_kopecks ? row.paid_kopecks : 0;
@@ -35,18 +35,24 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
   dialog.addEventListener('change', markDirty);
   const showError = error => { dialog.querySelector('[data-error]').textContent = scheduleError(error); };
   async function operation(callback) {
+    if (!isCurrent()) return;
     if (busy) return;
     busy = true; dialog.querySelector('[data-error]').textContent = '';
     const controls = [...form.querySelectorAll('button,input,select,textarea')].filter(c => !c.disabled); controls.forEach(c => c.disabled = true);
-    try { await callback(); dirty = false; delete form.dataset.dirty; dialog.close(); dialog.remove(); await onSaved(); }
-    catch (error) { showError(error); }
+    try { await callback();
+    if (!isCurrent()) return; dirty = false; delete form.dataset.dirty; dialog.close(); dialog.remove(); await onSaved();
+    if (!isCurrent()) return; }
+    catch (error) {
+    if (!isCurrent()) return; showError(error); }
     finally { busy = false; controls.forEach(c => c.disabled = false); }
   }
   async function contacts() {
+    if (!isCurrent()) return;
     const version = ++contactVersion, node = dialog.querySelector('[data-contact]');
     node.textContent = selected ? 'Загружаю контакты…' : 'Контакты можно будет добавить в карточку пациента.';
     if (!selected) return;
     const { data, error } = await sb.from('patient_contacts').select('full_name,relation,phone,is_primary').eq('patient_id', selected).eq('therapist_id', user.id).order('is_primary', { ascending: false });
+    if (!isCurrent()) return;
     if (!dialog.isConnected || version !== contactVersion) return;
     node.innerHTML = error ? 'Не удалось загрузить контакты. Закрой и открой запись, чтобы повторить.' : !data.length ? 'В карточке пока нет контактов родителя.' : data.map(c => {
       const phone = String(c.phone || ''), href = phone.replace(/[^+\d]/g, '');
@@ -85,7 +91,9 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
       if (dirty) return showError(new Error('Сначала сохрани изменения записи, затем открой её для оплаты долга.'));
       const due = previous + row.price_kopecks - row.paid_kopecks;
       if (!window.confirm(`Подтвердить получение ${rub(due)} за занятие и долг?`)) return;
-      operation(async () => { const { error } = await sb.rpc('settle_schedule_patient', { appointment_id: row.id, expected_due: due }); if (error) throw error; });
+      operation(async () => {
+    if (!isCurrent()) return; const { error } = await sb.rpc('settle_schedule_patient', { appointment_id: row.id, expected_due: due });
+    if (!isCurrent()) return; if (error) throw error; });
     };
   }
   function repeats() {
@@ -124,17 +132,22 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
           entries[0].starts_at = row.starts_at; entries[0].ends_at = row.ends_at;
         }
       }
-    } catch (error) { return showError(error); }
+    } catch (error) {
+    if (!isCurrent()) return; return showError(error); }
     // Первая ненулевая стоимость становится тарифом пациента автоматически.
     // Существующий тариф меняется только по явной галочке специалиста.
     const saveTariff = !!selected && (field('save_tariff').checked || !hasTariff()) && entries[0].price_kopecks > 0;
-    operation(async () => { const { error } = await sb.rpc('save_schedule_entries', { entries, save_tariff: saveTariff }); if (error) throw error; });
+    operation(async () => {
+    if (!isCurrent()) return; const { error } = await sb.rpc('save_schedule_entries', { entries, save_tariff: saveTariff });
+    if (!isCurrent()) return; if (error) throw error; });
   };
   const remove = dialog.querySelector('[data-delete]');
   if (remove) remove.onclick = () => {
     if (!window.confirm(`Удалить запись${row.paid_kopecks ? ' вместе с отметкой оплаты' : ''}? Это изменит итоги и долг пациента.`)) return;
     operation(async () => {
+    if (!isCurrent()) return;
       const { data, error } = await sb.from('appointments').delete().eq('id', row.id).eq('therapist_id', user.id).eq('updated_at', row.updated_at).select('id');
+    if (!isCurrent()) return;
       if (error) throw error; if (!data.length) throw new Error('SCHEDULE_STALE');
     });
   };

@@ -1,36 +1,50 @@
 name: Deploy Fizira frontend to Timeweb
-
-# Manual only: app.js and ptchild-ai are a coupled production contract.
-# Deploy them together after the production/source preflight passes.
 on:
   workflow_dispatch:
-
+    inputs:
+      reviewed_base_sha:
+        description: Reviewed main commit with reconciled production ancestry
+        required: true
+      release_evidence:
+        description: JSON evidence for completed separate DB, Edge, isolated synthetic and desktop/mobile gates
+        required: true
 permissions:
   contents: read
-
 concurrency:
   group: fizira-frontend-production
   cancel-in-progress: false
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-
-      - name: Use supported Node.js
-        uses: actions/setup-node@v4
+      - name: Provision and validate reviewed parent cache baseline
+        shell: bash
+        run: bash ops/release/ensure-parent-portal-baseline.sh
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
-      - name: Run frontend regression tests
+      - name: Full regression and five Edge syntax checks
         run: |
           npm ci
           npm test
-
+          node --experimental-strip-types --check supabase/functions/create-parent-invitation/index.ts
+          node --experimental-strip-types --check supabase/functions/resend-parent-invitation/index.ts
+          node --experimental-strip-types --check supabase/functions/revoke-parent-access/index.ts
+          node --experimental-strip-types --check supabase/functions/generate-parent-report-pdf/index.ts
+          node --experimental-strip-types --check supabase/functions/parent-report-file/index.ts
+      - name: Validate concrete release preflight evidence
+        env:
+          RELEASE_EVIDENCE: ${{ inputs.release_evidence }}
+          FIZIRA_BASE_SHA: ${{ inputs.reviewed_base_sha }}
+          FIZIRA_PR_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$FIZIRA_BASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          printf '%s\n' "$RELEASE_EVIDENCE" > release-evidence.json
+          node ops/release/verify-release-evidence.mjs release-evidence.json "$FIZIRA_PR_SHA" "$FIZIRA_BASE_SHA"
       - name: Require production legal recorder before registration deploy
         shell: bash
         run: |
@@ -38,43 +52,17 @@ jobs:
           if grep -Fq "record_legal_acceptances" app.js; then
             publishable_key="$(sed -n 's/^const SUPABASE_PUBLISHABLE_KEY = "\([^"]*\)";.*/\1/p' app.js)"
             test -n "$publishable_key"
-            status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-              --request POST \
-              --header "apikey: $publishable_key" \
-              --header "Authorization: Bearer $publishable_key" \
-              --header 'Content-Type: application/json' \
-              --data '{"p_documents":[{"document_type":"terms","document_version":"schema-check"}],"p_source":"deployment-check"}' \
-              https://auth.fizira.com/rest/v1/rpc/record_legal_acceptances)"
-            case "$status" in
-              400|401|403) ;;
-              *) echo "Legal recorder production gate failed with HTTP $status" >&2; exit 1 ;;
-            esac
+            status="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' --request POST --header "apikey: $publishable_key" --header "Authorization: Bearer $publishable_key" --header 'Content-Type: application/json' --data '{"p_documents":[{"document_type":"terms","document_version":"schema-check"}],"p_source":"deployment-check"}' https://auth.fizira.com/rest/v1/rpc/record_legal_acceptances)"
+            case "$status" in 400|401|403) ;; *) echo "Legal recorder production gate failed with HTTP $status" >&2; exit 1;; esac
           fi
-
-      - name: Package public frontend assets
-        shell: bash
+      - name: Package and hash every frontend dependency
         run: |
           set -euo pipefail
-          assets=(
-            index.html
-            app.js
-            cabinet.js
-            styles.css
-            media-fallback.css
-            auth-domain.mjs
-            schedule-domain.mjs
-            schedule-editor.js
-            security-utils.mjs
-            favicon.ico
-            fizira-symbol.png
-          )
-          for asset in "${assets[@]}"; do
-            test -f "$asset"
-          done
+          mapfile -t assets < ops/release/frontend-assets.txt
+          for asset in "${assets[@]}"; do test -f "$asset"; test ! -L "$asset"; done
+          sha256sum "${assets[@]}" > release-assets.sha256
           tar -czf fizira-frontend.tar.gz "${assets[@]}"
-          grep -Eo 'app\.js\?v=[^"]+' index.html | head -n 1 > expected-app-marker.txt
-          test -s expected-app-marker.txt
-
+          tar -czf release-tools.tar.gz ops/release/activate-frontend.sh ops/release/audit-production-source.sh ops/release/frontend-assets.txt ops/release/edge-assets.txt
       - name: Configure restricted SSH access
         env:
           SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
@@ -86,114 +74,70 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
-
-      - name: Upload and activate public frontend
+      - name: Source preflight before production mutation
+        id: preflight
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+          FIZIRA_BASE_SHA: ${{ inputs.reviewed_base_sha }}
+          FIZIRA_PR_SHA: ${{ github.sha }}
+          INVOCATION: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          remote_cache=".cache/fizira-frontend/$INVOCATION"
+          ssh -p "${PORT:-22}" -o BatchMode=yes "$USER@$HOST" "mkdir -p '$remote_cache'"
+          scp -P "${PORT:-22}" -o BatchMode=yes release-tools.tar.gz "$USER@$HOST:$remote_cache/tools.tar.gz"
+          ssh -p "${PORT:-22}" -o BatchMode=yes "$USER@$HOST" "set -eu; cd '$remote_cache'; tar -xzf tools.tar.gz; FIZIRA_BASE_SHA='$FIZIRA_BASE_SHA' FIZIRA_PR_SHA='$FIZIRA_PR_SHA' FIZIRA_AUDIT_MODE=preactivation FIZIRA_EDGE_REQUIRE_HEAD=1 bash ops/release/audit-production-source.sh > source-preflight.txt; cat source-preflight.txt"
+      - name: Upload and activate reviewed assets
         id: activate
         env:
           HOST: ${{ secrets.TIMEWEB_HOST }}
           PORT: ${{ secrets.TIMEWEB_PORT }}
           USER: ${{ secrets.TIMEWEB_USER }}
-          SHA: ${{ github.sha }}
+          INVOCATION: ${{ github.run_id }}-${{ github.run_attempt }}
+          FIZIRA_BASE_SHA: ${{ inputs.reviewed_base_sha }}
+          FIZIRA_PR_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          remote_cache=".cache/fizira-frontend"
-          ssh \
-            -p "${PORT:-22}" \
-            -i ~/.ssh/id_ed25519 \
-            -o BatchMode=yes \
-            "$USER@$HOST" \
-            "mkdir -p '$remote_cache'"
-          scp \
-            -P "${PORT:-22}" \
-            -i ~/.ssh/id_ed25519 \
-            -o BatchMode=yes \
-            fizira-frontend.tar.gz \
-            "$USER@$HOST:$remote_cache/$SHA.tar.gz"
-          ssh \
-            -p "${PORT:-22}" \
-            -i ~/.ssh/id_ed25519 \
-            -o BatchMode=yes \
-            "$USER@$HOST" \
-            "set -eu
-             target='/root/supabase-project/volumes/proxy/app'
-             release_sha='$SHA'
-             archive=\"\$HOME/$remote_cache/\$release_sha.tar.gz\"
-             backup_root=\"\$HOME/$remote_cache/backups\"
-             backup=\"\$backup_root/frontend-\$release_sha-before.tar.gz\"
-             stage=''
-             cleanup_stage() {
-               if [ -n \"\$stage\" ] && [ -d \"\$stage\" ]; then
-                 rm -rf -- \"\$stage\"
-               fi
-             }
-             trap cleanup_stage EXIT HUP INT TERM
-             stage=\"\$(mktemp -d \"\$target/.fizira-stage.XXXXXX\")\"
-             tar -xzf \"\$archive\" -C \"\$stage\"
-             for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png index.html; do
-               test -f \"\$stage/\$asset\"
-             done
-             mkdir -p \"\$backup_root\"
-             if [ ! -f \"\$backup\" ]; then
-               tar -czf \"\$backup\" -C \"\$target\" \
-                 app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png index.html
-               sha256sum \"\$backup\" > \"\$backup.sha256\"
-             fi
-             for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png; do
-               mv \"\$stage/\$asset\" \"\$target/\$asset\"
-             done
-             mv \"\$stage/index.html\" \"\$target/index.html\"
-             rmdir \"\$stage\"
-             stage=''
-             rm -f \"\$archive\"
-             echo \"backup=\$backup\""
-
-      - name: Verify published version on the public domain
+          remote_cache=".cache/fizira-frontend/$INVOCATION"
+          scp -P "${PORT:-22}" -o BatchMode=yes fizira-frontend.tar.gz release-assets.sha256 release-evidence.json "$USER@$HOST:$remote_cache/"
+          ssh -p "${PORT:-22}" -o BatchMode=yes "$USER@$HOST" "set -eu; cd '$remote_cache'; test -s source-preflight.txt; grep -q SOURCE_AUDIT_OK source-preflight.txt; mkdir stage; tar -xzf fizira-frontend.tar.gz -C stage; (cd stage; sha256sum -c ../release-assets.sha256); FIZIRA_BASE_SHA='$FIZIRA_BASE_SHA' FIZIRA_PR_SHA='$FIZIRA_PR_SHA' FIZIRA_AUDIT_MODE=preactivation FIZIRA_EDGE_REQUIRE_HEAD=1 bash ops/release/audit-production-source.sh; bash ops/release/activate-frontend.sh activate /root/supabase-project/volumes/proxy/app stage backup"
+      - name: Verify exact reviewed head for all live and public assets
         id: verify
         env:
-          SHA: ${{ github.sha }}
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+          INVOCATION: ${{ github.run_id }}-${{ github.run_attempt }}
+          FIZIRA_BASE_SHA: ${{ inputs.reviewed_base_sha }}
+          FIZIRA_PR_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          expected_marker="$(cat expected-app-marker.txt)"
-          curl --fail --silent --show-error --retry 5 --retry-delay 2 \
-            "https://app.fizira.com/?release=$SHA" \
-            -o deployed-index.html
-          grep -F "$expected_marker" deployed-index.html
-
-      - name: Roll back frontend after a failed activation or verification
+          ssh -p "${PORT:-22}" -o BatchMode=yes "$USER@$HOST" "set -eu; cd '.cache/fizira-frontend/$INVOCATION'; FIZIRA_BASE_SHA='$FIZIRA_BASE_SHA' FIZIRA_PR_SHA='$FIZIRA_PR_SHA' FIZIRA_AUDIT_MODE=postactivation bash ops/release/audit-production-source.sh"
+          mkdir public-verify
+          while IFS= read -r asset; do
+            curl --fail --silent --show-error --max-time 20 --retry 3 "https://app.fizira.com/$asset?release=$FIZIRA_PR_SHA" -o "public-verify/$asset"
+          done < ops/release/frontend-assets.txt
+          (cd public-verify; sha256sum -c ../release-assets.sha256)
+      - name: Roll back only this invocation after failed activation or verification
         if: ${{ failure() && (steps.activate.outcome == 'failure' || steps.verify.outcome == 'failure') }}
         env:
           HOST: ${{ secrets.TIMEWEB_HOST }}
           PORT: ${{ secrets.TIMEWEB_PORT }}
           USER: ${{ secrets.TIMEWEB_USER }}
-          SHA: ${{ github.sha }}
+          INVOCATION: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
-          ssh \
-            -p "${PORT:-22}" \
-            -i ~/.ssh/id_ed25519 \
-            -o BatchMode=yes \
-            "$USER@$HOST" \
-            "set -eu
-             target='/root/supabase-project/volumes/proxy/app'
-             release_sha='$SHA'
-             backup=\"\$HOME/.cache/fizira-frontend/backups/frontend-\$release_sha-before.tar.gz\"
-             test -f \"\$backup\" || exit 0
-             rollback=''
-             cleanup_rollback() {
-               if [ -n \"\$rollback\" ] && [ -d \"\$rollback\" ]; then
-                 rm -rf -- \"\$rollback\"
-               fi
-             }
-             trap cleanup_rollback EXIT HUP INT TERM
-             rollback=\"\$(mktemp -d \"\$target/.fizira-rollback.XXXXXX\")\"
-             tar -xzf \"\$backup\" -C \"\$rollback\"
-             for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png index.html; do
-               test -f \"\$rollback/\$asset\"
-             done
-             for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png; do
-               mv \"\$rollback/\$asset\" \"\$target/\$asset\"
-             done
-             mv \"\$rollback/index.html\" \"\$target/index.html\"
-             rmdir \"\$rollback\"
-             rollback=''
-             echo \"rollback=\$backup\""
+          ssh -p "${PORT:-22}" -o BatchMode=yes "$USER@$HOST" "set -eu; cd '.cache/fizira-frontend/$INVOCATION'; if [ -f backup/complete ]; then bash ops/release/activate-frontend.sh rollback /root/supabase-project/volumes/proxy/app stage backup; fi"
+      - name: Retain reviewable preflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            release-evidence.json
+            release-assets.sha256
+# Database migrations and actual Edge rollout remain separate operator gates.
+# Edge parity is audited from ops/release/edge-assets.txt, including helpers,
+# bundled Cyrillic font/license and supabase/config.toml static_files configuration.

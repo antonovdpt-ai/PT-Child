@@ -1,0 +1,1294 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+v22.23.3
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> test
+> TZ=UTC node --test --test-concurrency=2 tests/*.test.mjs supabase/functions/_shared/*.test.mjs ops/security/*.test.mjs ops/release/*.test.mjs ops/schedule/*.test.mjs ops/ai-evaluation/*.test.mjs
+
+TAP version 13
+# Subtest: deletion tombstone survives auth deletion and blocks all user writes
+ok 1 - deletion tombstone survives auth deletion and blocks all user writes
+  ---
+  duration_ms: 1.038439
+  type: 'test'
+  ...
+# Subtest: account deletion requires password verification before tombstone creation
+ok 2 - account deletion requires password verification before tombstone creation
+  ---
+  duration_ms: 0.277452
+  type: 'test'
+  ...
+# Subtest: deletion is retryable and removes storage before and after auth user
+ok 3 - deletion is retryable and removes storage before and after auth user
+  ---
+  duration_ms: 0.254867
+  type: 'test'
+  ...
+# Subtest: parent report uses the Fizira brand
+ok 4 - parent report uses the Fizira brand
+  ---
+  duration_ms: 0.792595
+  type: 'test'
+  ...
+# Subtest: general analysis distinguishes independent and supported function
+ok 5 - general analysis distinguishes independent and supported function
+  ---
+  duration_ms: 0.158495
+  type: 'test'
+  ...
+# Subtest: patient_media storage paths are constrained to the therapist UUID prefix
+ok 6 - patient_media storage paths are constrained to the therapist UUID prefix
+  ---
+  duration_ms: 0.712727
+  type: 'test'
+  ...
+# Subtest: migration aborts before DDL when inconsistent rows already exist
+ok 7 - migration aborts before DDL when inconsistent rows already exist
+  ---
+  duration_ms: 0.184814
+  type: 'test'
+  ...
+# Subtest: every CI test caller provisions and validates the reviewed baseline before regression tests
+ok 8 - every CI test caller provisions and validates the reviewed baseline before regression tests
+  ---
+  duration_ms: 7.582199
+  type: 'test'
+  ...
+# Subtest: fresh local shallow checkout fails without baseline, provisions pinned snapshot, passes current URLs and rejects stale v6
+ok 9 - fresh local shallow checkout fails without baseline, provisions pinned snapshot, passes current URLs and rejects stale v6
+  ---
+  duration_ms: 1089.394612
+  type: 'test'
+  ...
+# fresh depth-1 cache audit: tests1/pass0/fail1, exit1
+# pinned provisioning: current audit tests1/pass1/fail0 exit0; stale-v6 audit tests1/pass0/fail1 exit1
+# Subtest: release packages every portal dependency and checks independent runtime evidence
+ok 10 - release packages every portal dependency and checks independent runtime evidence
+  ---
+  duration_ms: 9.939144
+  type: 'test'
+  ...
+# Subtest: source audit distinguishes reviewed new assets, exact head, and unknown live bytes
+ok 11 - source audit distinguishes reviewed new assets, exact head, and unknown live bytes
+  ---
+  duration_ms: 1100.312545
+  type: 'test'
+  ...
+# Subtest: first activation backups absent files and rollback preserves unknown newer bytes
+ok 12 - first activation backups absent files and rollback preserves unknown newer bytes
+  ---
+  duration_ms: 456.251414
+  type: 'test'
+  ...
+# Subtest: release evidence binds reviewed SHA and completed separate runtime gates
+ok 13 - release evidence binds reviewed SHA and completed separate runtime gates
+  ---
+  duration_ms: 201.056523
+  type: 'test'
+  ...
+# Subtest: runbook documents migrations through012, independent Edge and disposable-target cleanup
+ok 14 - runbook documents migrations through012, independent Edge and disposable-target cleanup
+  ---
+  duration_ms: 1.265145
+  type: 'test'
+  ...
+# Subtest: changed transitive frontend dependencies never reuse baseline cache URLs and entry markers agree
+ok 15 - changed transitive frontend dependencies never reuse baseline cache URLs and entry markers agree
+  ---
+  duration_ms: 100.011513
+  type: 'test'
+  ...
+# SCHEDULE_SCHEMA_STATIC_TEST_OK
+# Subtest: ops/schedule/schedule-schema.test.mjs
+ok 6 - ops/schedule/schedule-schema.test.mjs
+  ---
+  duration_ms: 37.680136
+  type: 'test'
+  ...
+# Subtest: browser dependency is pinned to an exact stable Supabase release
+ok 17 - browser dependency is pinned to an exact stable Supabase release
+  ---
+  duration_ms: 0.679227
+  type: 'test'
+  ...
+# Subtest: signed Storage URLs are validated before HTML rendering
+ok 18 - signed Storage URLs are validated before HTML rendering
+  ---
+  duration_ms: 0.314326
+  type: 'test'
+  ...
+# Subtest: sign-out clears in-memory patient state
+ok 19 - sign-out clears in-memory patient state
+  ---
+  duration_ms: 0.510497
+  type: 'test'
+  ...
+# Subtest: full read-only release verifier rejects projection child-filter removal and private source return with intact grants/attributes
+ok 20 - full read-only release verifier rejects projection child-filter removal and private source return with intact grants/attributes
+  ---
+  duration_ms: 2032.53076
+  type: 'test'
+  ...
+# Subtest: full release verifier detects unknown body drift for every reviewed parent security function
+ok 21 - full release verifier detects unknown body drift for every reviewed parent security function
+  ---
+  duration_ms: 3854.835798
+  type: 'test'
+  ...
+# complete body mutations=35
+# Subtest: full release verifier rejects broad OR in every publication USING and WITH CHECK expression
+ok 22 - full release verifier rejects broad OR in every publication USING and WITH CHECK expression
+  ---
+  duration_ms: 2394.785566
+  type: 'test'
+  ...
+# publication policies=14; expression mutations=24
+# Subtest: full release verifier rejects policy set, roles, command and permissiveness drift
+ok 23 - full release verifier rejects policy set, roles, command and permissiveness drift
+  ---
+  duration_ms: 1640.191299
+  type: 'test'
+  ...
+# Subtest: full release verifier rejects unreviewed function attributes, named owner, extra grants and overloads
+ok 24 - full release verifier rejects unreviewed function attributes, named owner, extra grants and overloads
+  ---
+  duration_ms: 1786.178461
+  type: 'test'
+  ...
+# Subtest: reviewed repo-source reference regenerates deterministically and full schema verifies in READ ONLY without changes
+ok 25 - reviewed repo-source reference regenerates deterministically and full schema verifies in READ ONLY without changes
+  ---
+  duration_ms: 4485.540884
+  type: 'test'
+  ...
+# Subtest: synthetic gate refuses missing confirmation, non-isolated and known production targets before fetch
+ok 26 - synthetic gate refuses missing confirmation, non-isolated and known production targets before fetch
+  ---
+  duration_ms: 32.667515
+  type: 'test'
+  ...
+# Subtest: fixture reserves invitations before Auth insertion and uses exactly parent roles
+ok 27 - fixture reserves invitations before Auth insertion and uses exactly parent roles
+  ---
+  duration_ms: 4.576454
+  type: 'test'
+  ...
+# Subtest: cleanup is bounded, checks failures, retains immutable records and attempts every resource
+ok 28 - cleanup is bounded, checks failures, retains immutable records and attempts every resource
+  ---
+  duration_ms: 1.01908
+  type: 'test'
+  ...
+# Subtest: readonly verifier runs through012 and detects effective source/Storage authorization changes
+ok 29 - readonly verifier runs through012 and detects effective source/Storage authorization changes
+  ---
+  duration_ms: 2309.205877
+  type: 'test'
+  ...
+# Subtest: offline transport exercises reservation→Auth→acceptance, own publication and checked teardown
+ok 30 - offline transport exercises reservation→Auth→acceptance, own publication and checked teardown
+  ---
+  duration_ms: 80.891435
+  type: 'test'
+  ...
+# Subtest: production RLS test is synthetic, explicit and cleans up
+ok 31 - production RLS test is synthetic, explicit and cleans up
+  ---
+  duration_ms: 1.310353
+  type: 'test'
+  ...
+# Subtest: production RLS test covers every current application table
+ok 32 - production RLS test covers every current application table
+  ---
+  duration_ms: 0.417549
+  type: 'test'
+  ...
+# Subtest: production RLS test checks cross-user writes, Storage and anonymous access
+ok 33 - production RLS test checks cross-user writes, Storage and anonymous access
+  ---
+  duration_ms: 0.257322
+  type: 'test'
+  ...
+# Subtest: parent publication migration and verification keep clinical/Storage sources closed
+ok 34 - parent publication migration and verification keep clinical/Storage sources closed
+  ---
+  duration_ms: 8.434303
+  type: 'test'
+  ...
+# Subtest: escapeHtml neutralizes HTML and attribute delimiters
+ok 35 - escapeHtml neutralizes HTML and attribute delimiters
+  ---
+  duration_ms: 1.017749
+  type: 'test'
+  ...
+# Subtest: safeSameOriginHttpsUrl accepts an HTTPS URL from the configured backend
+ok 36 - safeSameOriginHttpsUrl accepts an HTTPS URL from the configured backend
+  ---
+  duration_ms: 0.196982
+  type: 'test'
+  ...
+# Subtest: safeSameOriginHttpsUrl rejects script, insecure and foreign URLs
+ok 37 - safeSameOriginHttpsUrl rejects script, insecure and foreign URLs
+  ---
+  duration_ms: 0.184053
+  type: 'test'
+  ...
+# Subtest: accepts only storage paths for the authenticated user and selected patient
+ok 38 - accepts only storage paths for the authenticated user and selected patient
+  ---
+  duration_ms: 2.237477
+  type: 'test'
+  ...
+# Subtest: rejects duplicate paths
+ok 39 - rejects duplicate paths
+  ---
+  duration_ms: 0.224673
+  type: 'test'
+  ...
+# Subtest: accepts only known AI operations and UUID patient ids
+ok 40 - accepts only known AI operations and UUID patient ids
+  ---
+  duration_ms: 0.481504
+  type: 'test'
+  ...
+# Subtest: encodes bytes without argument overflow
+ok 41 - encodes bytes without argument overflow
+  ---
+  duration_ms: 8.89792
+  type: 'test'
+  ...
+# Subtest: extracts OCR camelCase and snake_case payloads
+ok 42 - extracts OCR camelCase and snake_case payloads
+  ---
+  duration_ms: 0.433342
+  type: 'test'
+  ...
+# Subtest: parses OCR JSONL
+ok 43 - parses OCR JSONL
+  ---
+  duration_ms: 0.376939
+  type: 'test'
+  ...
+# Subtest: extracts Responses API output
+ok 44 - extracts Responses API output
+  ---
+  duration_ms: 0.329679
+  type: 'test'
+  ...
+# Subtest: restricts browser origins
+ok 45 - restricts browser origins
+  ---
+  duration_ms: 0.1817
+  type: 'test'
+  ...
+# Subtest: AI context builders omit database and direct child identifiers
+ok 46 - AI context builders omit database and direct child identifiers
+  ---
+  duration_ms: 2.230637
+  type: 'test'
+  ...
+# Subtest: AI file contract sends private storage paths, not signed URLs
+ok 47 - AI file contract sends private storage paths, not signed URLs
+  ---
+  duration_ms: 0.288528
+  type: 'test'
+  ...
+# Subtest: browser AI requests use structured input and never send a free-form prompt
+ok 48 - browser AI requests use structured input and never send a free-form prompt
+  ---
+  duration_ms: 1.451201
+  type: 'test'
+  ...
+# Subtest: AI Edge Function verifies patient ownership before building context or handling files
+ok 49 - AI Edge Function verifies patient ownership before building context or handling files
+  ---
+  duration_ms: 0.33044
+  type: 'test'
+  ...
+# Subtest: AI Edge Function rejects free-form prompts and builds allowlisted context server-side
+ok 50 - AI Edge Function rejects free-form prompts and builds allowlisted context server-side
+  ---
+  duration_ms: 0.325973
+  type: 'test'
+  ...
+# Subtest: only session drafts accept caller text and direct identifiers are scrubbed
+ok 51 - only session drafts accept caller text and direct identifiers are scrubbed
+  ---
+  duration_ms: 0.199125
+  type: 'test'
+  ...
+# Subtest: AI file transfer is fail-closed unless each file class is explicitly enabled
+ok 52 - AI file transfer is fail-closed unless each file class is explicitly enabled
+  ---
+  duration_ms: 0.198194
+  type: 'test'
+  ...
+# Subtest: global AI kill switch is checked before provider secrets are loaded
+ok 53 - global AI kill switch is checked before provider secrets are loaded
+  ---
+  duration_ms: 0.26356
+  type: 'test'
+  ...
+# Subtest: real PDF embeds Noto Sans and extracts exact Cyrillic snapshot/revision with pagination
+ok 54 - real PDF embeds Noto Sans and extracts exact Cyrillic snapshot/revision with pagination
+  ---
+  duration_ms: 2406.825294
+  type: 'test'
+  ...
+# Subtest: renderer rejects unknown schema and oversized body
+ok 55 - renderer rejects unknown schema and oversized body
+  ---
+  duration_ms: 1.862571
+  type: 'test'
+  ...
+# Subtest: server endpoints bind checked contracts and do not accept authored paths
+ok 56 - server endpoints bind checked contracts and do not accept authored paths
+  ---
+  duration_ms: 2.801732
+  type: 'test'
+  ...
+# Subtest: deployment config ships the bundled font/license without changing JWT verification
+ok 57 - deployment config ships the bundled font/license without changing JWT verification
+  ---
+  duration_ms: 3.031234
+  type: 'test'
+  ...
+# Subtest: helpers normalize, validate and hash without exposing values
+ok 58 - helpers normalize, validate and hash without exposing values
+  ---
+  duration_ms: 34.811761
+  type: 'test'
+  ...
+# Subtest: all wrappers use explicit payload allowlists and the shared handler
+ok 59 - all wrappers use explicit payload allowlists and the shared handler
+  ---
+  duration_ms: 1.126349
+  type: 'test'
+  ...
+# Subtest: malformed bodies, unknown fields and identifiers never create service clients
+ok 60 - malformed bodies, unknown fields and identifiers never create service clients
+  ---
+  duration_ms: 12.252772
+  type: 'test'
+  ...
+# Subtest: authorization rejects missing bearer, invalid identity, parent role and nonowned rows before admin
+ok 61 - authorization rejects missing bearer, invalid identity, parent role and nonowned rows before admin
+  ---
+  duration_ms: 3.765061
+  type: 'test'
+  ...
+# Subtest: new and existing deliveries have identical public success and digest-only RPC
+ok 62 - new and existing deliveries have identical public success and digest-only RPC
+  ---
+  duration_ms: 7.708676
+  type: 'test'
+  ...
+# Subtest: Auth errors, RPC failures and email races are generic and do not leak internals
+ok 63 - Auth errors, RPC failures and email races are generic and do not leak internals
+  ---
+  duration_ms: 5.243012
+  type: 'test'
+  ...
+# Subtest: resend verifies invitation, patient, contact then uses the atomic issue RPC; revoke verifies access/patient first
+ok 64 - resend verifies invitation, patient, contact then uses the atomic issue RPC; revoke verifies access/patient first
+  ---
+  duration_ms: 2.066803
+  type: 'test'
+  ...
+# Subtest: untrusted CORS and methods stop before any clients; all responses no-store
+ok 65 - untrusted CORS and methods stop before any clients; all responses no-store
+  ---
+  duration_ms: 0.635251
+  type: 'test'
+  ...
+# Subtest: paginated Auth lookup does not mistake later existing users for new
+ok 66 - paginated Auth lookup does not mistake later existing users for new
+  ---
+  duration_ms: 2.053123
+  type: 'test'
+  ...
+# Subtest: invalid service responses fail closed before delivery
+ok 67 - invalid service responses fail closed before delivery
+  ---
+  duration_ms: 5.132148
+  type: 'test'
+  ...
+# Subtest: accepted resend stops before service, null-contact access remains revocable, revoke RPC errors are generic
+ok 68 - accepted resend stops before service, null-contact access remains revocable, revoke RPC errors are generic
+  ---
+  duration_ms: 1.118007
+  type: 'test'
+  ...
+# Subtest: publication renders frozen claim, copies selected bytes and publishes after all uploads
+ok 69 - publication renders frozen claim, copies selected bytes and publishes after all uploads
+  ---
+  duration_ms: 61.157342
+  type: 'test'
+  ...
+# Subtest: upload/render failures mark error; ambiguous complete never deletes published/newer claim keys
+ok 70 - upload/render failures mark error; ambiguous complete never deletes published/newer claim keys
+  ---
+  duration_ms: 5.082855
+  type: 'test'
+  ...
+# Subtest: parent handoff checks visibility/selection before service, verifies bytes, then signs 300s
+ok 71 - parent handoff checks visibility/selection before service, verifies bytes, then signs 300s
+  ---
+  duration_ms: 5.585169
+  type: 'test'
+  ...
+# Subtest: strict browser contracts reject paths/body/kind/oversize and parent generate
+ok 72 - strict browser contracts reject paths/body/kind/oversize and parent generate
+  ---
+  duration_ms: 2.67883
+  type: 'test'
+  ...
+# Subtest: network response cap cancels oversized downloads before Blob allocation
+ok 73 - network response cap cancels oversized downloads before Blob allocation
+  ---
+  duration_ms: 0.979582
+  type: 'test'
+  ...
+# Subtest: unchanged DB claim A with changed HTTP ETag/bytes B fails before any upload/publication
+ok 74 - unchanged DB claim A with changed HTTP ETag/bytes B fails before any upload/publication
+  ---
+  duration_ms: 1.943931
+  type: 'test'
+  ...
+# Subtest: token refresh and repeated sign-in keep the current unsaved screen
+ok 75 - token refresh and repeated sign-in keep the current unsaved screen
+  ---
+  duration_ms: 0.654129
+  type: 'test'
+  ...
+# Subtest: initial session and real account changes render the auth screen
+ok 76 - initial session and real account changes render the auth screen
+  ---
+  duration_ms: 0.117955
+  type: 'test'
+  ...
+# Subtest: calendar supports patient search, parent contacts, debt and profile navigation
+ok 77 - calendar supports patient search, parent contacts, debt and profile navigation
+  ---
+  duration_ms: 213.709175
+  type: 'test'
+  ...
+# Subtest: pending real calendar reads stop before auto-completion and cannot restore retired account UI
+ok 78 - pending real calendar reads stop before auto-completion and cannot restore retired account UI
+  ---
+  duration_ms: 24.04743
+  type: 'test'
+  ...
+# Subtest: schedule editor preserves same-account inputs and finishes save; changed account cancels the awaited continuation
+ok 79 - schedule editor preserves same-account inputs and finishes save; changed account cancels the awaited continuation
+  ---
+  duration_ms: 60.301345
+  type: 'test'
+  ...
+# Subtest: registration requires two separate unchecked legal confirmations
+ok 80 - registration requires two separate unchecked legal confirmations
+  ---
+  duration_ms: 1.040853
+  type: 'test'
+  ...
+# Subtest: release document hashes in the client match published files
+ok 81 - release document hashes in the client match published files
+  ---
+  duration_ms: 4.677854
+  type: 'test'
+  ...
+# Subtest: public legal pages contain final operator contacts and no placeholders
+ok 82 - public legal pages contain final operator contacts and no placeholders
+  ---
+  duration_ms: 0.371491
+  type: 'test'
+  ...
+# Subtest: public routes, footer links and responsive legal layouts are committed
+ok 83 - public routes, footer links and responsive legal layouts are committed
+  ---
+  duration_ms: 0.185224
+  type: 'test'
+  ...
+# Subtest: acceptances are recorded per document by an authenticated server function
+ok 84 - acceptances are recorded per document by an authenticated server function
+  ---
+  duration_ms: 0.192756
+  type: 'test'
+  ...
+# Subtest: legal acceptance migration preserves legacy history and records server-timed documents
+ok 85 - legal acceptance migration preserves legacy history and records server-timed documents
+  ---
+  duration_ms: 1793.226412
+  type: 'test'
+  ...
+# Subtest: formats valid dates in Russian and safely labels missing or invalid dates
+ok 86 - formats valid dates in Russian and safely labels missing or invalid dates
+  ---
+  duration_ms: 14.480665
+  type: 'test'
+  ...
+# Subtest: formats age in months, Russian year forms, and clamps future dates
+ok 87 - formats age in months, Russian year forms, and clamps future dates
+  ---
+  duration_ms: 0.484558
+  type: 'test'
+  ...
+# Subtest: maps all publication states to parent-safe Russian labels
+ok 88 - maps all publication states to parent-safe Russian labels
+  ---
+  duration_ms: 1.322701
+  type: 'test'
+  ...
+# Subtest: groups finite numeric GMFM/HINE values and categorical scale values without inference
+ok 89 - groups finite numeric GMFM/HINE values and categorical scale values without inference
+  ---
+  duration_ms: 1.074032
+  type: 'test'
+  ...
+# Subtest: returns fresh allowlisted file request bodies
+ok 90 - returns fresh allowlisted file request bodies
+  ---
+  duration_ms: 0.483547
+  type: 'test'
+  ...
+# Subtest: rejects file request paths, patient IDs, URLs, invalid UUIDs, and unknown keys
+ok 91 - rejects file request paths, patient IDs, URLs, invalid UUIDs, and unknown keys
+  ---
+  duration_ms: 0.507653
+  type: 'test'
+  ...
+# Subtest: exports the exact parent navigation items
+ok 92 - exports the exact parent navigation items
+  ---
+  duration_ms: 0.740708
+  type: 'test'
+  ...
+# Subtest: parent identity SQL enforces invitation, role, consent and clinical boundaries
+    # Subtest: only initial users become specialists; retry cannot promote later parents
+    ok 1 - only initial users become specialists; retry cannot promote later parents
+      ---
+      duration_ms: 28.795227
+      type: 'test'
+      ...
+    # Subtest: legacy contacts/consents survive and contact email is normalized/validated
+    ok 2 - legacy contacts/consents survive and contact email is normalized/validated
+      ---
+      duration_ms: 18.605689
+      type: 'test'
+      ...
+    # Subtest: service issue validates ownership/digest/flow and stores no raw token with exactly seven days expiry
+    ok 3 - service issue validates ownership/digest/flow and stores no raw token with exactly seven days expiry
+      ---
+      duration_ms: 32.278396
+      type: 'test'
+      ...
+    # Subtest: resend retains but revokes prior invitation, with no identity in state
+    ok 4 - resend retains but revokes prior invitation, with no identity in state
+      ---
+      duration_ms: 20.214894
+      type: 'test'
+      ...
+    # Subtest: legal choices are exact and rejection leaves invitation/roles/links/consents unchanged
+    ok 5 - legal choices are exact and rejection leaves invitation/roles/links/consents unchanged
+      ---
+      duration_ms: 32.895331
+      type: 'test'
+      ...
+    # Subtest: acceptance atomically grants parent/access and authoritative current legal metadata/time
+    ok 6 - acceptance atomically grants parent/access and authoritative current legal metadata/time
+      ---
+      duration_ms: 30.173857
+      type: 'test'
+      ...
+    # Subtest: owner mismatch and duplicate active relations are rejected at the table boundary
+    ok 7 - owner mismatch and duplicate active relations are rejected at the table boundary
+      ---
+      duration_ms: 4.813064
+      type: 'test'
+      ...
+    # Subtest: RLS and grants deny browser mutations/anon RPCs without touching clinical policies
+    ok 8 - RLS and grants deny browser mutations/anon RPCs without touching clinical policies
+      ---
+      duration_ms: 64.263497
+      type: 'test'
+      ...
+    # Subtest: revocation is owner-only, retains history, invalidates pending invites and prevents access
+    ok 9 - revocation is owner-only, retains history, invalidates pending invites and prevents access
+      ---
+      duration_ms: 17.363548
+      type: 'test'
+      ...
+    # Subtest: second same-version acceptance preserves all original consent evidence in an immutable audit
+    ok 10 - second same-version acceptance preserves all original consent evidence in an immutable audit
+      ---
+      duration_ms: 58.694107
+      type: 'test'
+      ...
+    # Subtest: regrant retains revoked link history and uses newly active legal records across retries
+    ok 11 - regrant retains revoked link history and uses newly active legal records across retries
+      ---
+      duration_ms: 46.021878
+      type: 'test'
+      ...
+    # Subtest: expired, changed-email and transferred-child invitations cannot grant access
+    ok 12 - expired, changed-email and transferred-child invitations cannot grant access
+      ---
+      duration_ms: 18.605399
+      type: 'test'
+      ...
+    # Subtest: deployment verification executes and rejects accidental direct role grants
+    ok 13 - deployment verification executes and rejects accidental direct role grants
+      ---
+      duration_ms: 62.386916
+      type: 'test'
+      ...
+    1..13
+ok 93 - parent identity SQL enforces invitation, role, consent and clinical boundaries
+  ---
+  duration_ms: 2257.819849
+  type: 'test'
+  ...
+# Subtest: publication SQL executes with immutable snapshots, safe projections and real-role isolation
+    # Subtest: legacy drafts, grants, security-definer search paths and unchanged specialist sources
+    ok 1 - legacy drafts, grants, security-definer search paths and unchanged specialist sources
+      ---
+      duration_ms: 38.442355
+      type: 'test'
+      ...
+    # Subtest: selected images validate child, therapist, image type and source session ownership
+    ok 2 - selected images validate child, therapist, image type and source session ownership
+      ---
+      duration_ms: 9.046099
+      type: 'test'
+      ...
+    # Subtest: fixed allowlists and IDOR generic results, immutable published snapshot/PDF/media
+    ok 3 - fixed allowlists and IDOR generic results, immutable published snapshot/PDF/media
+      ---
+      duration_ms: 40.248312
+      type: 'test'
+      ...
+    # Subtest: published media reference and private file metadata do not follow mutable clinical source media
+    ok 4 - published media reference and private file metadata do not follow mutable clinical source media
+      ---
+      duration_ms: 8.261767
+      type: 'test'
+      ...
+    # Subtest: schedule only insert/time/status events reach active parents; finances never notify
+    ok 5 - schedule only insert/time/status events reach active parents; finances never notify
+      ---
+      duration_ms: 29.078795
+      type: 'test'
+      ...
+    # Subtest: dashboard/goals/dynamics project only safe fields and all endpoints fail closed
+    ok 6 - dashboard/goals/dynamics project only safe fields and all endpoints fail closed
+      ---
+      duration_ms: 48.05862
+      type: 'test'
+      ...
+    # Subtest: initial published snapshot and migration retry preserve existing publications
+    ok 7 - initial published snapshot and migration retry preserve existing publications
+      ---
+      duration_ms: 27.094163
+      type: 'test'
+      ...
+    # Subtest: publishing/errors stay invisible; archival cannot permit snapshot mutation or republishing
+    ok 8 - publishing/errors stay invisible; archival cannot permit snapshot mutation or republishing
+      ---
+      duration_ms: 27.102966
+      type: 'test'
+      ...
+    # Subtest: verification accepts the actual specialist Storage baseline including restrictive account policy
+    ok 9 - verification accepts the actual specialist Storage baseline including restrictive account policy
+      ---
+      duration_ms: 35.242372
+      type: 'test'
+      ...
+    # Subtest: approved Storage policy names cannot hide unsafe roles, commands or predicates
+    ok 10 - approved Storage policy names cannot hide unsafe roles, commands or predicates
+      ---
+      duration_ms: 129.271524
+      type: 'test'
+      ...
+    # Subtest: read-only verification executes and fails closed on source widening and missing guards
+    ok 11 - read-only verification executes and fails closed on source widening and missing guards
+      ---
+      duration_ms: 79.269595
+      type: 'test'
+      ...
+    # Subtest: all list projections and mark-read input are bounded; inactive ownership fails closed
+    ok 12 - all list projections and mark-read input are bounded; inactive ownership fails closed
+      ---
+      duration_ms: 107.810883
+      type: 'test'
+      ...
+    # Subtest: publication protection does not block child lifecycle cascades
+    ok 13 - publication protection does not block child lifecycle cascades
+      ---
+      duration_ms: 11.02651
+      type: 'test'
+      ...
+    1..13
+ok 94 - publication SQL executes with immutable snapshots, safe projections and real-role isolation
+  ---
+  duration_ms: 2229.058508
+  type: 'test'
+  ...
+# Subtest: 012 own active specialist withdrawal preserves immutable artifacts and parent invisibility
+    # Subtest: parent_reports RLS denies parent/foreign/inactive and mutable archival
+    ok 1 - parent_reports RLS denies parent/foreign/inactive and mutable archival
+      ---
+      duration_ms: 20.971948
+      type: 'test'
+      ...
+    # Subtest: parent_reports own archive succeeds once and remains invisible/immutable
+    ok 2 - parent_reports own archive succeeds once and remains invisible/immutable
+      ---
+      duration_ms: 22.557347
+      type: 'test'
+      ...
+    # Subtest: parent_session_reports RLS denies parent/foreign/inactive and mutable archival
+    ok 3 - parent_session_reports RLS denies parent/foreign/inactive and mutable archival
+      ---
+      duration_ms: 23.521026
+      type: 'test'
+      ...
+    # Subtest: parent_session_reports own archive succeeds once and remains invisible/immutable
+    ok 4 - parent_session_reports own archive succeeds once and remains invisible/immutable
+      ---
+      duration_ms: 22.120601
+      type: 'test'
+      ...
+    # Subtest: 012 replay and full verifier retain exact guard and detect weakened body
+    ok 5 - 012 replay and full verifier retain exact guard and detect weakened body
+      ---
+      duration_ms: 108.797165
+      type: 'test'
+      ...
+    1..5
+ok 95 - 012 own active specialist withdrawal preserves immutable artifacts and parent invisibility
+  ---
+  duration_ms: 2023.845377
+  type: 'test'
+  ...
+# Subtest: 010 claim/CAS, Storage freezes and artifact handoff execute with real database roles
+    # Subtest: snapshot/source object version captured before work; only one live claimant
+    ok 1 - snapshot/source object version captured before work; only one live claimant
+      ---
+      duration_ms: 11.246461
+      type: 'test'
+      ...
+    # Subtest: publishing authors/selections and captured source Storage objects freeze
+    ok 2 - publishing authors/selections and captured source Storage objects freeze
+      ---
+      duration_ms: 9.362138
+      type: 'test'
+      ...
+    # Subtest: source metadata late mutation rejects completion and error stays parent-invisible
+    ok 3 - source metadata late mutation rejects completion and error stays parent-invisible
+      ---
+      duration_ms: 14.931474
+      type: 'test'
+      ...
+    # Subtest: stale worker cannot complete/fail newer claim; new revision gets independent artifacts
+    ok 4 - stale worker cannot complete/fail newer claim; new revision gets independent artifacts
+      ---
+      duration_ms: 8.920624
+      type: 'test'
+      ...
+    # Subtest: permanent artifact namespace disallows owner insert/update/delete but permits original uploads
+    ok 5 - permanent artifact namespace disallows owner insert/update/delete but permits original uploads
+      ---
+      duration_ms: 8.292933
+      type: 'test'
+      ...
+    # Subtest: complete stores artifacts once, notification once, retries idempotent
+    ok 6 - complete stores artifacts once, notification once, retries idempotent
+      ---
+      duration_ms: 9.202952
+      type: 'test'
+      ...
+    # Subtest: handoff verifies active parent/published/explicit selection and ignores current media
+    ok 7 - handoff verifies active parent/published/explicit selection and ignores current media
+      ---
+      duration_ms: 16.84465
+      type: 'test'
+      ...
+    # Subtest: 010 verifier accepts exact added restrictive policies and rejects tampering; migration reapply safe
+    ok 8 - 010 verifier accepts exact added restrictive policies and rejects tampering; migration reapply safe
+      ---
+      duration_ms: 162.201998
+      type: 'test'
+      ...
+    1..8
+ok 96 - 010 claim/CAS, Storage freezes and artifact handoff execute with real database roles
+  ---
+  duration_ms: 2010.552301
+  type: 'test'
+  ...
+# Subtest: 011 authoritative roles deny own-source and Storage, provision trusted signups, and notify published goals
+    # Subtest: parent own-prefix clinical insert and direct private Storage are denied while specialist/dual retain owner isolation
+    ok 1 - parent own-prefix clinical insert and direct private Storage are denied while specialist/dual retain owner isolation
+      ---
+      duration_ms: 47.532089
+      type: 'test'
+      ...
+    # Subtest: ordinary email signup gets specialist; reservations/invited/anonymous/nonemail and metadata claims fail closed with no replay promotion
+    ok 2 - ordinary email signup gets specialist; reservations/invited/anonymous/nonemail and metadata claims fail closed with no replay promotion
+      ---
+      duration_ms: 34.714699
+      type: 'test'
+      ...
+    # Subtest: actual post011 reservation then Auth creation and invitation acceptance creates exactly parent, never specialist
+    ok 3 - actual post011 reservation then Auth creation and invitation acceptance creates exactly parent, never specialist
+      ---
+      duration_ms: 23.275412
+      type: 'test'
+      ...
+    # Subtest: goal publication/material changes notify only eligible parents with safe copy and no private or timestamp-only events
+    ok 4 - goal publication/material changes notify only eligible parents with safe copy and no private or timestamp-only events
+      ---
+      duration_ms: 22.887998
+      type: 'test'
+      ...
+    # Subtest: latest verifier rejects pre011, passes post011/replay and catches unsafe policies, provisioning and goal triggers
+    ok 5 - latest verifier rejects pre011, passes post011/replay and catches unsafe policies, provisioning and goal triggers
+      ---
+      duration_ms: 394.798226
+      type: 'test'
+      ...
+    1..5
+ok 97 - 011 authoritative roles deny own-source and Storage, provision trusted signups, and notify published goals
+  ---
+  duration_ms: 2319.446974
+  type: 'test'
+  ...
+# Subtest: specialist UI executes migrated schema and retained-access/version/lease contracts
+    # Subtest: every portal query compiles against actual schema even with empty access and reports
+    ok 1 - every portal query compiles against actual schema even with empty access and reports
+      ---
+      duration_ms: 38.300094
+      type: 'test'
+      ...
+    # Subtest: actual deleted contact retains active access, visible confirmed revoke, and stale revoke cannot refresh
+    ok 2 - actual deleted contact retains active access, visible confirmed revoke, and stale revoke cannot refresh
+      ---
+      duration_ms: 66.637169
+      type: 'test'
+      ...
+    # Subtest: older published session version remains selectable and explicitly archived while new draft survives
+    ok 3 - older published session version remains selectable and explicitly archived while new draft survives
+      ---
+      duration_ms: 130.965145
+      type: 'test'
+      ...
+    # Subtest: live lease recovery is server-refused; expired recovery publishes without any author or media write
+    ok 4 - live lease recovery is server-refused; expired recovery publishes without any author or media write
+      ---
+      duration_ms: 45.520407
+      type: 'test'
+      ...
+    # Subtest: initial-report tab also recovers an expired lease with the exact initial ID/kind
+    ok 5 - initial-report tab also recovers an expired lease with the exact initial ID/kind
+      ---
+      duration_ms: 36.933438
+      type: 'test'
+      ...
+    1..5
+ok 98 - specialist UI executes migrated schema and retained-access/version/lease contracts
+  ---
+  duration_ms: 2102.270544
+  type: 'test'
+  ...
+# Subtest: contact lifecycle states use IDs only, confirmation and no sensitive markup
+ok 99 - contact lifecycle states use IDs only, confirmation and no sensitive markup
+  ---
+  duration_ms: 49.315312
+  type: 'test'
+  ...
+# Subtest: legacy nullable email remains editable and invalid email cannot invite
+ok 100 - legacy nullable email remains editable and invalid email cannot invite
+  ---
+  duration_ms: 10.288631
+  type: 'test'
+  ...
+# Subtest: session editor writes four safe fields and explicitly selected owned photo IDs only
+ok 101 - session editor writes four safe fields and explicitly selected owned photo IDs only
+  ---
+  duration_ms: 9.56596
+  type: 'test'
+  ...
+# Subtest: publication confirms, uses exact server contract, error permits retry
+ok 102 - publication confirms, uses exact server contract, error permits retry
+  ---
+  duration_ms: 8.578787
+  type: 'test'
+  ...
+# Subtest: published reports are immutable; new version copies allowlisted content without metadata
+ok 103 - published reports are immutable; new version copies allowlisted content without metadata
+  ---
+  duration_ms: 13.939413
+  type: 'test'
+  ...
+# Subtest: stale handlers and async continuations cannot write, refresh or restore old child DOM
+ok 104 - stale handlers and async continuations cannot write, refresh or restore old child DOM
+  ---
+  duration_ms: 8.48713
+  type: 'test'
+  ...
+# Subtest: stale reads cannot render portal and detached editor cannot execute actions
+ok 105 - stale reads cannot render portal and detached editor cannot execute actions
+  ---
+  duration_ms: 5.879616
+  type: 'test'
+  ...
+# Subtest: goal editor requires explicit parent wording and allowlisted status
+ok 106 - goal editor requires explicit parent wording and allowlisted status
+  ---
+  duration_ms: 10.545592
+  type: 'test'
+  ...
+# Subtest: root integrates portal tab, nullable contact email, guarded refresh and versioned module
+ok 107 - root integrates portal tab, nullable contact email, guarded refresh and versioned module
+  ---
+  duration_ms: 2.451424
+  type: 'test'
+  ...
+# Subtest: successful publication retires editing and refreshes parent visibility
+ok 108 - successful publication retires editing and refreshes parent visibility
+  ---
+  duration_ms: 8.181267
+  type: 'test'
+  ...
+# Subtest: retry re-reads authoritative publication_error before updating draft, then publishes
+ok 109 - retry re-reads authoritative publication_error before updating draft, then publishes
+  ---
+  duration_ms: 13.020601
+  type: 'test'
+  ...
+# Subtest: pending read on reused root cannot replace new child; same view preserves typed fields
+ok 110 - pending read on reused root cannot replace new child; same view preserves typed fields
+  ---
+  duration_ms: 6.386577
+  type: 'test'
+  ...
+# Subtest: initial report authoring opens actual saved draft and publishes only checked safe fields
+ok 111 - initial report authoring opens actual saved draft and publishes only checked safe fields
+  ---
+  duration_ms: 8.489404
+  type: 'test'
+  ...
+# Subtest: real root portal callback checks captured child and mounted view around injected refresh
+ok 112 - real root portal callback checks captured child and mounted view around injected refresh
+  ---
+  duration_ms: 5.294428
+  type: 'test'
+  ...
+# Subtest: real patient loader does not install stale child response after selection changes
+ok 113 - real patient loader does not install stale child response after selection changes
+  ---
+  duration_ms: 1.490249
+  type: 'test'
+  ...
+# Subtest: stale selected-media deletion continuation cannot insert selections or publish
+ok 114 - stale selected-media deletion continuation cannot insert selections or publish
+  ---
+  duration_ms: 5.710896
+  type: 'test'
+  ...
+# Subtest: actual overview save stays a draft, refreshes local history, and refuses published edit
+ok 115 - actual overview save stays a draft, refreshes local history, and refuses published edit
+  ---
+  duration_ms: 3.932409
+  type: 'test'
+  ...
+# Subtest: actual session-tab handler supplies identity only and stops on retired child
+ok 116 - actual session-tab handler supplies identity only and stops on retired child
+  ---
+  duration_ms: 2.781233
+  type: 'test'
+  ...
+# Subtest: session editor load failure displays an actionable message
+ok 117 - session editor load failure displays an actionable message
+  ---
+  duration_ms: 1.245066
+  type: 'test'
+  ...
+# Subtest: photo selection shows an owned source preview and date with trusted signed URL only
+ok 118 - photo selection shows an owned source preview and date with trusted signed URL only
+  ---
+  duration_ms: 10.136666
+  type: 'test'
+  ...
+# Subtest: untrusted or stale source signing cannot attach an image and cannot reveal artifact paths
+ok 119 - untrusted or stale source signing cannot attach an image and cannot reveal artifact paths
+  ---
+  duration_ms: 5.28862
+  type: 'test'
+  ...
+# Subtest: an already selected photo must load before save or publication can proceed
+ok 120 - an already selected photo must load before save or publication can proceed
+  ---
+  duration_ms: 4.274476
+  type: 'test'
+  ...
+# Subtest: mobile entry has no referrer and dashboard uses only narrow RPCs
+ok 121 - mobile entry has no referrer and dashboard uses only narrow RPCs
+  ---
+  duration_ms: 24.824247
+  type: 'test'
+  ...
+# Subtest: new invitation requires matching password, name and three exact legal checks; update precedes acceptance
+ok 122 - new invitation requires matching password, name and three exact legal checks; update precedes acceptance
+  ---
+  duration_ms: 31.346526
+  type: 'test'
+  ...
+# Subtest: existing account accepts with blank password
+ok 123 - existing account accepts with blank password
+  ---
+  duration_ms: 14.968709
+  type: 'test'
+  ...
+# Subtest: invalid invitation never loads child/source data or provider errors
+ok 124 - invalid invitation never loads child/source data or provider errors
+  ---
+  duration_ms: 2.989522
+  type: 'test'
+  ...
+# Subtest: child switching discards stale requests
+ok 125 - child switching discards stale requests
+  ---
+  duration_ms: 20.430135
+  type: 'test'
+  ...
+# Subtest: empty children and retry errors are plain and safe
+ok 126 - empty children and retry errors are plain and safe
+  ---
+  duration_ms: 7.113405
+  type: 'test'
+  ...
+# Subtest: sections use actual RPC parameters, both schedule modes and safe dynamics
+ok 127 - sections use actual RPC parameters, both schedule modes and safe dynamics
+  ---
+  duration_ms: 50.436545
+  type: 'test'
+  ...
+# Subtest: unread notifications mark on explicit action
+ok 128 - unread notifications mark on explicit action
+  ---
+  duration_ms: 15.800151
+  type: 'test'
+  ...
+# Subtest: report escapes fields and validates photo and PDF endpoint URLs
+ok 129 - report escapes fields and validates photo and PDF endpoint URLs
+  ---
+  duration_ms: 18.06596
+  type: 'test'
+  ...
+# Subtest: profile and password updates, focus preservation and logout cancel child work
+ok 130 - profile and password updates, focus preservation and logout cancel child work
+  ---
+  duration_ms: 50.02259
+  type: 'test'
+  ...
+# Subtest: returning parent login and password recovery screens are usable
+ok 131 - returning parent login and password recovery screens are usable
+  ---
+  duration_ms: 13.15455
+  type: 'test'
+  ...
+# Subtest: actual specialist role gate redirects parent, supports dual role, and fails closed
+ok 132 - actual specialist role gate redirects parent, supports dual role, and fails closed
+  ---
+  duration_ms: 0.688561
+  type: 'test'
+  ...
+# Subtest: specialist bootstrap gate precedes consent/profile/patients and shell visibility respects it
+ok 133 - specialist bootstrap gate precedes consent/profile/patients and shell visibility respects it
+  ---
+  duration_ms: 1.284974
+  type: 'test'
+  ...
+# Subtest: executes real specialist bootstrap with parent-only, dual, empty and failed roles
+ok 134 - executes real specialist bootstrap with parent-only, dual, empty and failed roles
+  ---
+  duration_ms: 6.487387
+  type: 'test'
+  ...
+# Subtest: account switch cancels old child data and rechecks new account roles
+ok 135 - account switch cancels old child data and rechecks new account roles
+  ---
+  duration_ms: 25.565828
+  type: 'test'
+  ...
+# Subtest: invitation rejects unchecked legal and missing name, and update failure never accepts
+ok 136 - invitation rejects unchecked legal and missing name, and update failure never accepts
+  ---
+  duration_ms: 35.817318
+  type: 'test'
+  ...
+# Subtest: PDF download and photos use validated file responses and stale file never reappears
+ok 137 - PDF download and photos use validated file responses and stale file never reappears
+  ---
+  duration_ms: 39.100149
+  type: 'test'
+  ...
+# Subtest: unknown section cannot dispatch an unrestricted RPC
+ok 138 - unknown section cannot dispatch an unrestricted RPC
+  ---
+  duration_ms: 3.564544
+  type: 'test'
+  ...
+# Subtest: notification marking refreshes authoritative notification state
+ok 139 - notification marking refreshes authoritative notification state
+  ---
+  duration_ms: 13.926824
+  type: 'test'
+  ...
+# Subtest: parent layout overrides specialist auth flex and width at mobile and desktop
+ok 140 - parent layout overrides specialist auth flex and width at mobile and desktop
+  ---
+  duration_ms: 51.550186
+  type: 'test'
+  ...
+# Subtest: invitation flows come from actual migration008 enum
+ok 141 - invitation flows come from actual migration008 enum
+  ---
+  duration_ms: 37.596762
+  type: 'test'
+  ...
+# Subtest: appointment rows use Moscow date and clock across UTC midnight without changing DOB or assessment semantics
+ok 142 - appointment rows use Moscow date and clock across UTC midnight without changing DOB or assessment semantics
+  ---
+  duration_ms: 6.482509
+  type: 'test'
+  ...
+# Subtest: real root account switch synchronously retires old specialist action DOM before delayed roles
+ok 143 - real root account switch synchronously retires old specialist action DOM before delayed roles
+  ---
+  duration_ms: 15.052814
+  type: 'test'
+  ...
+# Subtest: root same-account token refresh and repeated sign-in preserve specialist unsaved form
+ok 144 - root same-account token refresh and repeated sign-in preserve specialist unsaved form
+  ---
+  duration_ms: 4.396036
+  type: 'test'
+  ...
+# Subtest: pending real patient list renderer stops after identity switch before another data call or DOM restoration
+ok 145 - pending real patient list renderer stops after identity switch before another data call or DOM restoration
+  ---
+  duration_ms: 3.635489
+  type: 'test'
+  ...
+# Subtest: signout synchronously retires specialist DOM and detached form action
+ok 146 - signout synchronously retires specialist DOM and detached form action
+  ---
+  duration_ms: 17.163263
+  type: 'test'
+  ...
+# Subtest: actual appointment and publication goal statuses render human labels
+ok 147 - actual appointment and publication goal statuses render human labels
+  ---
+  duration_ms: 9.802281
+  type: 'test'
+  ...
+# Subtest: mobile navigation stays at bottom with content clearance; desktop remains top; parent CSS leaves specialist layout unchanged
+ok 148 - mobile navigation stays at bottom with content clearance; desktop remains top; parent CSS leaves specialist layout unchanged
+  ---
+  duration_ms: 118.661326
+  type: 'test'
+  ...
+# Subtest: real stale patient data loader cannot populate changed-account state; patient renderer fails closed while roles pending
+ok 149 - real stale patient data loader cannot populate changed-account state; patient renderer fails closed while roles pending
+  ---
+  duration_ms: 3.721166
+  type: 'test'
+  ...
+# Subtest: same-account repeated password recovery keeps the existing password form
+ok 150 - same-account repeated password recovery keeps the existing password form
+  ---
+  duration_ms: 12.684483
+  type: 'test'
+  ...
+# Subtest: actual pending profile logo upload cannot upsert old fields or profile state after account switch
+ok 151 - actual pending profile logo upload cannot upsert old fields or profile state after account switch
+  ---
+  duration_ms: 16.209188
+  type: 'test'
+  ...
+# Subtest: real pending delete password dialog is cancelled on switch and cannot delete new account
+ok 152 - real pending delete password dialog is cancelled on switch and cannot delete new account
+  ---
+  duration_ms: 6.916392
+  type: 'test'
+  ...
+# Subtest: actual specialist photo preview overlay is retired synchronously on switch and signout
+ok 153 - actual specialist photo preview overlay is retired synchronously on switch and signout
+  ---
+  duration_ms: 9.743062
+  type: 'test'
+  ...
+# Subtest: unavailable patient media replaces the broken image with a clear status
+ok 154 - unavailable patient media replaces the broken image with a clear status
+  ---
+  duration_ms: 0.940364
+  type: 'test'
+  ...
+# Subtest: unavailable patient media has a dedicated visible state
+ok 155 - unavailable patient media has a dedicated visible state
+  ---
+  duration_ms: 0.18894
+  type: 'test'
+  ...
+# Subtest: day and period calculations stay in local calendar time
+ok 156 - day and period calculations stay in local calendar time
+  ---
+  duration_ms: 0.901306
+  type: 'test'
+  ...
+# Subtest: earnings exclude planned, cancelled and no-show visits
+ok 157 - earnings exclude planned, cancelled and no-show visits
+  ---
+  duration_ms: 0.646298
+  type: 'test'
+  ...
+# Subtest: debt is only unpaid balance of completed visits
+ok 158 - debt is only unpaid balance of completed visits
+  ---
+  duration_ms: 0.153808
+  type: 'test'
+  ...
+# Subtest: recurrence preserves chosen hour and creates selected weekdays only
+ok 159 - recurrence preserves chosen hour and creates selected weekdays only
+  ---
+  duration_ms: 0.846365
+  type: 'test'
+  ...
+# Subtest: payload rounds to the hour, omits end-time input and preserves partial payment
+ok 160 - payload rounds to the hour, omits end-time input and preserves partial payment
+  ---
+  duration_ms: 0.853655
+  type: 'test'
+  ...
+# Subtest: database errors are converted to actionable messages
+ok 161 - database errors are converted to actionable messages
+  ---
+  duration_ms: 0.242209
+  type: 'test'
+  ...
+# Subtest: migration executes and schedule writes are isolated, atomic and debt-safe
+ok 162 - migration executes and schedule writes are isolated, atomic and debt-safe
+  ---
+  duration_ms: 1598.628408
+  type: 'test'
+  ...
+1..162
+# tests 211
+# suites 0
+# pass 211
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 23208.588001

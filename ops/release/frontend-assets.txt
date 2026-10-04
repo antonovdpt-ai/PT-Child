@@ -1,0 +1,17 @@
+app.js
+cabinet.js
+styles.css
+media-fallback.css
+auth-domain.mjs
+schedule-domain.mjs
+schedule-editor.js
+security-utils.mjs
+role-gate.mjs
+parent.html
+parent.js
+parent.css
+parent-domain.mjs
+parent-specialist.js
+favicon.ico
+fizira-symbol.png
+index.html
