@@ -1,3 +1,4 @@
+import { notoSansRegularBytes } from "./font-data.ts";
 // No external assets: the font is bundled with the deployed function.
 const initial = [['complaint','Жалоба'],['strengths','Сильные стороны'],['observations','Наблюдения'],['goals','Цели'],['progress','Прогресс'],['recommendations','Рекомендации']];
 const session = [['what_did','Что делали'],['what_worked','Что получилось'],['attention','На что обратить внимание'],['home_recommendations','Рекомендации для дома']];
@@ -7,7 +8,7 @@ export async function renderParentPublicationPdf(snapshot: Record<string, any>):
   const { PDFDocument, rgb } = await (deno ? import('npm:pdf-lib@1.17.1') : import('pdf-lib'));
   const fontkit = await (deno ? import('npm:@pdf-lib/fontkit@1.1.1') : import('@pdf-lib/fontkit'));
   const url = new URL('./fonts/NotoSans-Regular.ttf', import.meta.url);
-  const fontBytes = deno ? await deno.readFile(url) : await (await import('node:fs/promises')).readFile(url);
+  const fontBytes = deno ? notoSansRegularBytes() : await (await import('node:fs/promises')).readFile(url);
   const document = await PDFDocument.create(); document.registerFontkit(fontkit.default);
   const font = await document.embedFont(fontBytes, { subset: true });
   document.setTitle('Отчёт для родителей'); document.setSubject(`Revision ${snapshot.revision}`);
