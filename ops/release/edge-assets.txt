@@ -8,6 +8,7 @@ functions/parent-report-file/index.ts
 functions/_shared/parent-portal.ts
 functions/_shared/parent-publication.ts
 functions/_shared/parent-pdf.ts
+functions/_shared/font-data.ts
 functions/_shared/fonts/NotoSans-Regular.ttf
 functions/_shared/fonts/OFL.txt
 config.toml
