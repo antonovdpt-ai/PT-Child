@@ -10,7 +10,7 @@ export async function renderParentPublicationPdf(snapshot: Record<string, any>):
   const url = new URL('./fonts/NotoSans-Regular.ttf', import.meta.url);
   const fontBytes = deno ? notoSansRegularBytes() : await (await import('node:fs/promises')).readFile(url);
   const document = await PDFDocument.create(); document.registerFontkit(fontkit.default);
-  const font = await document.embedFont(fontBytes, { subset: true });
+  const font = await document.embedFont(fontBytes, { subset: false });
   document.setTitle('Отчёт для родителей'); document.setSubject(`Revision ${snapshot.revision}`);
   let page: any; let y = 0; let pages = 0;
   const addPage = () => { if (++pages > 100) throw new Error('PDF page limit'); page = document.addPage([595.28,841.89]); y = 790; };
