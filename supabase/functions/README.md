@@ -197,8 +197,13 @@ parent visibility and selected IDs. A **service-only** private resolver repeats
 active parent role/link, specialist account and published/selected checks, then
 returns the frozen artifact path/digest internally. The function downloads the
 artifact, verifies SHA-256 (and image/PDF signature), rechecks access, and returns
-only `{url, expires_at}`. URLs must use the configured Supabase HTTPS origin and
-Storage signing path, expire after 300 seconds, and all responses are no-store.
+only `{url, expires_at}`. In self-hosted deployments, `SUPABASE_URL` may be the
+private SDK origin (for example an internal HTTP gateway), while
+`SUPABASE_PUBLIC_URL` must be the root public HTTPS origin exposed to browsers.
+The function accepts a signed URL only when it comes from the exact private SDK
+origin and expected Storage signing path, then rewrites only that validated
+path/query onto the configured public HTTPS origin. URLs expire after 300 seconds
+and all responses are no-store.
 There is no authenticated/private-path resolver grant and no parent Storage RLS
 policy. Revocation stops new URLs; already-issued URLs expire within five minutes.
 
