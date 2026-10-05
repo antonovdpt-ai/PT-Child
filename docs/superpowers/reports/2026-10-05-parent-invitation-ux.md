@@ -79,6 +79,8 @@ The file handoff was corrected without weakening authorization or integrity chec
 
 **Actual revoke enforcement now passes at the parent UI boundary.** The specialist revoked the exact fictional access for `antonovdpt+fizira-e2e-20261005@gmail.com`. Afterward, the authenticated mobile parent no longer saw the child portal and instead received `Приглашение недоступно` with instructions to request a new invitation. This demonstrates that the previously active parent session no longer retained child access after revocation. It does not by itself prove every underlying actor-level RLS denial or expiry of any already-issued 300-second signed file URL.
 
+**Specialist continuity after revoke now passes.** Returning to the same fictional child in the specialist portal shows `Доступ отозван` for `Анна Тестовая`, no orphan active access entries, and the specialist-side primary-report section remains available. The UI again offers `Отправить приглашение`, which is consistent with a revoked relationship rather than deletion of the contact or patient. This closes the specialist-continuity UI gate.
+
 ## Read-only backend diagnostic blocker
 
 A narrowly scoped workflow, `.github/workflows/verify-parent-runtime.yml`, was added to the existing release branch. It uses the existing SSH secrets, makes no production writes/restarts, never prints credentials or signed URLs, and attempts to inspect only the existing Functions/DB service pair. Its database query is wrapped in `BEGIN READ ONLY` and targets only the exact fictional test parent and child. The query would check persisted roles/access/invitation/file-resolver booleans; it is not a substitute for authenticated actor-level RLS tests.
@@ -93,6 +95,6 @@ Further backend diagnosis/deployment requires authorized administrator access to
 
 The full authenticated parent E2E is **not complete**, but actual parent PDF delivery now passes. The accepted test parent has verified schedule, goals, report text and real mobile PDF download.
 
-Remaining gates: authenticated actor-level cross-UUID denial and parent-safe projections, plus specialist continuity after revoke. Persisted production inspection already confirmed exactly one parent role, active child access, accepted invitation and a resolvable PDF before revoke. Real mobile delivery covers both PDF and an explicitly selected published photo, and the active parent session is denied after revoke. Re-check any existing fictional records before adding fixtures to avoid duplicates.
+Remaining gate: authenticated actor-level cross-UUID denial and direct parent-safe projection checks. Persisted production inspection already confirmed exactly one parent role, active child access, accepted invitation and a resolvable PDF before revoke. Real mobile delivery covers both PDF and an explicitly selected published photo; the active parent session is denied after revoke; specialist continuity after revoke also passes. Re-check any existing fictional records before adding fixtures to avoid duplicates.
 
 Automated responsive results use the actual renderer/styles/module with synthetic data. They do not establish a signed-in real-production mobile viewport result; that remains outstanding. Do not merge main or claim full production E2E success while these gates remain open.
