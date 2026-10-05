@@ -77,6 +77,8 @@ The file handoff was corrected without weakening authorization or integrity chec
 
 **Actual protected parent photo delivery now passes.** The authenticated mobile parent opened the published session report dated 2026-10-05 on `app.fizira.com`; the four fictional report sections were visible and the explicitly selected test image rendered in the report. This establishes the real parent photo handoff path for a published report. It does not yet establish post-revoke denial or cross-UUID actor isolation.
 
+**Actual revoke enforcement now passes at the parent UI boundary.** The specialist revoked the exact fictional access for `antonovdpt+fizira-e2e-20261005@gmail.com`. Afterward, the authenticated mobile parent no longer saw the child portal and instead received `Приглашение недоступно` with instructions to request a new invitation. This demonstrates that the previously active parent session no longer retained child access after revocation. It does not by itself prove every underlying actor-level RLS denial or expiry of any already-issued 300-second signed file URL.
+
 ## Read-only backend diagnostic blocker
 
 A narrowly scoped workflow, `.github/workflows/verify-parent-runtime.yml`, was added to the existing release branch. It uses the existing SSH secrets, makes no production writes/restarts, never prints credentials or signed URLs, and attempts to inspect only the existing Functions/DB service pair. Its database query is wrapped in `BEGIN READ ONLY` and targets only the exact fictional test parent and child. The query would check persisted roles/access/invitation/file-resolver booleans; it is not a substitute for authenticated actor-level RLS tests.
@@ -91,6 +93,6 @@ Further backend diagnosis/deployment requires authorized administrator access to
 
 The full authenticated parent E2E is **not complete**, but actual parent PDF delivery now passes. The accepted test parent has verified schedule, goals, report text and real mobile PDF download.
 
-Remaining gates: authenticated actor-level cross-UUID denial and parent-safe projections, access denial after revoke and specialist continuity. Persisted production inspection already confirmed exactly one parent role, active child access, accepted invitation and a resolvable PDF. Real mobile delivery now covers both PDF and an explicitly selected published photo. Re-check any existing fictional records before adding fixtures to avoid duplicates.
+Remaining gates: authenticated actor-level cross-UUID denial and parent-safe projections, plus specialist continuity after revoke. Persisted production inspection already confirmed exactly one parent role, active child access, accepted invitation and a resolvable PDF before revoke. Real mobile delivery covers both PDF and an explicitly selected published photo, and the active parent session is denied after revoke. Re-check any existing fictional records before adding fixtures to avoid duplicates.
 
 Automated responsive results use the actual renderer/styles/module with synthetic data. They do not establish a signed-in real-production mobile viewport result; that remains outstanding. Do not merge main or claim full production E2E success while these gates remain open.
