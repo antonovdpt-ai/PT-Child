@@ -1,2 +1,2 @@
-28793a929e0d0ff077a3dbccc0fada307e115753
-follow-up: authoritative patient owner projection, app/index/parent HTML only
+17eba82de395e6185a1d2dc2db2dcab4e3d176af
+Retain confirmed send feedback after authoritative remount; update app/module and entry cache markers only.

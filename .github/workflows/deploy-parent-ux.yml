@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      RELEASE_SHA: 28793a929e0d0ff077a3dbccc0fada307e115753
+      RELEASE_SHA: 17eba82de395e6185a1d2dc2db2dcab4e3d176af
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,6 +77,7 @@ jobs:
             curl --fail --silent --show-error --max-time 25 --retry 2 "https://app.fizira.com/$file?release=$RELEASE_SHA" -o "public-verify/$file"
           done < ops/release/parent-ux-release.sha256
           (cd public-verify; sha256sum -c ../ops/release/parent-ux-release.sha256) | tee public-verification.log
+          bash ops/release/test-public-production.sh | tee public-smoke.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -84,6 +85,7 @@ jobs:
           path: |
             activation.log
             public-verification.log
+            public-smoke.log
             ops/release/parent-ux-baseline.sha256
             ops/release/parent-ux-release.sha256
 # Uses existing server and secrets. No migrations, Edge rollout, main merge or rollback.
