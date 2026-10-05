@@ -4,7 +4,7 @@
 
 Base: `7566dc412e4918b1ea3f65831e3c9f024545b65a`, release branch `codex/task1-8-saved-20261004`.
 All 17 files in `ops/release/frontend-assets.txt` were downloaded from production and exactly matched that base. Production entry remained `0.172-parent-release`.
-No old main checkout was used. No migrations, servers, staging, Edge functions or existing rollback files were changed. Authenticated production checks later created only the fictional test records described below; no existing records were removed.
+No old main checkout was used. No migrations, servers, staging, Edge functions or existing rollback files were changed. Authenticated production checks later created only the fictional test records described below; no existing records were removed. The later runtime diagnostic workflow is read-only and has not reached Docker or the database because the existing deployment account lacks the required privileges.
 
 ## Causes and correction
 
@@ -55,12 +55,40 @@ Final local aggregate: **232/232 PASS**. Chromium: **6/6 PASS**, widths 375/390/
 
 The signed-in specialist created only child `ТЕСТ Fizira E2E 20261005` (DOB2020-01-15, no medical content), representative `Анна Тестовая` / `Мать`, and test email alias `antonovdpt+fizira-e2e-20261005@gmail.com`. Missing email was rejected with no contact insert. The saved contact appeared with the correct name/relationship/email and an ID-based invitation button. Sending created a pending row with expiry, saved invitation email and a resend action. The connected Gmail API confirmed the exact invitation email from Fizira at2026-10-05T00:38:57Z; it was classified as SPAM. No authentication link/token is included in evidence. Later, the signed-in Gmail browser did not show that email when searched by exact alias or sender/subject; API delivery evidence and browser retrieval are not treated as equivalent. Opening the actual invitation link remains unverified.
 
-A fictional goal was explicitly published through the specialist UI. A fictional initial report containing Cyrillic was explicitly published; the UI showed published state after the PDF Edge operation completed. Parent-side opening/downloading is still unverified. A fictional schedule appointment and session save were submitted; their final parent-visible result must still be checked. No real patient was used for test mutations. A synthetic image was prepared locally but has not yet been uploaded or published.
+A fictional goal was explicitly published through the specialist UI. A fictional initial report containing Cyrillic was explicitly published; the UI showed published state after the PDF Edge operation completed. A fictional schedule appointment and session save were submitted. The appointment is now verified in the parent interface; a session-specific parent result has not been established. No real patient was used for test mutations. A synthetic image was prepared locally but has not yet been uploaded or published.
+
+## Actual parent acceptance and PDF failure
+
+On 2026-10-05 the user completed the invitation/signup/login steps manually. The authenticated production parent interface then showed profile name `Родитель тест` and exactly one child option, `ТЕСТ Fizira E2E 20261005`. This confirms the resulting parent-visible access; it does not independently establish each mail-link redirect or the database role assignment.
+
+Actual production UI checks passed:
+
+- Dashboard and Schedule both show the fictional appointment on 2026-10-06, 12:00–13:00, planned.
+- Goals shows `ТЕСТ: вымышленная опубликованная цель`, its fictional description and status `Новая`.
+- The published initial report opens with the four expected fictional parent-safe text sections, including Cyrillic. No actual medical data was used.
+- Dynamics displays the safe empty state `Оценок пока нет`.
+- The parent portal exposes no specialist navigation. This is UI evidence, not a persisted exactly-parent-role or actor-level RLS test.
+
+**Actual parent PDF download failed.** Clicking `Скачать PDF` produced `PDF недоступен. Попробуйте ещё раз.` No download, file or new PDF tab appeared; a separately armed download wait also timed out. Earlier generator smoke and the specialist's published-report state do not establish successful parent file delivery. The full E2E must therefore remain failed/incomplete.
+
+Source inspection found a plausible self-hosted incompatibility in `_shared/parent-publication.ts`: the SDK uses `SUPABASE_URL`, while the signed-file response requires HTTPS and exactly that URL's origin. If the runtime uses an internal HTTP service origin, this check cannot succeed. **The production runtime value and precise failure stage remain unconfirmed.** No HTTPS check was relaxed, no global URL was changed, and no backend fix was deployed on this hypothesis.
+
+The independent reviewer agreed this is a credible hypothesis and advised preserving the existing visibility, service-only file resolver, private download, digest/header checks, repeat authorization and strict public HTTPS URL validation. Any eventual internal-to-public URL mapping needs explicit trusted-origin checks and regression tests before rollout.
+
+## Read-only backend diagnostic blocker
+
+A narrowly scoped workflow, `.github/workflows/verify-parent-runtime.yml`, was added to the existing release branch. It uses the existing SSH secrets, makes no production writes/restarts, never prints credentials or signed URLs, and attempts to inspect only the existing Functions/DB service pair. Its database query is wrapped in `BEGIN READ ONLY` and targets only the exact fictional test parent and child. The query would check persisted roles/access/invitation/file-resolver booleans; it is not a substitute for authenticated actor-level RLS tests.
+
+- Commit `c66949b9cee23ac590b3a48eaaca87549b2f9ddb`, Actions run `37264347185`: Docker socket access denied to the existing deployment account. No runtime configuration or SQL was read.
+- Commit `589a8808d703230cd99a3e3728a843e661ace720`, run `37264569892`: existing noninteractive `sudo -n` requires a password. Again, no runtime configuration or SQL was read. This revision also requires the Functions/DB containers to belong to the same nonempty Compose project.
+- Workflow YAML/static Python parsing and `git diff --check` passed. The independent reviewer found no blockers in the read-only diagnostic design. These checks are not a successful runtime diagnostic.
+
+Further backend diagnosis/deployment requires authorized administrator access to the **existing** server. No access rights, Docker group membership, credentials, runtime configuration or production data were changed to bypass this blocker. Frontend production remains `0.175-parent-feedback`, source `17eba82`, deployment run `37262563653` successful; these diagnostic commits do not deploy frontend or backend changes.
 
 ## Outstanding production gates
 
-The full authenticated parent E2E is **not complete**. The cloud browser currently shows the signed-out specialist/parent login. Accepting the test invitation requires the user to open the email, create a new password and personally accept the three legal documents. Browser authentication guidance requires manual handoff for signup/new credentials; credentials must never be requested in chat.
+The full authenticated parent E2E is **not complete** and actual parent PDF delivery currently fails. The cloud browser contains the accepted test parent's authenticated portal. Acceptance no longer blocks progress; administrator access to the existing backend server now blocks investigation of the PDF failure. Credentials must never be requested in chat.
 
-After acceptance, verify exactly-parent role, authorized-child projections and cross-UUID denial, parent-safe data, schedule/goals/reports, actual parent PDF and protected synthetic photographs, access denial after revoke and specialist continuity. Re-check persisted session/appointment creation before adding another fixture, to avoid duplicates.
+Remaining gates: persisted exactly-parent role, authenticated actor-level cross-UUID denial and parent-safe projections, successful actual parent PDF download, protected synthetic photographs, access denial after revoke and specialist continuity. Schedule/goals/report text have passed real parent UI checks. Re-check any existing fictional records before adding fixtures to avoid duplicates.
 
 Automated responsive results use the actual renderer/styles/module with synthetic data. They do not establish a signed-in real-production mobile viewport result; that remains outstanding. Do not merge main or claim full production E2E success while these gates remain open.
