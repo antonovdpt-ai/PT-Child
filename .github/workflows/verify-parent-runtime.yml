@@ -1,0 +1,53 @@
+name: Read-only parent production runtime diagnostic
+on:
+  push:
+    branches: [codex/task1-8-saved-20261004]
+    paths: [.github/workflows/verify-parent-runtime.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/codex/task1-8-saved-20261004'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect existing runtime without changing data or configuration
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY"; test -n "$KNOWN_HOSTS"; test -n "$HOST"; test -n "$USER"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh -p "${PORT:-22}" -o BatchMode=yes "$USER@$HOST" python3 - <<'PY'
+          import json, subprocess, urllib.parse
+          inspected=json.loads(subprocess.check_output(['docker','inspect','supabase-edge-functions'],timeout=20))[0]
+          env=dict(item.split('=',1) for item in inspected['Config']['Env'] if '=' in item)
+          url=urllib.parse.urlsplit(env.get('SUPABASE_URL',''))
+          print('EDGE_SDK_ORIGIN',json.dumps({'scheme':url.scheme,'host':url.hostname,'port':url.port}))
+          print('EDGE_PUBLIC_ORIGIN_CONFIGURED',bool(env.get('SUPABASE_PUBLIC_URL')))
+          sql="""begin read only;
+          set local statement_timeout='15s';
+          select json_build_object(
+           'parents',count(*),
+           'roles',coalesce((select json_agg(role order by role) from public.app_user_roles where user_id in(select id from auth.users where email='antonovdpt+fizira-e2e-20261005@gmail.com')),'[]'::json),
+           'active_access',exists(select 1 from public.parent_child_access a join public.patients p on p.id=a.patient_id where a.parent_user_id=u.id and p.display_name='ТЕСТ Fizira E2E 20261005' and a.status='active'),
+           'accepted_invitation',exists(select 1 from public.parent_invitations i join public.patients p on p.id=i.patient_id where i.accepted_by=u.id and p.display_name='ТЕСТ Fizira E2E 20261005' and i.accepted_at is not null),
+           'pdf_resolvable',exists(select 1 from public.parent_reports r join public.patients p on p.id=r.patient_id where p.display_name='ТЕСТ Fizira E2E 20261005' and r.publication_status='published' and public.resolve_parent_publication_file(u.id,r.id,'pdf',null) is not null)
+          ) from auth.users u where email='antonovdpt+fizira-e2e-20261005@gmail.com' group by u.id;
+          rollback;"""
+          result=subprocess.check_output(['docker','exec','-i','supabase-db','psql','-U','postgres','-d','postgres','-X','-q','-t','-A','-v','ON_ERROR_STOP=1'],input=sql.encode(),timeout=30).decode().strip()
+          data=json.loads(result)
+          print('SYNTHETIC_PARENT_STATE',json.dumps(data,sort_keys=True))
+          if data['parents']!=1 or data['roles']!=['parent'] or not data['active_access'] or not data['accepted_invitation'] or not data['pdf_resolvable']:
+              raise SystemExit('Synthetic parent prerequisite failed')
+          print('PARENT_RUNTIME_READONLY_OK')
+          PY
