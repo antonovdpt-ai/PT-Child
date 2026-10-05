@@ -69,11 +69,11 @@ Actual production UI checks passed:
 - Dynamics displays the safe empty state `Оценок пока нет`.
 - The parent portal exposes no specialist navigation. This is UI evidence, not a persisted exactly-parent-role or actor-level RLS test.
 
-**Actual parent PDF download failed.** Clicking `Скачать PDF` produced `PDF недоступен. Попробуйте ещё раз.` No download, file or new PDF tab appeared; a separately armed download wait also timed out. Earlier generator smoke and the specialist's published-report state do not establish successful parent file delivery. The full E2E must therefore remain failed/incomplete.
+The first actual parent PDF download attempt failed with `PDF недоступен. Попробуйте ещё раз.`. Read-only production inspection then confirmed the self-hosted split: `SUPABASE_URL` is the internal SDK origin `http://api-gw:8000`, while `SUPABASE_PUBLIC_URL` is the browser-facing `https://auth.fizira.com`. The synthetic parent state simultaneously confirmed exactly one parent role, active child access, accepted invitation and a resolvable published PDF.
 
-Source inspection found a plausible self-hosted incompatibility in `_shared/parent-publication.ts`: the SDK uses `SUPABASE_URL`, while the signed-file response requires HTTPS and exactly that URL's origin. If the runtime uses an internal HTTP service origin, this check cannot succeed. **The production runtime value and precise failure stage remain unconfirmed.** No HTTPS check was relaxed, no global URL was changed, and no backend fix was deployed on this hypothesis.
+The file handoff was corrected without weakening authorization or integrity checks: the signed URL must still originate from the exact internal SDK origin and expected Storage signing path; only its already-validated path/query are remapped to the configured root public HTTPS origin. Regression coverage includes the internal-HTTP/public-HTTPS self-hosted case and rejects insecure/non-root public origins. Production installed the single shared handler file with a fresh backup and restart; preflight returned 200 and an unauthenticated request returned 401.
 
-The independent reviewer agreed this is a credible hypothesis and advised preserving the existing visibility, service-only file resolver, private download, digest/header checks, repeat authorization and strict public HTTPS URL validation. Any eventual internal-to-public URL mapping needs explicit trusted-origin checks and regression tests before rollout.
+**Actual parent PDF delivery now passes.** On 2026-10-05 the authenticated parent opened the published Cyrillic initial-report PDF from `auth.fizira.com` on a real mobile browser. The browser showed the expected fictional report content and offered the downloaded file `1.pdf` (424 KB). This closes the real parent PDF gate; it does not yet close protected-photo, revoke or actor-level cross-UUID gates.
 
 ## Read-only backend diagnostic blocker
 
@@ -87,8 +87,8 @@ Further backend diagnosis/deployment requires authorized administrator access to
 
 ## Outstanding production gates
 
-The full authenticated parent E2E is **not complete** and actual parent PDF delivery currently fails. The cloud browser contains the accepted test parent's authenticated portal. Acceptance no longer blocks progress; administrator access to the existing backend server now blocks investigation of the PDF failure. Credentials must never be requested in chat.
+The full authenticated parent E2E is **not complete**, but actual parent PDF delivery now passes. The accepted test parent has verified schedule, goals, report text and real mobile PDF download.
 
-Remaining gates: persisted exactly-parent role, authenticated actor-level cross-UUID denial and parent-safe projections, successful actual parent PDF download, protected synthetic photographs, access denial after revoke and specialist continuity. Schedule/goals/report text have passed real parent UI checks. Re-check any existing fictional records before adding fixtures to avoid duplicates.
+Remaining gates: authenticated actor-level cross-UUID denial and parent-safe projections, protected synthetic photographs, access denial after revoke and specialist continuity. Persisted production inspection already confirmed exactly one parent role, active child access, accepted invitation and a resolvable PDF. Re-check any existing fictional records before adding fixtures to avoid duplicates.
 
 Automated responsive results use the actual renderer/styles/module with synthetic data. They do not establish a signed-in real-production mobile viewport result; that remains outstanding. Do not merge main or claim full production E2E success while these gates remain open.
