@@ -55,9 +55,9 @@ Final local aggregate: **232/232 PASS**. Chromium: **6/6 PASS**, widths 375/390/
 
 The signed-in specialist created only child `ТЕСТ Fizira E2E 20261005` (DOB2020-01-15, no medical content), representative `Анна Тестовая` / `Мать`, and test email alias `antonovdpt+fizira-e2e-20261005@gmail.com`. Missing email was rejected with no contact insert. The saved contact appeared with the correct name/relationship/email and an ID-based invitation button. Sending created a pending row with expiry, saved invitation email and a resend action. The connected Gmail API confirmed the exact invitation email from Fizira at2026-10-05T00:38:57Z; it was classified as SPAM. No authentication link/token is included in evidence. Later, the signed-in Gmail browser did not show that email when searched by exact alias or sender/subject; API delivery evidence and browser retrieval are not treated as equivalent. Opening the actual invitation link remains unverified.
 
-A fictional goal was explicitly published through the specialist UI. A fictional initial report containing Cyrillic was explicitly published; the UI showed published state after the PDF Edge operation completed. A fictional schedule appointment and session save were submitted. The appointment is now verified in the parent interface; a session-specific parent result has not been established. No real patient was used for test mutations. A synthetic image was prepared locally but has not yet been uploaded or published.
+A fictional goal was explicitly published through the specialist UI. A fictional initial report containing Cyrillic was explicitly published; the UI showed published state after the PDF Edge operation completed. A fictional schedule appointment and session report were submitted. The appointment and the session-specific parent report are now verified in the parent interface. No real patient was used for test mutations. A test image was uploaded to the fictional patient, explicitly selected for the session report and published.
 
-## Actual parent acceptance and PDF failure
+## Actual parent acceptance and file delivery
 
 On 2026-10-05 the user completed the invitation/signup/login steps manually. The authenticated production parent interface then showed profile name `Родитель тест` and exactly one child option, `ТЕСТ Fizira E2E 20261005`. This confirms the resulting parent-visible access; it does not independently establish each mail-link redirect or the database role assignment.
 
@@ -75,6 +75,8 @@ The file handoff was corrected without weakening authorization or integrity chec
 
 **Actual parent PDF delivery now passes.** On 2026-10-05 the authenticated parent opened the published Cyrillic initial-report PDF from `auth.fizira.com` on a real mobile browser. The browser showed the expected fictional report content and offered the downloaded file `1.pdf` (424 KB). This closes the real parent PDF gate; it does not yet close protected-photo, revoke or actor-level cross-UUID gates.
 
+**Actual protected parent photo delivery now passes.** The authenticated mobile parent opened the published session report dated 2026-10-05 on `app.fizira.com`; the four fictional report sections were visible and the explicitly selected test image rendered in the report. This establishes the real parent photo handoff path for a published report. It does not yet establish post-revoke denial or cross-UUID actor isolation.
+
 ## Read-only backend diagnostic blocker
 
 A narrowly scoped workflow, `.github/workflows/verify-parent-runtime.yml`, was added to the existing release branch. It uses the existing SSH secrets, makes no production writes/restarts, never prints credentials or signed URLs, and attempts to inspect only the existing Functions/DB service pair. Its database query is wrapped in `BEGIN READ ONLY` and targets only the exact fictional test parent and child. The query would check persisted roles/access/invitation/file-resolver booleans; it is not a substitute for authenticated actor-level RLS tests.
@@ -89,6 +91,6 @@ Further backend diagnosis/deployment requires authorized administrator access to
 
 The full authenticated parent E2E is **not complete**, but actual parent PDF delivery now passes. The accepted test parent has verified schedule, goals, report text and real mobile PDF download.
 
-Remaining gates: authenticated actor-level cross-UUID denial and parent-safe projections, protected synthetic photographs, access denial after revoke and specialist continuity. Persisted production inspection already confirmed exactly one parent role, active child access, accepted invitation and a resolvable PDF. Re-check any existing fictional records before adding fixtures to avoid duplicates.
+Remaining gates: authenticated actor-level cross-UUID denial and parent-safe projections, access denial after revoke and specialist continuity. Persisted production inspection already confirmed exactly one parent role, active child access, accepted invitation and a resolvable PDF. Real mobile delivery now covers both PDF and an explicitly selected published photo. Re-check any existing fictional records before adding fixtures to avoid duplicates.
 
 Automated responsive results use the actual renderer/styles/module with synthetic data. They do not establish a signed-in real-production mobile viewport result; that remains outstanding. Do not merge main or claim full production E2E success while these gates remain open.
