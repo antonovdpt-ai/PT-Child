@@ -25,10 +25,16 @@ jobs:
           cache: npm
       - name: Provision and validate reviewed parent cache baseline
         run: bash ops/release/ensure-parent-portal-baseline.sh
+      - name: Install PDF verification tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+          command -v pdftotext
+          command -v pdfinfo
       - name: Verify pinned release and regression gates
         run: |
           set -euo pipefail
-          test "$(cat ops/release/parent-ux-deploy-trigger.txt)" == "$RELEASE_SHA"
+          test "$(head -n 1 ops/release/parent-ux-deploy-trigger.txt)" == "$RELEASE_SHA"
           git merge-base --is-ancestor "$RELEASE_SHA" HEAD
           npm ci
           npm test

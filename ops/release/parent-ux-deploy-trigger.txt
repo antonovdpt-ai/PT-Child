@@ -1,1 +1,2 @@
 2173a05341d40baa4285732c90a4686a3b189919
+retry: provision PDF verification dependencies in the GitHub runner
