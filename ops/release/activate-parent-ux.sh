@@ -5,7 +5,22 @@ target="${1:?live frontend directory}"
 payload="${2:?five reviewed files}"
 backup="${3:?fresh additional backup directory}"
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-changed=(app.js parent-specialist.js styles.css parent.html index.html)
+allowed=(app.js parent-specialist.js styles.css parent.html index.html)
+changed=()
+while read -r digest file; do
+ old="$(awk -v f="$file" '$2==f{print $1}' "$script_dir/parent-ux-baseline.sha256")"
+ test -n "$old"
+ if [[ "$old" != "$digest" ]]; then
+  case "$file" in app.js|parent-specialist.js|styles.css|parent.html|index.html) ;; *) echo "UNSUPPORTED_ASSET_DIFFERENCE $file" >&2; exit 1;; esac
+ fi
+done < "$script_dir/parent-ux-release.sha256"
+for file in "${allowed[@]}"; do
+ old="$(awk -v f="$file" '$2==f{print $1}' "$script_dir/parent-ux-baseline.sha256")"
+ new="$(awk -v f="$file" '$2==f{print $1}' "$script_dir/parent-ux-release.sha256")"
+ test -n "$old"; test -n "$new"
+ if [[ "$old" != "$new" ]]; then changed+=("$file"); fi
+done
+test "${#changed[@]}" -gt 0
 test -d "$target"; test ! -L "$target"
 test -d "$payload"; test ! -L "$payload"
 while read -r digest file; do
@@ -20,7 +35,7 @@ if (cd "$target"; sha256sum --status -c "$script_dir/parent-ux-release.sha256");
  echo PARENT_UX_ALREADY_ACTIVE
  exit 0
 fi
-# All 17 assets must still match the confirmed 0.172 production baseline.
+# All 17 assets must still match the confirmed production baseline.
 (cd "$target"; sha256sum --status -c "$script_dir/parent-ux-baseline.sha256")
 test ! -e "$backup"; test ! -L "$backup"
 mkdir -p "$backup/files"

@@ -1,2 +1,2 @@
-2173a05341d40baa4285732c90a4686a3b189919
-retry: provision PDF verification dependencies in the GitHub runner
+28793a929e0d0ff077a3dbccc0fada307e115753
+follow-up: authoritative patient owner projection, app/index/parent HTML only
