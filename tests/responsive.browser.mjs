@@ -21,8 +21,9 @@ test('actual specialist renderer fits all requested widths with contact form and
   }catch{res.writeHead(404);res.end();}
  });
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE,headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ let browser;
  try {
+  browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE,headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   for(const width of [375,390,430,768,1440])await t.test(`${width}px`,async()=>{
    const page=await browser.newPage({viewport:{width,height:1100}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);
@@ -54,5 +55,5 @@ test('actual specialist renderer fits all requested widths with contact form and
    if(process.env.RESPONSIVE_SCREENSHOT_DIR){await mkdir(process.env.RESPONSIVE_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.RESPONSIVE_SCREENSHOT_DIR}/specialist-${width}.png`,fullPage:true});}
    await page.close();
   });
- }finally{await browser.close();await new Promise(r=>server.close(r));}
+ }finally{if(browser)await browser.close();await new Promise(r=>server.close(r));}
 });

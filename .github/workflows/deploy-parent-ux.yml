@@ -1,0 +1,83 @@
+name: Deploy reviewed parent UX correction
+on:
+  push:
+    branches: [codex/task1-8-saved-20261004]
+    paths: [ops/release/parent-ux-deploy-trigger.txt]
+permissions:
+  contents: read
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/codex/task1-8-saved-20261004'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RELEASE_SHA: 2173a05341d40baa4285732c90a4686a3b189919
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Provision and validate reviewed parent cache baseline
+        run: bash ops/release/ensure-parent-portal-baseline.sh
+      - name: Verify pinned release and regression gates
+        run: |
+          set -euo pipefail
+          test "$(cat ops/release/parent-ux-deploy-trigger.txt)" == "$RELEASE_SHA"
+          git merge-base --is-ancestor "$RELEASE_SHA" HEAD
+          npm ci
+          npm test
+          npx playwright-core install --with-deps chromium
+          CHROMIUM_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright-core";process.stdout.write(chromium.executablePath())')" npm run test:responsive
+          bash -n ops/release/activate-parent-ux.sh
+      - name: Package exactly the reviewed frontend bytes
+        run: |
+          set -euo pipefail
+          mkdir -p payload ops-package
+          for file in app.js parent-specialist.js styles.css parent.html index.html; do
+            git show "$RELEASE_SHA:$file" > "payload/$file"
+          done
+          cp ops/release/activate-parent-ux.sh ops/release/parent-ux-baseline.sha256 ops/release/parent-ux-release.sha256 ops-package/
+          tar -czf parent-ux.tar.gz payload ops-package
+      - name: Apply only five files through existing SSH credentials
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY"; test -n "$KNOWN_HOSTS"; test -n "$HOST"; test -n "$USER"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          remote_cache=".cache/fizira-parent-ux/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ssh -p "${PORT:-22}" -o BatchMode=yes "$USER@$HOST" "mkdir -p '$remote_cache'"
+          scp -P "${PORT:-22}" -o BatchMode=yes parent-ux.tar.gz "$USER@$HOST:$remote_cache/"
+          ssh -p "${PORT:-22}" -o BatchMode=yes "$USER@$HOST" "set -eu; cd '$remote_cache'; tar -xzf parent-ux.tar.gz; bash ops-package/activate-parent-ux.sh /root/supabase-project/volumes/proxy/app payload backup" | tee activation.log
+      - name: Verify all 17 public assets after activation
+        run: |
+          set -euo pipefail
+          mkdir public-verify
+          while read -r digest file; do
+            curl --fail --silent --show-error --max-time 25 --retry 2 "https://app.fizira.com/$file?release=$RELEASE_SHA" -o "public-verify/$file"
+          done < ops/release/parent-ux-release.sha256
+          (cd public-verify; sha256sum -c ../ops/release/parent-ux-release.sha256) | tee public-verification.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: parent-ux-production-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            activation.log
+            public-verification.log
+            ops/release/parent-ux-baseline.sha256
+            ops/release/parent-ux-release.sha256
+# Uses existing server and secrets. No migrations, Edge rollout, main merge or rollback.

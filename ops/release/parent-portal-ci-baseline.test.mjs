@@ -23,7 +23,7 @@ test('every CI test caller provisions and validates the reviewed baseline before
   const preflight=workflow.indexOf(`bash ${helper}`);
   assert.ok(preflight>workflow.indexOf('actions/checkout@v4')&&preflight<tests,`${file}: required baseline preflight before tests`);
  }
- assert.deepEqual(callers.sort(),['deploy-fizira-frontend.yml','frontend-tests.yml','release-safety-tests.yml']);
+ assert.deepEqual(callers.sort(),['deploy-fizira-frontend.yml','deploy-parent-ux.yml','frontend-tests.yml','release-safety-tests.yml']);
 });
 
 test('fresh local shallow checkout fails without baseline, provisions pinned snapshot, passes current URLs and rejects stale v6',async(t)=>{
