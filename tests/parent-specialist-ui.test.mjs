@@ -8,6 +8,20 @@ const contact={id:'contact',patient_id:'child',therapist_id:'therapist',full_nam
 const session={id:'session',patient_id:'child',therapist_id:'therapist',note:'SOURCE_SECRET',ai_draft:'AI_SECRET',tolerance:'TOLERANCE_SECRET'};
 const report={id:'report',patient_id:'child',therapist_id:'therapist',session_id:'session',publication_status:'draft',what_did:'Поиграли',pdf_storage_path:'PRIVATE_PATH',published_media:[{storage_path:'PRIVATE_PATH'}]};
 const tick=()=>new Promise(r=>setTimeout(r,0));
+test('real patient list projection supplies authoritative owner to the mounted parent tab',async()=>{
+ const h=harness();h.root.id='tabContent';
+ const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const load=source.slice(source.indexOf('async function loadPatients()'),source.indexOf('async function countsForPatients()'));
+ const tab=source.slice(source.indexOf('function renderTab(p)'),source.indexOf('let editingContactId = null;'))+'}';
+ const row={...patient,display_name:'ТЕСТ: ребёнок из списка'};
+ const sb={...h.options.sb,from(table){if(table!=='patients')return h.options.sb.from(table);let columns;const q={select(value){columns=value.split(',');return q;},order(){return q;},then(resolve){return Promise.resolve({data:[Object.fromEntries(columns.map(k=>[k,row[k]]))],error:null}).then(resolve);}};return q;}};
+ const env={sb,document:h.window.document,user,roleGate:{canNavigate:()=>true},authViewRevision:1,state:{patients:[],patientId:patient.id,tab:'parent',contacts:[contact]},SUPABASE_URL:'https://auth.fizira.com',renderParentPortalSpecialist,renderPatient(){},loadPatientData:async()=>{}};
+ const code=new Function('env',`with(env){${load}\n${tab}\nreturn {loadPatients,renderTab};}`)(env);
+ await code.loadPatients();code.renderTab(env.state.patients[0]);await tick();await tick();
+ assert.ok(h.root.querySelector('[data-add-parent]'),'parent controls must mount for a child loaded by the real list query');
+ h.root.replaceChildren();code.renderTab({...env.state.patients[0],therapist_id:'different-specialist'});await tick();
+ assert.equal(h.root.textContent,'','an unowned child must remain rejected');
+});
 function harness(seed={}) {
  const window=new Window();window.document.body.innerHTML='<main></main>';const root=window.document.querySelector('main');let current=true,confirm=true,refreshes=0;window.confirm=()=>confirm;
  const rows={parent_invitations:[],parent_child_access:[],parent_reports:[],parent_session_reports:[],parent_goal_publications:[],goals:[],sessions:[session],patient_media:[],parent_session_report_media:[],...seed};const calls=[];let delayed, readDelay, responseDelay;
