@@ -90,9 +90,14 @@ export function parentPublicationHandler(operation: 'generate'|'file', deps: Dep
         const checked=await admin.rpc('resolve_parent_publication_file',{p_parent_id:userId,p_report_id:body.report_id,p_file_kind:body.kind,p_media_id:body.media_id||null});
         if(checked.error||JSON.stringify(checked.data)!==JSON.stringify(record))throw new ParentPublicError(403);
         const signed=await storage.createSignedUrl(record.storage_path, 300);
-        const parsed=new URL(signed.data?.signedUrl);const trusted=new URL(url);
-        if(signed.error||parsed.origin!==trusted.origin||parsed.protocol!=='https:'||parsed.username||parsed.password||!parsed.pathname.startsWith('/storage/v1/object/sign/patient-media/'))throw new Error(PUBLIC_ERROR);
-        return parentJson(origin,200,{url:parsed.href,expires_at:new Date(Date.now()+300000).toISOString()});
+        if(signed.error||!signed.data?.signedUrl)throw new Error(PUBLIC_ERROR);
+        const parsed=new URL(signed.data.signedUrl);
+        const internal=new URL(url);
+        const publicBase=new URL(required('SUPABASE_PUBLIC_URL'));
+        if(parsed.origin!==internal.origin||parsed.username||parsed.password||parsed.hash||!parsed.pathname.startsWith('/storage/v1/object/sign/patient-media/'))throw new Error(PUBLIC_ERROR);
+        if(publicBase.protocol!=='https:'||publicBase.username||publicBase.password||publicBase.pathname!=='/'||publicBase.search||publicBase.hash)throw new Error(PUBLIC_ERROR);
+        const publicSigned=new URL(parsed.pathname+parsed.search,publicBase.origin);
+        return parentJson(origin,200,{url:publicSigned.href,expires_at:new Date(Date.now()+300000).toISOString()});
       }
       const claimed=await admin.rpc('claim_parent_publication',{p_therapist_id:userId,p_report_id:body.report_id,p_kind:body.report_kind});
       if(claimed.error||!claimed.data)throw new Error(PUBLIC_ERROR);
