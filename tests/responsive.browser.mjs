@@ -6,7 +6,7 @@ import {chromium} from 'playwright-core';
 const root=new URL('../',import.meta.url);
 const source=await readFile(new URL('app.js',root),'utf8');
 const slice=(start,end)=>source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start)));
-const snippets={header:slice('function renderHeader()','function setButtonSaving('),patient:slice('function renderPatient()','function option('),tab:slice('function renderTab(p)','let editingContactId = null;')+'}'};
+const snippets={header:slice('function renderHeader()','function setButtonSaving('),patient:slice('function renderPatient(','function option('),tab:slice('function renderTab(','let editingContactId = null;')+'}'};
 const html=(await readFile(new URL('index.html',root),'utf8')).replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
 
 test('actual specialist renderer fits all requested widths with contact form and long labels',async t=>{

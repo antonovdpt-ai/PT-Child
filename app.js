@@ -3,7 +3,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
 import { shouldRenderAuthEvent } from './auth-domain.mjs?v=1';
 import { createSpecialistRoleGate } from './role-gate.mjs';
-import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=3';
+import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=4';
 import { publicationLabel } from './parent-domain.mjs';
 import { renderCabinet } from './cabinet.js?v=7';
 
@@ -3161,7 +3161,7 @@ function goalsHtml(goals, deletable = false) {
     </article>
   `).join('');
 }
-function renderPatient() {
+function renderPatient(parentInvitationSent = false) {
   const accountRevision = authViewRevision, accountUserId = user?.id;
   const accountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && roleGate.canNavigate();
 
@@ -3191,7 +3191,7 @@ function renderPatient() {
     <nav class="tabs patient-tabs" aria-label="Разделы карточки пациента">${tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" data-tab="${k}" ${state.tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('')}</nav>
     <div id="flash"></div>
     <div id="tabContent"></div>`;
-  document.getElementById('editPatient').onclick = renderEditPatient; document.getElementById('backPatients').onclick = renderPatients; document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderPatient() }); renderTab(p);
+  document.getElementById('editPatient').onclick = renderEditPatient; document.getElementById('backPatients').onclick = renderPatients; document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderPatient() }); renderTab(p, parentInvitationSent === true);
   const actions = app.querySelector(".actions");
   
   const deletePatientWrap = document.createElement("div");
@@ -4860,7 +4860,7 @@ function structuredFromAssessmentForm(fd) {
   };
 }
 
-function renderTab(p) {
+function renderTab(p, parentInvitationSent = false) {
   const accountRevision = authViewRevision, accountUserId = user?.id;
   const accountPatientId = p.id;
   let box;
@@ -4873,14 +4873,14 @@ let generateParentReportBtn = null;
 let saveParentReportPdfBtn = null;
 let editParentReportBtn = null;
   box = document.getElementById('tabContent');
-  const refreshParentControls = async () => {
+  const refreshParentControls = async invitationSent => {
     if (!accountIsCurrent()) return;
     await loadPatientData();
     if (!accountIsCurrent()) return;
-    renderPatient();
+    renderPatient(invitationSent === true);
   };
   if (state.tab === 'parent') {
-    renderParentPortalSpecialist({ root: box, sb, user: { id: accountUserId }, patient: p, contacts: state.contacts, storageOrigin: SUPABASE_URL, isCurrent: accountIsCurrent, refresh: refreshParentControls });
+    renderParentPortalSpecialist({ root: box, sb, user: { id: accountUserId }, patient: p, contacts: state.contacts, storageOrigin: SUPABASE_URL, isCurrent: accountIsCurrent, refresh: refreshParentControls, invitationSent: parentInvitationSent === true });
     return;
   }
 let editingContactId = null;

@@ -8,11 +8,23 @@ const contact={id:'contact',patient_id:'child',therapist_id:'therapist',full_nam
 const session={id:'session',patient_id:'child',therapist_id:'therapist',note:'SOURCE_SECRET',ai_draft:'AI_SECRET',tolerance:'TOLERANCE_SECRET'};
 const report={id:'report',patient_id:'child',therapist_id:'therapist',session_id:'session',publication_status:'draft',what_did:'Поиграли',pdf_storage_path:'PRIVATE_PATH',published_media:[{storage_path:'PRIVATE_PATH'}]};
 const tick=()=>new Promise(r=>setTimeout(r,0));
+test('confirmed invitation send remains visible after authoritative portal remount',async()=>{
+ const h=harness();
+ h.options.refresh=async invitationSent=>{
+  h.rows.parent_invitations=[{id:'invite',contact_id:contact.id,patient_id:patient.id,therapist_id:user.id,email_normalized:contact.email,expires_at:'2099-01-02T12:00:00Z'}];
+  await renderParentPortalSpecialist({...h.options,invitationSent});
+ };
+ await renderParentPortalSpecialist(h.options);await click(h,'[data-invite]');
+ assert.match(h.root.querySelector('[data-status]').textContent,/Приглашение отправлено/);
+ assert.match(h.root.querySelector('[data-contact]').textContent,/Приглашение создано/);
+ await renderParentPortalSpecialist(h.options);
+ assert.equal(h.root.querySelector('[data-status]').textContent,'','ordinary reload must not claim a new email send');
+});
 test('real patient list projection supplies authoritative owner to the mounted parent tab',async()=>{
  const h=harness();h.root.id='tabContent';
  const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
  const load=source.slice(source.indexOf('async function loadPatients()'),source.indexOf('async function countsForPatients()'));
- const tab=source.slice(source.indexOf('function renderTab(p)'),source.indexOf('let editingContactId = null;'))+'}';
+ const tab=source.slice(source.indexOf('function renderTab('),source.indexOf('let editingContactId = null;'))+'}';
  const row={...patient,display_name:'ТЕСТ: ребёнок из списка'};
  const sb={...h.options.sb,from(table){if(table!=='patients')return h.options.sb.from(table);let columns;const q={select(value){columns=value.split(',');return q;},order(){return q;},then(resolve){return Promise.resolve({data:[Object.fromEntries(columns.map(k=>[k,row[k]]))],error:null}).then(resolve);}};return q;}};
  const env={sb,document:h.window.document,user,roleGate:{canNavigate:()=>true},authViewRevision:1,state:{patients:[],patientId:patient.id,tab:'parent',contacts:[contact]},SUPABASE_URL:'https://auth.fizira.com',renderParentPortalSpecialist,renderPatient(){},loadPatientData:async()=>{}};
@@ -55,7 +67,7 @@ test('initial report authoring opens actual saved draft and publishes only check
 test('real root portal callback checks captured child and mounted view around injected refresh',async()=>{
  const source=readFileSync(new URL('../app.js',import.meta.url),'utf8'),window=new Window();window.document.body.innerHTML='<div id="tabContent"></div>';let options,loads=0,renders=0,finish;
  const env={document:window.document,authViewRevision:1,user:{id:'therapist'},state:{patientId:'child',tab:'parent',contacts:[contact]},roleGate:{canNavigate:()=>true},SUPABASE_URL:'https://auth.fizira.com',sb:{},renderParentPortalSpecialist(o){options=o},loadPatientData:async()=>{loads++;await new Promise(r=>finish=r)},renderPatient(){renders++}};
- const part=source.slice(source.indexOf('function renderTab(p) {'),source.indexOf('init().catch'));
+ const part=source.slice(source.indexOf('function renderTab('),source.indexOf('init().catch'));
  const render=new Function('env',`with(env){return (${part});}`)(env);render(patient);assert.equal(options.isCurrent(),true);const pending=options.refresh();env.state.patientId='other';finish();await pending;assert.equal(renders,0);await options.refresh();assert.equal(loads,1);env.state.patientId='child';assert.equal(options.isCurrent(),true);env.authViewRevision++;assert.equal(options.isCurrent(),false);await options.refresh();assert.equal(loads,1);
 });
 test('real patient loader does not install stale child response after selection changes',async()=>{

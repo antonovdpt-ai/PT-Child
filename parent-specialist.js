@@ -16,7 +16,7 @@ function scope(o) {
   const current = () => o.root.isConnected && generations.get(o.root) === generation &&
     o.user?.id && o.patient?.therapist_id === o.user.id && o.isCurrent?.() === true;
   const status = message => { if (current()) { const el=o.root.querySelector('[data-status]'); if(el) el.textContent=message; } };
-  const refresh = async () => { if (current()) await o.refresh?.(); };
+  const refresh = async invitationSent => { if (current()) await o.refresh?.(invitationSent === true); };
   let busy=false;
   const action = (button, operation, disabledAfter = () => false) => {
     button.onclick = async event => {
@@ -194,7 +194,7 @@ export async function renderParentPortalSpecialist(o) {
     if(!s.current()) return;
     const photoCount=safe(selections).filter(m=>published.some(r=>r.id===m.parent_session_report_id)).length;
     o.root.innerHTML=`<section class="card parent-specialist"><h2>Кабинет родителя</h2><p>Видимость: первичный отчёт — ${safe(initial).some(r=>r.publication_status==='published')?'опубликован':'не опубликован'}; отчёт занятия — ${published.length?'опубликован':'не опубликован'}; цели — ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}; фото — ${photoCount}.</p>
-      <p data-status role="status" aria-live="polite"></p>
+      <p data-status role="status" aria-live="polite">${o.invitationSent === true ? 'Приглашение отправлено. Проверьте получение письма родителем.' : ''}</p>
       <section aria-label="Родители и представители"><div class="parent-contacts-heading"><h3>Родители и представители</h3><button type="button" class="btn" data-add-parent>Добавить родителя / представителя</button><button type="button" class="btn" data-refresh-parent>Обновить статус</button></div>
       <p>Сохраните имя, родство и email представителя, затем отправьте ему приглашение.</p>
       <form data-parent-contact-form class="parent-contact-form" hidden>
@@ -268,7 +268,7 @@ export async function renderParentPortalSpecialist(o) {
         if(data?.ok!==true||!Number.isFinite(Date.parse(data.expires_at)))throw new Error();
       }catch{s.status('Не удалось подтвердить отправку письма. Приглашение могло быть создано; нажмите «Обновить статус».');return;}
       s.status('Приглашение отправлено. Проверьте получение письма родителем.');
-      try{await s.refresh();}catch{s.status('Приглашение отправлено. Не удалось обновить список; нажмите «Обновить статус».');}
+      try{await s.refresh(true);}catch{s.status('Приглашение отправлено. Не удалось обновить список; нажмите «Обновить статус».');}
     }
     contacts.forEach(c=>{
       const el=[...o.root.querySelectorAll('[data-contact]')].find(x=>x.dataset.contact===c.id);
