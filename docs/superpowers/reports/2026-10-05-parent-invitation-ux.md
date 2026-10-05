@@ -4,7 +4,7 @@
 
 Base: `7566dc412e4918b1ea3f65831e3c9f024545b65a`, release branch `codex/task1-8-saved-20261004`.
 All 17 files in `ops/release/frontend-assets.txt` were downloaded from production and exactly matched that base. Production entry remained `0.172-parent-release`.
-No old main checkout was used. No migrations, servers, staging, DB/Storage records, Edge functions or existing rollback files were changed.
+No old main checkout was used. No migrations, servers, staging, Edge functions or existing rollback files were changed. Authenticated production checks later created only the fictional test records described below; no existing records were removed.
 
 ## Causes and correction
 
@@ -37,10 +37,30 @@ Reviewer independently examined ownership, escaped rendering, stale handlers and
 
 This local verdict is not production runtime approval.
 
+## Authenticated production findings and follow-up fixes
+
+The real patient list query omitted `therapist_id`. The specialist portal correctly required that owner field and therefore returned before rendering for a child loaded through the actual application. Earlier isolated fixtures supplied the field and missed this integration defect. The fix adds `therapist_id` to the existing RLS-protected projection; the ownership guard remains strict. A regression executes the actual list loader, actual parent-tab branch and actual specialist module, and also rejects a different owner. Source commit: `28793a929e0d0ff077a3dbccc0fada307e115753`.
+
+A confirmed successful invitation send was also erased by the subsequent authoritative remount. A strict boolean notice now crosses the guarded refresh only after a valid current Edge response. The fresh view shows fixed confirmation text; an ordinary reload clears that transient notice and persisted pending rows retain the honest “created” label. No delivery/access status is invented in client storage. Source commit: `17eba82de395e6185a1d2dc2db2dcab4e3d176af`.
+
+Final local aggregate: **232/232 PASS**. Chromium: **6/6 PASS**, widths 375/390/430/768/1440. Independent feedback review: **73/73 targeted PASS**, no blockers. Deployment manifests independently verified: 34 digests, exact four-file final delta; CSS stays untouched. Activation/CI checks: 11/11 PASS. The new confirmation/remount test reproduced the defect before the implementation.
+
+## Production rollout and fictional fixture
+
+- Initial frontend correction activated through existing GitHub Actions SSH secrets: run `37247135343`, commit `0a22df5cf56e0216941f3b28a7a56405be30fd3c`, source `2173a05341d40baa4285732c90a4686a3b189919`, entry `0.173-parent-ux`. Full CI229 + browser6 passed; all17 public digests matched.
+- Owner projection activated in run `37248101965`, deployment commit `90ef847e2178d79c410b4e214a6bb9014e7b7100`, source `28793a9`, entry `0.174-parent-owner`. CI231/231 and browser6/6 PASS, `PARENT_UX_ACTIVATION_OK`, all17 public hashes PASS. Only app.js/index.html/parent.html changed in this follow-up.
+- Final feedback rollout requested by deployment commit `d552a6179dd2b4ddbece5cb490e627a1cd8c06e6`, run `37262563653`, source `17eba82`, entry `0.175-parent-feedback`. Completed successfully: CI232/232, browser6/6, `PARENT_UX_ACTIVATION_OK`, all17 public hashes matched and public Auth/API smoke passed (Auth200, CORS200, anonymousAI401).
+- Every activation uses the same existing webroot, rejects unknown drift, backs up only the actual delta to a fresh run-specific directory, builds all replacements before swapping, and activates index last. Existing rollback copies are retained. No automatic rollback, migration replay, backend rollout or main merge occurred.
+- A standalone local-shell public smoke attempt could not connect through its proxy. This was an environment network failure, not evidence that production was unavailable. Cloud browser and Actions verification worked. The final Actions run additionally executes the existing read-only public production smoke after its17 checksum gate.
+
+The signed-in specialist created only child `ТЕСТ Fizira E2E 20261005` (DOB2020-01-15, no medical content), representative `Анна Тестовая` / `Мать`, and test email alias `antonovdpt+fizira-e2e-20261005@gmail.com`. Missing email was rejected with no contact insert. The saved contact appeared with the correct name/relationship/email and an ID-based invitation button. Sending created a pending row with expiry, saved invitation email and a resend action. The connected Gmail API confirmed the exact invitation email from Fizira at2026-10-05T00:38:57Z; it was classified as SPAM. No authentication link/token is included in evidence. Later, the signed-in Gmail browser did not show that email when searched by exact alias or sender/subject; API delivery evidence and browser retrieval are not treated as equivalent. Opening the actual invitation link remains unverified.
+
+A fictional goal was explicitly published through the specialist UI. A fictional initial report containing Cyrillic was explicitly published; the UI showed published state after the PDF Edge operation completed. Parent-side opening/downloading is still unverified. A fictional schedule appointment and session save were submitted; their final parent-visible result must still be checked. No real patient was used for test mutations. A synthetic image was prepared locally but has not yet been uploaded or published.
+
 ## Outstanding production gates
 
-Authenticated production E2E and deployment have **not** run. The available browser shows Fizira's specialist login; this workspace has no Timeweb SSH identity. Authenticated existing-service access and a designated working test mailbox are required.
+The full authenticated parent E2E is **not complete**. The cloud browser currently shows the signed-out specialist/parent login. Accepting the test invitation requires the user to open the email, create a new password and personally accept the three legal documents. Browser authentication guidance requires manual handoff for signup/new credentials; credentials must never be requested in chat.
 
-After that access is available, use only fictional child/representative data to verify specialist create/save/invite, actual delivery and parent redirect/login/acceptance, exactly-parent role, authorized-child projections, cross-UUID denial, schedule/goals/reports, real PDF and protected photographs, new file/access denial after revoke and continued specialist operation.
+After acceptance, verify exactly-parent role, authorized-child projections and cross-UUID denial, parent-safe data, schedule/goals/reports, actual parent PDF and protected synthetic photographs, access denial after revoke and specialist continuity. Re-check persisted session/appointment creation before adding another fixture, to avoid duplicates.
 
-Then preserve the current server rollback, activate only the five changed frontend files, verify their exact reviewed hashes/public entry and perform authenticated mobile production checks. Do not replay 008–012, alter working Auth/Storage/RLS, delete production data or merge main before successful production verification.
+Automated responsive results use the actual renderer/styles/module with synthetic data. They do not establish a signed-in real-production mobile viewport result; that remains outstanding. Do not merge main or claim full production E2E success while these gates remain open.
