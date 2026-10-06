@@ -9,7 +9,7 @@ const LEGAL = [
 ];
 const ERROR = 'Не удалось загрузить данные. Попробуйте ещё раз.';
 const array = value => Array.isArray(value) ? value : [];
-const statuses = {planned:'Запланировано',completed:'Проведено',cancelled:'Отменено',no_show:'Неявка',new:'Новая',in_progress:'В работе',achieved:'Достигнута',revised:'Пересмотрена'};
+const statuses = {planned:'Запланировано',completed:'Проведено',cancelled:'Отменено',no_show:'Неявка',new:'Новая',in_progress:'В работе',achieved:'Достигнута',revised:'Пересмотрена',paused:'Приостановлена'};
 const status = value => statuses[value] || 'Статус не указан';
 const reportLabels = {complaint:'Запрос',strengths:'Сильные стороны',observations:'Наблюдения',goals:'Цели',progress:'Прогресс',recommendations:'Рекомендации',what_did:'Что делали',what_worked:'Что получилось',attention:'На что обратить внимание',home_recommendations:'Рекомендации для дома',therapist_name:'Специалист',therapist_profession:'Профессия',therapist_organization:'Организация',therapist_phone:'Телефон специалиста'};
 
@@ -61,7 +61,16 @@ export function createParentPortal({ app, sb, window, document, initialRecovery 
   function appointmentDate(value) { const d=new Date(value);return Number.isNaN(d.getTime())?'Дата не указана':d.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}); }
   function time(value) { const d=new Date(value);return Number.isNaN(d.getTime())?'Время не указано':d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); }
   const reportsRows = rows => array(rows).map(r=>`<div class="item"><p>${r.kind==='initial'?'Первичный отчёт':'Отчёт о занятии'} · ${esc(formatParentDate(r.published_at))}</p>${button('Открыть отчёт',`data-report="${esc(r.id)}"`)}</div>`).join('')||empty('Опубликованных отчётов пока нет');
-  const goalRows = rows => array(rows).map(g=>`<div class="goal"><h3>${esc(g.title)}</h3><p>${esc(g.description)}</p><span class="badge">${esc(status(g.status))}</span></div>`).join('')||empty('Опубликованных целей пока нет');
+  const goalRows = rows => array(rows).map(g=>{
+    const progress=Number.isInteger(g.progress)&&g.progress>=0&&g.progress<=100?g.progress:null;
+    return `<article class="goal parent-goal-card"><h3>${esc(g.title)}</h3>
+      ${g.baseline?`<p><b>С чего начали:</b> ${esc(g.baseline)}</p>`:''}
+      ${g.criterion?`<p><b>Как поймём, что получилось:</b> ${esc(g.criterion)}</p>`:''}
+      ${g.deadline?`<p><b>Ориентир по сроку:</b> ${esc(formatParentDate(g.deadline))}</p>`:''}
+      ${progress!==null?`<p>Прогресс: ${progress}%</p><progress max="100" value="${progress}" aria-label="Прогресс цели">${progress}%</progress>`:''}
+      ${g.description?`<p>${esc(g.description)}</p>`:''}<span class="badge">${esc(g.status==='cancelled'?'Отменена':status(g.status))}</span>
+      ${g.updated_at?`<p class="muted">Обновлено: ${esc(formatParentDate(g.updated_at))}</p>`:''}</article>`;
+  }).join('')||empty('Опубликованных целей пока нет');
   function dynamics(rows) {const series=dynamicsSeries(rows);const numeric=series.numeric.map(s=>`<h3>${esc(s.scale.toUpperCase())}</h3><table><thead><tr><th>Дата</th><th>Результат</th></tr></thead><tbody>${s.points.map(p=>`<tr><td>${esc(formatParentDate(p.assessed_at))}</td><td>${esc(p.value)}</td></tr>`).join('')}</tbody></table>`).join('');const categorical=series.categorical.map(p=>`<p><b>${esc(p.scale.toUpperCase())}</b> · ${esc(formatParentDate(p.assessed_at))}: ${esc(p.value)}</p>`).join('');return numeric||categorical?`${numeric}${categorical}<p class="muted">Результаты оценок стоит обсудить со специалистом. Уровни классификаций показаны как категории.</p>`:empty('Оценок пока нет');}
   function wireReports(){app.querySelectorAll('[data-report]').forEach(b=>b.onclick=()=>openReport(b.dataset.report));}
   function profile() {
@@ -81,8 +90,8 @@ export function createParentPortal({ app, sb, window, document, initialRecovery 
         if(!data?.child){shell(empty('Доступ к ребёнку больше недоступен. Обратитесь к специалисту.'));return;}
         body=card('Ближайшее занятие',scheduleRows(array(data.schedule).slice(0,1)))+card('Последние отчёты',reportsRows(array(data.reports).slice(0,2)))+card('Цели',goalRows(array(data.goals).slice(0,2)))+card('Динамика',dynamics(data.dynamics))+card('Уведомления',array(data.notifications).map(n=>`<div class="item"><h3>${esc(n.title)}</h3><p>${esc(n.body)}</p>${!n.read_at?button('Отметить прочитанным',`data-read="${esc(n.id)}"`):'<span class="muted">Прочитано</span>'}</div>`).join('')||empty('Новых уведомлений нет'));
       } else if(next==='schedule')body=card('Расписание',`<div class="parent-modes">${button('Предстоящие','data-mode="upcoming"')}${button('История','data-mode="history"')}</div>${scheduleRows(data)}`);
-      else if(next==='reports')body=card('Отчёты',reportsRows(data));else if(next==='goals')body=card('Цели',goalRows(data));else if(next==='dynamics')body=card('Динамика',dynamics(data));
-      shell(body);wireReports();app.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;navigate('schedule');});
+      else if(next==='reports')body=card('Отчёты',reportsRows(data));else if(next==='goals')body=card('Цели',button('Обновить цели','data-refresh-goals')+goalRows(data));else if(next==='dynamics')body=card('Динамика',dynamics(data));
+      shell(body);wireReports();const refreshGoals=app.querySelector('[data-refresh-goals]');if(refreshGoals)refreshGoals.onclick=()=>navigate('goals');app.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;navigate('schedule');});
       app.querySelectorAll('[data-read]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await rpc('parent_mark_notifications_read',{p_notification_ids:[b.dataset.read]});if(!alive(ticket))return;const notifications=await rpc('parent_portal_notifications',{p_patient_id:childId});if(alive(ticket)){const notification=array(notifications).find(n=>n.id===b.dataset.read);b.textContent=notification?.read_at?'Прочитано':'Уведомление недоступно';}}catch{if(alive(ticket)){b.disabled=false;b.textContent='Повторить';}}});
     }catch{if(alive(ticket))failure(()=>navigate(next));}
   }

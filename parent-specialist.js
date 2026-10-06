@@ -176,13 +176,12 @@ export async function renderParentPortalSpecialist(o) {
   const s=scope(o); if(!s.current()) return;
   o.root.innerHTML='<p data-status role="status">Загружаем кабинет родителя…</p>';
   try {
-    const [invitations,access,initial,reports,publications,goals,sessions]=await Promise.all([
+    const [invitations,access,initial,reports,publications,sessions]=await Promise.all([
       result(query(o,'parent_invitations','id,contact_id,patient_id,therapist_id,created_at,expires_at,accepted_at,revoked_at,email_normalized,accepted_by').order('created_at',{ascending:false})),
       result(query(o,'parent_child_access','id,contact_id,patient_id,therapist_id,status,granted_at,parent_user_id').order('granted_at',{ascending:false})),
       result(query(o,'parent_reports',reportColumns('initial')).order('created_at',{ascending:false})),
       result(query(o,'parent_session_reports',reportColumns('session')).order('created_at',{ascending:false})),
       result(query(o,'parent_goal_publications','id,goal_id,patient_id,therapist_id,title,description,status,published_at,unpublished_at')),
-      result(query(o,'goals','id,patient_id,therapist_id').order('created_at',{ascending:false})),
       result(query(o,'sessions','id,patient_id,therapist_id,session_date').order('session_date',{ascending:false}))
     ]);
     if(!s.current()) return;
@@ -231,10 +230,10 @@ export async function renderParentPortalSpecialist(o) {
       ).join('')||'<p>Таких доступов нет.</p>'}</section></section>
       <section class="card"><h3>Первичные отчёты</h3><button class="btn" data-create-initial>Новый черновик</button>${safe(initial).map(r=>`<p>${esc(publicationLabel(r.publication_status))} <button class="btn" data-open-initial="${esc(r.id)}">Открыть отчёт</button></p>`).join('')}<div data-initial-editor></div></section>
       <section class="card"><h3>Отчёты занятий</h3>${safe(sessions).map((r,i)=>`<button class="btn" data-session="${esc(r.id)}">Отчёт занятия ${esc(r.session_date||String(i+1))}</button>`).join('')}<div data-session-editor></div></section>
-      <section class="card"><h3>Цели для родителя</h3>${safe(goals).map((g,i)=>{
-        const p=safe(publications).find(x=>x.goal_id===g.id)||{};
-        return `<form data-goal-form="${esc(g.id)}"><h4>Цель ${i+1}</h4><label>Название для родителя<input name="title" maxlength="500" required value="${esc(p.title||'')}"></label><label>Описание для родителя<textarea name="description">${esc(p.description||'')}</textarea></label><label>Статус<select name="status">${[['new','Новая'],['in_progress','В работе'],['achieved','Достигнута'],['revised','Пересмотрена']].map(([v,l])=>`<option value="${v}" ${p.status===v?'selected':''}>${l}</option>`).join('')}</select></label><p>${p.published_at&&!p.unpublished_at?'Опубликовано для родителя':'Не опубликовано'}</p><div class="parent-specialist-actions"><button type="button" class="btn" data-publish-goal>Опубликовать цель</button>${p.published_at&&!p.unpublished_at?'<button type="button" class="btn" data-withdraw-goal>Убрать из кабинета родителя</button>':''}</div></form>`;
-      }).join('')||'<p>Добавьте рабочую цель во вкладке «Цели».</p>'}</section>`;
+      <section class="card"><h3>Цели для родителя</h3><p>Опубликовано целей: ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}</p>
+      ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).map(g=>`<article class="goal"><h4>${esc(g.title)}</h4>${g.description?`<p>${esc(g.description)}</p>`:''}<p>${esc(({new:'Новая',in_progress:'В работе',achieved:'Достигнута',paused:'Приостановлена',cancelled:'Отменена',revised:'Пересмотрена'})[g.status]||'Статус не указан')}</p></article>`).join('')||'<p>Опубликованных целей пока нет.</p>'}
+      <button type="button" class="btn" data-manage-goals>Управлять целями</button></section>`;
+    s.action(o.root.querySelector('[data-manage-goals]'),()=>o.manageGoals?.());
     let savedContactId=null;
     const contactForm=o.root.querySelector('[data-parent-contact-form]');
     const contactStatus=message=>{if(s.current())contactForm.querySelector('[data-contact-status]').textContent=message;};
@@ -309,23 +308,5 @@ export async function renderParentPortalSpecialist(o) {
     });
     o.root.querySelectorAll('[data-open-initial]').forEach(b=>s.action(b,()=>renderReportEditor({...editorOptions(initialRoot),kind:'initial',reportId:b.dataset.openInitial})));
     o.root.querySelectorAll('[data-session]').forEach(b=>s.action(b,()=>renderParentSessionReportEditor({...editorOptions(o.root.querySelector('[data-session-editor]')),session:safe(sessions).find(x=>x.id===b.dataset.session)})));
-    o.root.querySelectorAll('[data-goal-form]').forEach(form=>{
-      form.onsubmit=e=>e.preventDefault();
-      const p=safe(publications).find(x=>x.goal_id===form.dataset.goalForm);
-      s.action(form.querySelector('[data-publish-goal]'),async()=>{
-        const title=form.elements.title.value.trim(),status=form.elements.status.value;
-        if(!title||title.length>500||!['new','in_progress','achieved','revised'].includes(status)){s.status('Проверьте название и статус цели');return;}
-        if(!confirm(o,'Опубликовать эту формулировку цели для родителя?'))return;
-        if(!s.current())return;
-        const payload={goal_id:form.dataset.goalForm,patient_id:o.patient.id,therapist_id:o.user.id,title,description:form.elements.description.value.trim()||null,status,published_at:new Date().toISOString(),unpublished_at:null};
-        await result(p?o.sb.from('parent_goal_publications').update(payload).eq('id',p.id).eq('patient_id',o.patient.id).eq('therapist_id',o.user.id):o.sb.from('parent_goal_publications').insert(payload));
-        if(!s.current())return;await s.refresh();
-      });
-      const withdraw=form.querySelector('[data-withdraw-goal]');if(withdraw)s.action(withdraw,async()=>{
-        if(!confirm(o,'Убрать цель из кабинета родителя?'))return;if(!s.current())return;
-        await result(o.sb.from('parent_goal_publications').update({unpublished_at:new Date().toISOString()}).eq('id',p.id).eq('patient_id',o.patient.id).eq('therapist_id',o.user.id));
-        if(!s.current())return;await s.refresh();
-      });
-    });
   } catch {s.status('Не удалось загрузить кабинет родителя. Обновите вкладку.');}
 }

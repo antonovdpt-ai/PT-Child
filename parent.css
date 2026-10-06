@@ -8,3 +8,5 @@ body.parent-portal main{display:block;min-height:0;max-width:1000px;margin:auto;
 @media (max-width:600px){.parent-topline{display:block}.parent-account{margin-top:14px}body.parent-portal main{padding:14px 14px 32px}.parent-brand{padding:18px 16px 6px}.parent-portal h1{font-size:24px}.parent-portal .card{padding:18px}.parent-nav{margin-right:-14px;padding-right:14px}.parent-nav .btn{font-size:13px;padding:10px}.parent-portal fieldset{padding:12px}}
 
 @media (max-width:759px){body.parent-portal main{padding-bottom:96px}.parent-portal .parent-nav{position:fixed;bottom:0;left:0;right:0;z-index:20;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:0;padding:10px 8px calc(10px + env(safe-area-inset-bottom,0px));background:#fff;border-top:1px solid var(--line);box-shadow:0 -3px 14px rgba(23,25,29,.05)}.parent-portal .parent-nav .btn{width:100%;min-width:0;font-size:11px;padding:10px 2px}}
+.parent-portal .parent-goal-card { min-width: 0; overflow-wrap: anywhere; }
+.parent-portal .parent-goal-card progress { display: block; width: 100%; max-width: 100%; height: 14px; margin-bottom: 12px; }

@@ -269,3 +269,13 @@ body:not(.is-authenticated) .header,body:not(.is-authenticated) .warning{display
   .parent-contact-fields { grid-template-columns:minmax(0,1fr); }
   .parent-contacts-heading .btn { width:100%; }
 }
+/* Goal controls share one editor and wrap within narrow patient cards. */
+.goal-parent-badge { display: inline-block; margin-top: 10px; white-space: normal; }
+.goal-card, .goal-form-card { min-width: 0; overflow-wrap: anywhere; }
+.goal-card .goal-pct { flex-shrink: 0; white-space: nowrap; }
+.goal-card .goal-top > div:first-child { min-width: 0; flex: 1; }
+.goal-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.goal-actions > button { white-space: normal; }
+.goal-visibility-control { display: flex; align-items: center; gap: 10px; }
+.goal-visibility-control input[type="checkbox"] { width: 22px; min-width: 22px; height: 22px; margin: 0; }
+.goal-form-card[hidden] { display: none; }

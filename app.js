@@ -3,7 +3,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
 import { shouldRenderAuthEvent } from './auth-domain.mjs?v=1';
 import { createSpecialistRoleGate } from './role-gate.mjs';
-import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=4';
+import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=5';
 import { publicationLabel } from './parent-domain.mjs';
 import { renderCabinet } from './cabinet.js?v=7';
 
@@ -3151,10 +3151,12 @@ function goalsHtml(goals, deletable = false) {
         <span>${esc(g.criterion || 'Критерий не указан')}</span>
         <span>${g.deadline ? fmtDate(g.deadline) : 'Срок не указан'}</span>
       </div>
-      ${deletable ? `
+      <span class="badge goal-parent-badge">${g.parent_visible ? 'Родителю: опубликовано' : 'Родителю: скрыто'}</span>
+      ${state.tab === 'goals' ? `
         <div class="goal-actions">
           <button type="button" class="link" data-edit-goal="${g.id}">Изменить</button>
-          <button type="button" class="link goal-complete-link" data-complete-goal="${g.id}">Завершить</button>
+          ${g.status !== 'achieved' ? `<button type="button" class="link goal-complete-link" data-complete-goal="${g.id}">Завершить</button>` : ''}
+          <button type="button" class="link" data-visibility-goal="${g.id}">${g.parent_visible ? 'Скрыть от родителя' : 'Показать родителю'}</button>
           <button type="button" class="link goal-delete-link" data-del-goal="${g.id}">Удалить</button>
         </div>
       ` : ''}
@@ -4880,7 +4882,7 @@ let editParentReportBtn = null;
     renderPatient(invitationSent === true);
   };
   if (state.tab === 'parent') {
-    renderParentPortalSpecialist({ root: box, sb, user: { id: accountUserId }, patient: p, contacts: state.contacts, storageOrigin: SUPABASE_URL, isCurrent: accountIsCurrent, refresh: refreshParentControls, invitationSent: parentInvitationSent === true });
+    renderParentPortalSpecialist({ root: box, sb, user: { id: accountUserId }, patient: p, contacts: state.contacts, storageOrigin: SUPABASE_URL, isCurrent: accountIsCurrent, refresh: refreshParentControls, invitationSent: parentInvitationSent === true, manageGoals: () => { if (accountIsCurrent()) { state.tab = 'goals'; renderPatient(); } } });
     return;
   }
 let editingContactId = null;
@@ -7364,217 +7366,102 @@ if (saveStandardizedHistoryBtn) {
   }
 
   if (state.tab === 'goals') {
-    box.innerHTML = `<section class="card goals-workspace">
-  <div class="workspace-heading">
-    <div>
-      <h3>Активные цели</h3>
-      <p>Функциональные ориентиры и их подтверждённый прогресс.</p>
-    </div>
-    <span class="badge">${state.goals.filter(g => g.status === 'active').length}</span>
-  </div>
-  ${goalsHtml(
-    state.goals.filter(g => g.status === 'active'),
-    true
-  )}
-</section>
-${state.goals.some(g => g.status === 'achieved') ? `
-  <section class="card goals-achieved">
-    <div class="workspace-heading">
-      <div><h3>Достигнутые цели</h3><p>Сохраняются в истории пациента.</p></div>
-    </div>
-
-    ${goalsHtml(
-      state.goals.filter(g => g.status === 'achieved'),
-      false
-    )}
-  </section>
-` : ''}
-<form class="card goal-form-card" id="goalForm"><div class="form-heading"><div><h3>Новая цель</h3><p>Сформулируйте наблюдаемый результат и критерий его достижения.</p></div></div><label>Функциональная цель</label><textarea name="title" required></textarea><label>Исходное состояние</label><textarea name="baseline"></textarea><label>Критерий достижения</label><input name="criterion"><label>Срок</label><input type="date" name="deadline"><label>Прогресс</label><select name="progress"><option value="0">0%</option><option value="20">20%</option><option value="40">40%</option><option value="60">60%</option><option value="80">80%</option><option value="100">100%</option></select><div class="actions"><button id="goalSaveBtn" class="btn primary full" type="submit">Добавить цель</button></div><div id="goalStatus" class="save-status"></div></form>`;
+    const goalCurrent = () => accountIsCurrent() && state.patientId === p.id && state.tab === 'goals' && box.isConnected;
+    const notice = state.goalSaveNotice?.patientId === p.id ? state.goalSaveNotice.text : '';
+    box.innerHTML = `<section class="card goals-workspace"><div class="workspace-heading"><div><h3>Активные цели</h3><p>Рабочая цель и её прогресс. Родитель видит только явно опубликованные цели.</p></div></div>${goalsHtml(state.goals.filter(g => g.status === 'active'), true)}</section>
+      ${state.goals.some(g => g.status !== 'active') ? `<section class="card goals-achieved"><h3>Завершённые и приостановленные цели</h3>${goalsHtml(state.goals.filter(g => g.status !== 'active'), true)}</section>` : ''}
+      <button class="btn goal-form-toggle" type="button" id="goalFormToggle">Добавить цель</button>
+      <form class="card goal-form-card" id="goalForm" hidden><div class="form-heading"><h3>Новая цель</h3></div>
+      <label>Функциональная цель<textarea name="title" required></textarea></label>
+      <label>Исходное состояние<textarea name="baseline"></textarea></label>
+      <label>Критерий достижения<input name="criterion"></label>
+      <label>Срок<input type="date" name="deadline"></label>
+      <label>Прогресс, %<input type="number" name="progress" min="0" max="100" step="1" value="0" required></label>
+      <p data-completion-hint class="muted" hidden>Достигнутая цель сохраняет прогресс 100%.</p>
+      <label>Дополнение для родителя (необязательно)<textarea name="parent_note"></textarea></label>
+      <label class="goal-visibility-control"><input type="checkbox" name="parent_visible">Показывать родителю</label>
+      <p class="muted">При включении родитель увидит название, исходное состояние, критерий, срок и прогресс. Проверьте, что формулировки понятны родителю.</p>
+      <div class="goal-actions"><button id="goalSaveBtn" class="btn primary" type="submit">Добавить цель</button><button class="btn" id="goalCancelBtn" type="button">Отмена</button></div></form>
+      <p id="goalStatus" class="save-status" role="status" aria-live="polite">${esc(notice)}</p>`;
     const form = document.getElementById('goalForm'), btn = document.getElementById('goalSaveBtn'), status = document.getElementById('goalStatus');
-    watchFormDirty(form, btn, 'Добавить цель');
-
-const goalFormToggle = document.createElement('button');
-
-goalFormToggle.type = 'button';
-goalFormToggle.className = 'btn goal-form-toggle';
-goalFormToggle.textContent = 'Добавить цель';
-
-form.parentNode.insertBefore(
-  goalFormToggle,
-  form
-);
-
-form.style.display = 'none';
-
-const setGoalFormOpen = open => {
-  form.style.display =
-    open ? 'block' : 'none';
-
-  goalFormToggle.textContent =
-    open
-      ? 'Скрыть форму'
-      : 'Добавить цель';
-};
-
-goalFormToggle.onclick = () => {
-  const isOpen =
-    form.style.display !== 'none';
-
-  setGoalFormOpen(!isOpen);
-};
-
-   let editingGoalId = null;
-
-document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
-  editBtn.onclick = () => {
-    const goal = state.goals.find(
-      g => g.id === editBtn.dataset.editGoal
-    );
-
-    if (!goal) return;
-
-    editingGoalId = goal.id;
-
-    setGoalFormOpen(true);
-
-    form.querySelector('h3').textContent =
-      'Изменить цель';
-
-    form.elements.title.value =
-      goal.title || '';
-
-    form.elements.baseline.value =
-      goal.baseline || '';
-
-    form.elements.criterion.value =
-      goal.criterion || '';
-
-    form.elements.deadline.value =
-      goal.deadline || '';
-
-    form.elements.progress.value =
-      String(goal.progress ?? 0);
-
-    btn.textContent =
-      'Сохранить изменения';
-
-    form.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start'
-    });
-  };
-});
-    
-    form.onsubmit = async e => {
-    if (!accountIsCurrent()) return;
-  e.preventDefault();
-
-  setButtonSaving(btn);
-
-  const fd = new FormData(e.target);
-
-  const payload = {
-    patient_id: p.id,
-    title: fd.get('title').trim(),
-    baseline:
-      fd.get('baseline').trim() || null,
-    criterion:
-      fd.get('criterion').trim() || null,
-    deadline:
-      fd.get('deadline') || null,
-    progress:
-      Number(fd.get('progress')),
-    status: 'active'
-  };
-
-  const { error } = editingGoalId
-    ? await sb
-        .from('goals')
-        .update(payload)
-        .eq('id', editingGoalId)
-    : await sb
-        .from('goals')
-        .insert(payload);
-    if (!accountIsCurrent()) return;
-
-  if (error) {
-    setButtonError(
-      btn,
-      editingGoalId
-        ? 'Сохранить изменения'
-        : 'Добавить цель'
-    );
-
-    return flash(
-      'error',
-      error.message
-    );
-  }
-
-  setButtonSaved(
-    btn,
-    editingGoalId
-      ? '✓ Изменения сохранены'
-      : '✓ Цель сохранена'
-  );
-
-  status.textContent =
-    '✓ Данные сохранены в облаке';
-
-  await sleep(700);
-    if (!accountIsCurrent()) return;
-  await loadPatientData();
-    if (!accountIsCurrent()) return;
-  renderPatient();
-};
-   document
-  .querySelectorAll('[data-complete-goal]')
-  .forEach(completeBtn => {
-    completeBtn.onclick = async () => {
-    if (!accountIsCurrent()) return;
-      const goalId =
-        completeBtn.dataset.completeGoal;
-
-      const confirmed = confirm(
-        'Завершить эту цель? Она будет отмечена как достигнутая и сохранится в истории.'
-      );
-
-      if (!confirmed) return;
-
-      completeBtn.disabled = true;
-      completeBtn.textContent =
-        'Завершаю...';
-
-      const { error } = await sb
-        .from('goals')
-        .update({
-          status: 'achieved',
-          progress: 100
-        })
-        .eq('id', goalId);
-    if (!accountIsCurrent()) return;
-
-      if (error) {
-        completeBtn.disabled = false;
-        completeBtn.textContent =
-          'Завершить';
-
-        return flash(
-          'error',
-          error.message
-        );
-      }
-
-      await loadPatientData();
-    if (!accountIsCurrent()) return;
-      renderPatient();
+    const toggle = document.getElementById('goalFormToggle');
+    let editingGoalId = null, editingGoalVersion = null, busy = false, saved = false;
+    const draftId = crypto.randomUUID();
+    const setGoalFormOpen = open => { form.hidden = !open; toggle.textContent = open ? 'Скрыть форму' : 'Добавить цель'; };
+    const resetForm = () => { editingGoalId = null; editingGoalVersion = null; saved = false; form.reset(); form.elements.progress.readOnly = false; form.querySelector('[data-completion-hint]').hidden = true; form.querySelector('h3').textContent = 'Новая цель'; btn.textContent = 'Добавить цель'; setGoalFormOpen(false); };
+    toggle.onclick = () => { if (!goalCurrent() || busy || saved) return; if (form.hidden) { resetForm(); setGoalFormOpen(true); } else resetForm(); };
+    document.getElementById('goalCancelBtn').onclick = () => { if (goalCurrent() && !busy && !saved) resetForm(); };
+    const goalMessage = visible => visible ? 'Цель сохранена и опубликована родителю' : 'Цель сохранена · не опубликована родителю';
+    const reloadGoals = async message => {
+      state.goalSaveNotice = {patientId: p.id, text: message};
+      status.textContent = message;
+      try { await loadPatientData(); if (goalCurrent()) renderPatient(); }
+      catch { if (goalCurrent()) status.textContent = message + '. Не удалось обновить список. Перейдите во вкладку заново.'; }
     };
-  });
-
-document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () => {
-    if (!accountIsCurrent()) return; const { error } = await sb.from('goals').delete().eq('id', b.dataset.delGoal);
-    if (!accountIsCurrent()) return; if (error) return flash('error', error.message); await loadPatientData();
-    if (!accountIsCurrent()) return; renderPatient() });
+    document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
+      editBtn.onclick = () => {
+        if (!goalCurrent() || busy || saved) return;
+        const goal = state.goals.find(g => g.id === editBtn.dataset.editGoal); if (!goal) return;
+        editingGoalId = goal.id; editingGoalVersion = goal.updated_at; setGoalFormOpen(true); form.querySelector('h3').textContent = 'Изменить цель';
+        for (const name of ['title','baseline','criterion','deadline','parent_note']) form.elements[name].value = goal[name] || '';
+        form.elements.progress.value = String(goal.status === 'achieved' ? 100 : goal.progress ?? 0); form.elements.progress.readOnly = goal.status === 'achieved'; form.querySelector('[data-completion-hint]').hidden = goal.status !== 'achieved'; form.elements.parent_visible.checked = goal.parent_visible === true;
+        btn.textContent = 'Сохранить изменения'; form.scrollIntoView({behavior:'smooth',block:'start'});
+      };
+    });
+    form.onsubmit = async e => {
+      e.preventDefault(); if (!goalCurrent() || busy || saved) return;
+      const fd = new FormData(form), visible = form.elements.parent_visible.checked, title = String(fd.get('title') || '').trim();
+      const progress = Number(fd.get('progress'));
+      if (!title || !Number.isInteger(progress) || progress < 0 || progress > 100) { status.textContent = 'Укажите цель и прогресс от 0 до 100%'; return; }
+      if (visible && title.length > 500) { status.textContent = 'Для родителя название должно быть не длиннее 500 символов'; return; }
+      const original = state.goals.find(g => g.id === editingGoalId);
+      const payload = {patient_id:p.id,title,baseline:String(fd.get('baseline')||'').trim()||null,criterion:String(fd.get('criterion')||'').trim()||null,deadline:fd.get('deadline')||null,progress,status:progress === 100 ? 'achieved' : original?.status || 'active',parent_note:String(fd.get('parent_note')||'').trim()||null,parent_visible:visible};
+      busy = true; btn.disabled = true; status.textContent = 'Сохраняем…';
+      try {
+        const query = editingGoalId ? sb.from('goals').update(payload).eq('id',editingGoalId).eq('patient_id',p.id) : sb.from('goals').insert({...payload,id:draftId});
+        if (editingGoalId && editingGoalVersion) query.eq('updated_at',editingGoalVersion);
+        const {error} = await query.select('id').single(); if (!goalCurrent()) return;
+        if (error) throw error;
+        saved = true; await reloadGoals(goalMessage(visible));
+      } catch (error) { if (goalCurrent()) {status.textContent = error?.code === 'PGRST116' ? 'Цель уже изменена. Обновите вкладку перед сохранением; данные формы сохранены.' : 'Не удалось сохранить цель. Данные формы сохранены; повторите попытку.';btn.disabled = false;} }
+      finally {busy = false;}
+    };
+    const mutateGoal = async (button, payload, message) => {
+      if (!goalCurrent() || busy || saved) return;
+      busy = true; button.disabled = true;
+      try {
+        const id = button.dataset.completeGoal || button.dataset.visibilityGoal;
+        const goal = state.goals.find(g => g.id === id);
+        const query = sb.from('goals').update(payload).eq('id',id).eq('patient_id',p.id);
+        if (goal?.updated_at) query.eq('updated_at',goal.updated_at);
+        const {error} = await query.select('id').single();
+        if (!goalCurrent()) return; if (error) throw error; await reloadGoals(message);
+      } catch {if (goalCurrent()) {button.disabled = false;status.textContent = 'Не удалось изменить цель. Попробуйте ещё раз.';}}
+      finally {busy = false;}
+    };
+    document.querySelectorAll('[data-complete-goal]').forEach(button => button.onclick = () => {
+      if (!goalCurrent() || busy || saved) return;
+      const goal = state.goals.find(g => g.id === button.dataset.completeGoal); if (!goal) return;
+      if (confirm('Завершить цель? Прогресс станет 100%, статус — достигнуто.')) return mutateGoal(button,{status:'achieved',progress:100},goalMessage(goal.parent_visible));
+    });
+    document.querySelectorAll('[data-visibility-goal]').forEach(button => button.onclick = () => {
+      if (!goalCurrent() || busy || saved) return;
+      const goal = state.goals.find(g => g.id === button.dataset.visibilityGoal); if (!goal) return;
+      if (!goal.parent_visible && !confirm('Показать родителю название, исходное состояние, критерий, срок и прогресс этой цели?')) return;
+      return mutateGoal(button,{parent_visible:!goal.parent_visible},goalMessage(!goal.parent_visible));
+    });
+    document.querySelectorAll('[data-del-goal]').forEach(button => button.onclick = async () => {
+      if (!goalCurrent() || busy || saved || !confirm('Удалить цель? Она будет удалена из карточки ребёнка и кабинета родителя.')) return;
+      busy = true; button.disabled = true;
+      try {
+        const goal = state.goals.find(g => g.id === button.dataset.delGoal);
+        const query = sb.from('goals').delete().eq('id',button.dataset.delGoal).eq('patient_id',p.id);
+        if (goal?.updated_at) query.eq('updated_at',goal.updated_at);
+        const {error} = await query.select('id').single();
+        if (!goalCurrent()) return; if (error) throw error; await reloadGoals('Цель удалена из карточки и кабинета родителя');
+      } catch {if (goalCurrent()) {button.disabled = false;status.textContent = 'Не удалось удалить цель. Попробуйте ещё раз.';}}
+      finally {busy = false;}
+    });
   }
   if (state.tab === 'sessions') {
     box.innerHTML = `<form class="card session-form-card" id="sessionForm"><div class="form-heading"><div><h3>Новое занятие</h3><p>Зафиксируйте наблюдения, переносимость и функциональные изменения.</p></div></div>
@@ -7899,6 +7786,7 @@ const suggestedProgress =
 
     pendingGoalUpdates.push({
       goal_id: goal.id,
+      updated_at: goal.updated_at,
       progress: suggestedProgress
     });
 
@@ -8436,16 +8324,16 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
   let goalUpdateFailed = false;
 
 for (const update of pendingGoalUpdates) {
-  const { error: goalError } = await sb
+  const goalQuery = sb
     .from('goals')
     .update({
       progress: update.progress
     })
     .eq('id', update.goal_id)
     .eq('patient_id', p.id)
-    .eq('status', 'active')
-    .select('id')
-    .single();
+    .eq('status', 'active');
+  if (update.updated_at) goalQuery.eq('updated_at', update.updated_at);
+  const { error: goalError } = await goalQuery.select('id').single();
     if (!accountIsCurrent()) return;
 
   if (goalError) {

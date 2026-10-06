@@ -8,6 +8,17 @@ const identitySql=readFileSync(new URL('../supabase/migrations/20261003_008_pare
 const invitationFlows=[...identitySql.match(/auth_flow text not null check \(auth_flow in \(([^)]+)\)\)/)[1].matchAll(/'([^']+)'/g)].map(match=>match[1]);
 const CHILD='11111111-1111-4111-8111-111111111111', OTHER='22222222-2222-4222-8222-222222222222', REPORT='33333333-3333-4333-8333-333333333333', MEDIA='44444444-4444-4444-8444-444444444444';
 const wait=()=>new Promise(r=>setTimeout(r,10));
+test('parent Goals presents safe details, clamps invalid progress, escapes text and refreshes from server',async()=>{
+ let rows=[{title:'Правой рукой',baseline:'<img src=x onerror=alert(1)>',criterion:'Три попытки',deadline:'2027-01-01',progress:60,status:'in_progress',updated_at:'2026-10-06',description:'Сохранённое описание'}];
+ const h=setup({rpc:n=>n==='parent_portal_goals'?{data:rows}:undefined});
+ await h.portal.start();await h.portal.navigate('goals');
+ for(const text of ['Правой рукой','С чего начали','Три попытки','60%','Сохранённое описание'])assert.ok(h.app.textContent.includes(text));
+ assert.equal(h.app.querySelector('[onerror]'),null);assert.equal(h.app.querySelector('progress').value,60);
+ rows=[{title:'Обновлённая цель',progress:100,status:'achieved'}];
+ h.app.querySelector('[data-refresh-goals]').click();await wait();assert.match(h.app.textContent,/Обновлённая цель/);assert.match(h.app.textContent,/100%/);
+ rows=[];h.app.querySelector('[data-refresh-goals]').click();await wait();assert.equal(h.app.querySelector('.parent-goal-card'),null);
+ assert.match(h.app.textContent,/Опубликованных целей пока нет/);
+});
 function setup({invite=false,flow='new',children=[{id:CHILD,display_name:'Маша',date_of_birth:'2020-01-01'}],rpc,functions,user={id:'parent',email:'p@example.com',user_metadata:{full_name:'Мама'}}}={}) {
  const window=new Window({url:`https://fizira.com/parent.html${invite?'?invite=private-token':''}`}); window.document.body.innerHTML='<main id="app"></main>';
  const calls=[],updates=[];let callback;
