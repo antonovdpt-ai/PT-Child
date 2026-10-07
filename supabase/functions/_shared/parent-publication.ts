@@ -39,7 +39,7 @@ async function readBody(request: Request, operation: string) {
     const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
     const body=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
     if(!body||typeof body!=='object'||Array.isArray(body)) throw new Error();
-    const keys=operation==='generate'?['report_id','report_kind']:body.kind==='photo'?['kind','report_id','media_id']:['kind','report_id'];
+    const keys=operation==='generate'?(body.mode==='export'?['report_id','report_kind','mode']:['report_id','report_kind']):body.kind==='photo'?['kind','report_id','media_id']:['kind','report_id'];
     if(Object.keys(body).length!==keys.length||Object.keys(body).some(k=>!keys.includes(k))) throw new Error();
     uuid(body.report_id);if(operation==='generate'){if(!['initial','session'].includes(body.report_kind))throw new Error();}
     else {if(!['pdf','photo'].includes(body.kind))throw new Error();if(body.kind==='photo')uuid(body.media_id);}
@@ -50,6 +50,71 @@ async function blobBytes(result: any): Promise<Uint8Array> {
   if(result.error||!result.data||result.data.size<=0||result.data.size>MAX_MEDIA_BYTES)throw new Error(PUBLIC_ERROR);
   return new Uint8Array(await result.data.arrayBuffer());
 }
+// Export is a read-only owner operation. It never claims/publishes a report or
+// creates parent identity/access. Use the actor's JWT and existing RLS for ALL reads.
+async function exportOwnedPdf(user: any, body: any, userId: string, deps: Dependencies, cors: Record<string,string>) {
+  const fields = body.report_kind==='initial'
+    ? ['complaint','strengths','observations','goals','progress','recommendations','therapist_name','therapist_profession','therapist_organization','therapist_phone']
+    : ['session_id','what_did','what_worked','attention','home_recommendations'];
+  const columns=['id','patient_id','therapist_id','publication_status','publication_revision','published_at','published_snapshot','pdf_storage_path','pdf_sha256','created_at','updated_at',...fields].join(',');
+  const table=body.report_kind==='initial'?'parent_reports':'parent_session_reports';
+  const read=()=>user.from(table).select(columns).eq('id',body.report_id).eq('therapist_id',userId).single();
+  const source=await read();const report=source.data;
+  if(source.error||!report||report.id!==body.report_id||report.therapist_id!==userId)throw new ParentPublicError(403);
+  if(!['draft','publication_error','published','archived'].includes(report.publication_status))throw new ParentPublicError(409);
+  const child=await user.from('patients').select('id,therapist_id,display_name').eq('id',report.patient_id).eq('therapist_id',userId).single();
+  if(child.error||!child.data||child.data.id!==report.patient_id||child.data.therapist_id!==userId)throw new ParentPublicError(403);
+  const frozen=!!report.published_at;
+  let pdf: Uint8Array | undefined;
+  if(frozen && report.pdf_sha256) {
+    const expected=`${userId}/parent-reports/${body.report_kind}/${body.report_id}/${report.publication_revision}.pdf`;
+    if(report.pdf_storage_path!==expected||!/^[a-f0-9]{64}$/.test(report.pdf_sha256))throw new ParentPublicError(403);
+    pdf=await blobBytes(await user.storage.from('patient-media').download(expected));
+    if(await digestBytes(pdf)!==report.pdf_sha256)throw new Error(PUBLIC_ERROR);
+  } else {
+    let snapshot=report.published_snapshot;
+    // 009 snapshots were unversioned. Reuse only recognized report-bound originals;
+    // never fill a legacy publication from current clinical text.
+    if(frozen) {
+      const paths=[`${userId}/parent-reports/${body.report_kind}/${body.report_id}/${report.publication_revision}.pdf`, `${userId}/parent-reports/${table}/${body.report_id}/${report.publication_revision}.pdf`];
+      if(paths.includes(report.pdf_storage_path)) {
+        const original=await user.storage.from('patient-media').download(report.pdf_storage_path);
+        if(!original.error) {
+          pdf=await blobBytes(original);
+          if(new TextDecoder().decode(pdf.subarray(0,5))!=='%PDF-')throw new Error(PUBLIC_ERROR);
+        }
+      }
+      if(!pdf) {
+        if(!snapshot||typeof snapshot!=='object'||Array.isArray(snapshot))throw new Error(PUBLIC_ERROR);
+        snapshot={schema_version:1,report_kind:body.report_kind,revision:report.publication_revision,
+          source_date:snapshot.source_date||String(report.created_at).slice(0,10),child_name:snapshot.child_name||'',
+          ...Object.fromEntries([...fields.filter(k=>k!=='session_id'),'therapist_name','therapist_profession','therapist_organization','therapist_phone'].map(k=>[k,snapshot[k]]))};
+      }
+    }
+    if(!frozen) {
+      snapshot={schema_version:1,report_kind:body.report_kind,revision:report.publication_revision,
+        source_date:String(report.created_at).slice(0,10),child_name:child.data.display_name,
+        ...Object.fromEntries(fields.filter(k=>k!=='session_id').map(k=>[k,report[k]]))};
+      if(body.report_kind==='session') {
+        const session=await user.from('sessions').select('id,patient_id,therapist_id,session_date').eq('id',report.session_id).eq('patient_id',report.patient_id).eq('therapist_id',userId).single();
+        if(session.error||!session.data)throw new ParentPublicError(403);
+        const profile=await user.from('profiles').select('full_name,profession,organization,phone').eq('id',userId).maybeSingle();
+        if(profile.error)throw new Error(PUBLIC_ERROR);
+        snapshot.source_date=session.data.session_date||snapshot.source_date;
+        for(const [key,column] of Object.entries({therapist_name:'full_name',therapist_profession:'profession',therapist_organization:'organization',therapist_phone:'phone'}))snapshot[key]=profile.data?.[column]||null;
+      }
+    }
+    if(!pdf) {
+      if(!snapshot||snapshot.report_kind!==body.report_kind)throw new Error(PUBLIC_ERROR);
+      pdf=await (deps.render||renderParentPublicationPdf)(snapshot);
+    }
+  }
+  if(!pdf||!pdf.length||pdf.length>MAX_MEDIA_BYTES||new TextDecoder().decode(pdf.subarray(0,5))!=='%PDF-')throw new Error(PUBLIC_ERROR);
+  const [checked,active,roles]=await Promise.all([read(),user.rpc('account_is_active'),user.rpc('current_app_roles')]);
+  if(checked.error||JSON.stringify(checked.data)!==JSON.stringify(report)||active.error||active.data!==true||roles.error||!roles.data?.some((r:any)=>r.role==='specialist'))throw new ParentPublicError(403);
+  return new Response(pdf,{headers:{...cors,'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="Fizira-report.pdf"','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+}
+
 export function parentPublicationHandler(operation: 'generate'|'file', deps: Dependencies) {
   return async(request:Request):Promise<Response>=>{
     const cors=parentCors(request.headers.get('origin'),deps.env('FIZIRA_ALLOWED_ORIGINS')||'https://app.fizira.com');const origin=cors?.['Access-Control-Allow-Origin']||null;
@@ -76,6 +141,7 @@ export function parentPublicationHandler(operation: 'generate'|'file', deps: Dep
         const visible=await user.rpc('parent_portal_report',{p_report_id:body.report_id});
         if(visible.error||!visible.data?.report||(body.kind==='photo'&&!visible.data.report.media_ids?.includes(body.media_id)))throw new ParentPublicError(403);
       }
+      if(operation==='generate'&&body.mode==='export')return await exportOwnedPdf(user,body,userId,deps,cors);
       admin=deps.createClient(url,required('SUPABASE_SERVICE_ROLE_KEY','SERVICE_ROLE_KEY'),{auth,global:{fetch:boundedFetch}});
       recovery=()=>deps.createClient(url,required('SUPABASE_SERVICE_ROLE_KEY','SERVICE_ROLE_KEY'),{auth,global:{fetch:(input:any,init:any={})=>fetch(input,{...init,signal:AbortSignal.timeout(10000)})}});
       const storage=admin.storage.from('patient-media');

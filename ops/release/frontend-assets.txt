@@ -12,6 +12,7 @@ parent.js
 parent.css
 parent-domain.mjs
 parent-specialist.js
+report-pdf-export.mjs
 favicon.ico
 fizira-symbol.png
 index.html

@@ -30,8 +30,8 @@ test('session suggestion saves its displayed version even after goal state refre
  assert.equal(env.pendingGoalUpdates[0].updated_at,goal.updated_at);
  const filters=[];
  const q={update(){return q;},eq(k,v){filters.push([k,v]);return q;},select(){return q;},single:async()=>({error:null})};
- Object.assign(env,{state:{goals:[{...goal,updated_at:'2026-10-06T11:00:00Z'}]},p:{id:'child'},sb:{from:()=>q},accountIsCurrent:()=>true,console});
- const saveStart=source.indexOf('for (const update of pendingGoalUpdates) {');
+ Object.assign(env,{goalUpdatesToSave:env.pendingGoalUpdates,sessionAccountIsCurrent:()=>true,state:{goals:[{...goal,updated_at:'2026-10-06T11:00:00Z'}]},p:{id:'child'},sb:{from:()=>q},accountIsCurrent:()=>true,console});
+ const saveStart=source.indexOf('for (const update of goalUpdatesToSave) {');
  const saveEnd=source.indexOf('if (!editingSessionId && p.next_session_plan)',saveStart);
  await new Function('env',`return (async()=>{with(env){let goalUpdateFailed=false;${source.slice(saveStart,saveEnd)}}})();`)(env);
  assert.ok(filters.some(([k,v])=>k==='updated_at'&&v===goal.updated_at));

@@ -279,3 +279,6 @@ body:not(.is-authenticated) .header,body:not(.is-authenticated) .warning{display
 .goal-visibility-control { display: flex; align-items: center; gap: 10px; }
 .goal-visibility-control input[type="checkbox"] { width: 22px; min-width: 22px; height: 22px; margin: 0; }
 .goal-form-card[hidden] { display: none; }
+
+.report-pdf-export { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line, #e2e8f0); }
+.report-pdf-export [data-pdf-status] { overflow-wrap: anywhere; }

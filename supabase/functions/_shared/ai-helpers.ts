@@ -117,3 +117,30 @@ export function allowedOrigin(origin: string | null, configured: string): string
   const allowed = configured.split(",").map((value) => value.trim()).filter(Boolean);
   return allowed.includes(origin) ? origin : null;
 }
+
+// Keep these two pure validators identical to the Edge contract; parity is tested.
+export function validateNextSessionPlan(plan: any) {
+  const text = (value: any) => typeof value === 'string' && value.trim().length > 0 && value.length <= 12000;
+  const list = (value: any) => Array.isArray(value) && value.length > 0 && value.every(text);
+  const placeholder = (value: any) => /^\s*(?:\d+[.)]?\s*)?рабочий блок(?:\s*\d+)?[.\s]*$/i.test(value);
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan) ||
+      !text(plan.main_task) || !text(plan.start_check?.action) ||
+      !Array.isArray(plan.work_blocks) || !plan.work_blocks.length || plan.work_blocks.length > 8 ||
+      !plan.work_blocks.every((block: any) => block && text(block.title) && !placeholder(block.title) &&
+        text(block.action) && !placeholder(block.action) && text(block.why) && text(block.progress_if)) ||
+      !list(plan.what_to_track) || !list(plan.session_success_criteria)) {
+    throw new Error('ИИ вернул неполный план. Повторите подготовку: нужны содержательные рабочие блоки и критерии проверки.');
+  }
+  return plan;
+}
+
+export function validateSessionDraft(draft: any) {
+  if (!draft || typeof draft !== 'object' || Array.isArray(draft) ||
+      typeof draft.session_note !== 'string' || !draft.session_note.trim() ||
+      ![null, '', 'good', 'medium', 'low', 'unclear'].includes(draft.tolerance) ||
+      ![null, '', 'improved', 'stable', 'worse', 'unclear'].includes(draft.dynamics_status) ||
+      typeof draft.function_changes !== 'string' || !Array.isArray(draft.goal_updates)) {
+    throw new Error('ИИ вернул некорректный черновик. Повторите разбор; введённые данные сохранены в форме.');
+  }
+  return draft;
+}

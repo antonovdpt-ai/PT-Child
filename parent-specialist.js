@@ -1,3 +1,4 @@
+import { mountReportPdfExport } from './report-pdf-export.mjs?v=1';
 import { escapeHtml as esc, safeSameOriginHttpsUrl } from './security-utils.mjs';
 import { publicationLabel } from './parent-domain.mjs';
 
@@ -67,10 +68,19 @@ async function renderReportEditor(o) {
       ${kind==='session'&&versions.length?`<nav class="parent-report-versions" aria-label="Версии отчёта занятия">${versions.map((v,i)=>`<button type="button" class="btn" data-session-version="${esc(v.id)}" ${v.id===report.id?'aria-current="true"':''}>Версия ${versions.length-i} · ${esc(v.created_at?new Date(v.created_at).toLocaleString('ru-RU'):'Дата не указана')} · ${esc(publicationLabel(v.publication_status))}</button>`).join('')}</nav>`:''}
       ${fields.map(k=>`<label>${esc(labels[k])}<textarea name="${k}" ${canEdit?'':'readonly'}>${esc(report[k]||'')}</textarea></label>`).join('')}
       ${kind==='session'?`<fieldset><legend>Явно выбрать фотографии</legend>${media.map((m,i)=>`<label class="parent-photo-choice"><input type="checkbox" name="media" value="${esc(m.id)}" ${(selected||[]).some(x=>x.patient_media_id===m.id)?'checked':''} disabled> Фото ${i+1} · ${esc(m.captured_at || m.created_at ? new Date(m.captured_at || m.created_at).toLocaleDateString('ru-RU') : 'Дата не указана')}<img data-photo="${esc(m.id)}" alt="Фото ${i+1}" hidden loading="lazy"><span data-photo-status>${canEdit?'Фото недоступно':'Опубликованная фотография сохранена в неизменяемой версии'}</span></label>`).join('') || '<p>Фотографий пока нет.</p>'}</fieldset>`:''}
-      <div class="parent-specialist-actions">${canEdit?'<button type="button" class="btn" data-save-report>Сохранить черновик</button><button type="button" class="btn primary" data-publish-report>Опубликовать / повторить PDF</button>':''}
+      <div class="parent-specialist-actions">${canEdit?'<button type="button" class="btn" data-save-report>Сохранить черновик</button><button type="button" class="btn primary" data-publish-report>Отправить в кабинет родителя</button>':''}
       ${locked?'<button type="button" class="btn" data-refresh-report>Обновить статус</button><button type="button" class="btn" data-recover-report>Повторить генерацию PDF</button><p>Если публикация прервалась, повтор доступен после 15 минут. Доступность проверяет сервер.</p>':''}
       ${report.id&&!canEdit&&!locked?'<button type="button" class="btn" data-new-version>Новая версия</button>':''}
-      ${report.publication_status==='published'?'<button type="button" class="btn" data-archive-report>В архив</button>':''}</div><p data-status role="status"></p></section>`;
+      ${report.publication_status==='published'?'<button type="button" class="btn" data-archive-report>В архив</button>':''}</div><div data-report-pdf-export></div><p data-status role="status"></p></section>`;
+    let pdfControl, unsaved=false;
+    let savedValues=Object.fromEntries(fields.map(k=>[k,String(report[k]||'').trim()]));
+    const valuesMatch=()=>fields.every(k=>o.root.querySelector(`[name="${k}"]`).value.trim()===savedValues[k]);
+    const mountPdf = () => {
+      if(!report.id || locked || !s.current()) return;
+      pdfControl=mountReportPdfExport({root:o.root.querySelector('[data-report-pdf-export]'), sb:o.sb, reportId:report.id, reportKind:kind, isCurrent:s.current, canPrepare:()=>!unsaved && valuesMatch()});
+    };
+    mountPdf();
+    o.root.querySelectorAll('textarea,[name=media]').forEach(field=>field.addEventListener('input',()=>{unsaved=true;pdfControl?.invalidate();}));
     async function save() {
       if(!s.current() || !editable(report)) return false;
       if(kind==='session' && [...o.root.querySelectorAll('[name=media]:checked')].some(x=>x.disabled)) {
@@ -101,6 +111,8 @@ async function renderReportEditor(o) {
         if(ids.length) await result(o.sb.from('parent_session_report_media').insert(ids.map((id,position)=>({parent_session_report_id:report.id,patient_media_id:id,patient_id:o.patient.id,therapist_id:o.user.id,position}))));
         if(!s.current()) return false;
       }
+      savedValues=Object.fromEntries(fields.map(k=>[k,String(values[k]||'').trim()]));
+      unsaved=!valuesMatch(); mountPdf();
       s.status('Черновик сохранён'); return true;
     }
     const bind=(selector,fn)=>{const b=o.root.querySelector(selector);if(b)s.action(b,fn);};

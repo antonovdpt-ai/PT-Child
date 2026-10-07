@@ -3,7 +3,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
 import { shouldRenderAuthEvent } from './auth-domain.mjs?v=1';
 import { createSpecialistRoleGate } from './role-gate.mjs';
-import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=5';
+import { mountReportPdfExport } from './report-pdf-export.mjs?v=1';
+import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=6';
 import { publicationLabel } from './parent-domain.mjs';
 import { renderCabinet } from './cabinet.js?v=7';
 
@@ -186,7 +187,7 @@ function plannedSessionHtml(plan) {
         whatToTrack.length
           ? `
             <div class="item-sub" style="margin-top:10px">
-              <b>📌 Что отслеживали:</b>
+              <b>📌 Что планировали отслеживать:</b>
               <ul>
                 ${whatToTrack
                   .map(item => `<li>${esc(item)}</li>`)
@@ -230,6 +231,34 @@ async function callAI(operation, patientId, input = {}, files = []) {
   return data.text;
 }
 
+// Keep these two pure validators identical to the Edge contract; parity is tested.
+function validateNextSessionPlan(plan) {
+  const text = value => typeof value === 'string' && value.trim().length > 0 && value.length <= 12000;
+  const list = value => Array.isArray(value) && value.length > 0 && value.every(text);
+  const placeholder = value => /^\s*(?:\d+[.)]?\s*)?рабочий блок(?:\s*\d+)?[.\s]*$/i.test(value);
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan) ||
+      !text(plan.main_task) || !text(plan.start_check?.action) ||
+      !Array.isArray(plan.work_blocks) || !plan.work_blocks.length || plan.work_blocks.length > 8 ||
+      !plan.work_blocks.every(block => block && text(block.title) && !placeholder(block.title) &&
+        text(block.action) && !placeholder(block.action) && text(block.why) && text(block.progress_if)) ||
+      !list(plan.what_to_track) || !list(plan.session_success_criteria)) {
+    throw new Error('ИИ вернул неполный план. Повторите подготовку: нужны содержательные рабочие блоки и критерии проверки.');
+  }
+  return plan;
+}
+
+function validateSessionDraft(draft) {
+  if (!draft || typeof draft !== 'object' || Array.isArray(draft) ||
+      typeof draft.session_note !== 'string' || !draft.session_note.trim() ||
+      ![null, '', 'good', 'medium', 'low', 'unclear'].includes(draft.tolerance) ||
+      ![null, '', 'improved', 'stable', 'worse', 'unclear'].includes(draft.dynamics_status) ||
+      typeof draft.function_changes !== 'string' || !Array.isArray(draft.goal_updates)) {
+    throw new Error('ИИ вернул некорректный черновик. Повторите разбор; введённые данные сохранены в форме.');
+  }
+  return draft;
+}
+
+
 async function analyzeSessionDraft({
   patientId,
   transcript
@@ -241,7 +270,7 @@ async function analyzeSessionDraft({
     .replace(/```/g, "")
     .trim();
 
-  return JSON.parse(cleaned);
+  return validateSessionDraft(JSON.parse(cleaned));
 }
 
 async function prepareNextSessionPlan(patientId) {
@@ -253,14 +282,7 @@ async function prepareNextSessionPlan(patientId) {
     .trim();
 
   const result = JSON.parse(cleaned);
-
-  if (!result || typeof result !== 'object') {
-    throw new Error(
-      'ИИ вернул некорректный план занятия'
-    );
-  }
-
-  return result;
+  return validateNextSessionPlan(result);
 }
 
 function buildNextSessionContext(p) {
@@ -4894,13 +4916,24 @@ const setParentReportStatus = (status, message) => {
   statusEl.dataset.state = status;
 };
 
+
+function mountOverviewPdfExport(report) {
+  const root = document.getElementById('parentReportPdfExport');
+  if (!root || !report?.id || !parentReportEditor) return;
+  const fields = {therapist_name:'reportTherapistName', complaint:'reportComplaint', strengths:'reportStrengths', observations:'reportObservations', goals:'reportGoals', progress:'reportProgress', recommendations:'reportRecommendations'};
+  const control = mountReportPdfExport({root, sb, reportId:report.id, reportKind:'initial',
+    isCurrent:() => accountIsCurrent() && parentReportEditor.style.display !== 'none',
+    canPrepare:() => Object.entries(fields).every(([key, id]) => (document.getElementById(id)?.value.trim() || '') === (String(report[key] || '').trim()))});
+  parentReportEditor.oninput = () => control.invalidate();
+}
+
 if (state.tab === 'overview') {
   box.insertAdjacentHTML('beforeend', `
     <section class="card parent-report-launch">
       <div class="parent-report-launch-copy">
         <div class="workspace-eyebrow">Обратная связь</div>
         <h3>Отчёт для родителя</h3>
-        <p>Подготовьте и сохраните черновик. Публикация PDF — во вкладке «Кабинет родителя».</p>
+        <p>Сохраните отчёт, скачайте PDF или поделитесь файлом без кабинета родителя. Отправка в кабинет — отдельное действие.</p>
       </div>
       <button
         type="button"
@@ -5016,6 +5049,7 @@ if (state.tab === 'overview') {
         </button>
       </div>
       <div id="parentReportStatus" class="parent-report-status" aria-live="polite"></div>
+      <div id="parentReportPdfExport"></div>
     </div>
 
 <section class="card parent-report-history">
@@ -5119,6 +5153,7 @@ if (state.tab === 'overview') {
   Удалить
 </button>
 
+                  <div data-report-pdf-export="${esc(report.id)}"></div>
                 </article>
               `)
               .join('')
@@ -5155,6 +5190,7 @@ editParentReportBtn =
   if (parentReportBtn && parentReportEditor) {
     parentReportBtn.onclick = () => {
       editingParentReportId = null;
+      document.getElementById('parentReportPdfExport')?.replaceChildren();
       setParentReportStatus('', '');
 
       const reportTherapistName =
@@ -5222,6 +5258,7 @@ if (generateParentReportBtn) {
     generateParentReportBtn.disabled = true;
     generateParentReportBtn.textContent =
       'Подготавливаю черновик...';
+    document.getElementById('parentReportPdfExport')?.replaceChildren();
     setParentReportStatus('loading', 'ИИ подготавливает черновик отчёта…');
 
     try {
@@ -5389,7 +5426,8 @@ const { error } = saveResult;
     if (!accountIsCurrent()) return;
     saveParentReportPdfBtn.textContent =
       '✓ Черновик сохранён';
-    setParentReportStatus('saved', 'Черновик сохранён. Для публикации откройте «Кабинет родителя».');
+    setParentReportStatus('saved', 'Черновик сохранён. Подготовьте PDF для скачивания или передачи файла. Отправка в кабинет родителя — отдельно.');
+    if (document.getElementById('parentReportPdfExport')) mountOverviewPdfExport({...report, id:editingParentReportId, therapist_name:therapistName});
 
     setTimeout(() => {
       if (!accountIsCurrent()) return;
@@ -5399,6 +5437,10 @@ const { error } = saveResult;
     }, 1000);
   };
 }
+
+document.querySelectorAll('[data-report-pdf-export]').forEach(root => {
+  mountReportPdfExport({root, sb, reportId:root.dataset.reportPdfExport, reportKind:'initial', isCurrent:accountIsCurrent});
+});
 
 document
   .querySelectorAll('[data-open-parent-report]')
@@ -5522,6 +5564,7 @@ if (generateParentReportBtn) {
 }
 
       parentReportEditor.style.display = 'block';
+      mountOverviewPdfExport(report);
 
       parentReportEditor.scrollIntoView({
         behavior: 'smooth',
@@ -7465,6 +7508,7 @@ if (saveStandardizedHistoryBtn) {
   }
   if (state.tab === 'sessions') {
     box.innerHTML = `<form class="card session-form-card" id="sessionForm"><div class="form-heading"><div><h3>Новое занятие</h3><p>Зафиксируйте наблюдения, переносимость и функциональные изменения.</p></div></div>
+<section id="acceptedSessionPlan" aria-label="План следующего занятия"></section>
 
 <div
   class="session-ai-intake"
@@ -7615,6 +7659,11 @@ ${state.sessions.map(s => `
       };
     });
     const form = document.getElementById('sessionForm'), btn = document.getElementById('sessionSaveBtn'), status = document.getElementById('sessionStatus'); watchFormDirty(form, btn, 'Сохранить занятие');
+const sessionIsCurrent = () => accountIsCurrent() && form.isConnected && state.tab === 'sessions';
+// Finish already-confirmed writes for the captured patient even if the view changes.
+const sessionAccountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && roleGate.canNavigate();
+
+
 
     enableVoiceInput(form);
 
@@ -7641,7 +7690,7 @@ sessionAiStatus.insertAdjacentElement(
 let pendingGoalUpdates = [];
 
 analyzeSessionBtn.onclick = async () => {
-    if (!accountIsCurrent()) return;
+    if (!sessionIsCurrent()) return;
   const transcript = sessionTranscript.value.trim();
 
   if (!transcript) {
@@ -7649,6 +7698,10 @@ analyzeSessionBtn.onclick = async () => {
       'Сначала расскажите о занятии.';
     return;
   }
+
+  const draftFields = ['note', 'tolerance', 'dynamics_status', 'function_changes'];
+  const before = draftFields.map(name => form.elements[name].value);
+  if (before.some(Boolean) && !confirm('ИИ заменит заполненные поля занятия. Продолжить?')) return;
 
   analyzeSessionBtn.disabled = true;
   analyzeSessionBtn.textContent = 'Анализируем…';
@@ -7680,7 +7733,14 @@ analyzeSessionBtn.onclick = async () => {
       goals: activeGoals,
       recentSessions
     });
-    if (!accountIsCurrent()) return;
+    if (!sessionIsCurrent()) return;
+
+    validateSessionDraft(result);
+    if (draftFields.some((name, index) => form.elements[name].value !== before[index]) &&
+        !confirm('Пока ИИ работал, поля были изменены. Заменить ваши правки черновиком ИИ?')) {
+      sessionAiStatus.textContent = 'Ручные правки сохранены в форме. Черновик ИИ не применён.';
+      return;
+    }
 
     form.elements.note.value =
       result.session_note || transcript;
@@ -7825,7 +7885,7 @@ if (!sessionGoalSuggestions.children.length) {
     sessionAiStatus.textContent =
       '✓ Черновик подготовлен. Проверьте данные перед сохранением.';
   } catch (error) {
-    if (!accountIsCurrent()) return;
+    if (!sessionIsCurrent()) return;
     console.error(
       'Ошибка разбора занятия ИИ:',
       error
@@ -7840,404 +7900,139 @@ if (!sessionGoalSuggestions.children.length) {
   }
 };
 
-const prepareNextSessionBtn =
-  document.getElementById('prepareNextSessionBtn');
-
-const nextSessionPlanStatus =
-  document.getElementById('nextSessionPlanStatus');
-
-const nextSessionPlan =
-  document.getElementById('nextSessionPlan');
-
-  const savedNextSessionPlan = p.next_session_plan;
-
-if (savedNextSessionPlan && nextSessionPlan) {
-  const savedWorkBlocks =
-    Array.isArray(savedNextSessionPlan.work_blocks)
-      ? savedNextSessionPlan.work_blocks
-      : [];
-
-  const savedWhatToTrack =
-    Array.isArray(savedNextSessionPlan.what_to_track)
-      ? savedNextSessionPlan.what_to_track
-      : [];
-
-  const savedSuccessCriteria =
-    Array.isArray(savedNextSessionPlan.session_success_criteria)
-      ? savedNextSessionPlan.session_success_criteria
-      : [];
-
-  const savedCautions =
-    Array.isArray(savedNextSessionPlan.cautions)
-      ? savedNextSessionPlan.cautions
-      : [];
-
-  nextSessionPlanStatus.textContent =
-    '✓ Сохранённый план следующего занятия';
-
-  nextSessionPlan.innerHTML = `
-    <div class="item">
-      <div class="item-title">
-        Главная задача
-      </div>
-
-      <div style="margin-top:6px">
-        ${esc(savedNextSessionPlan.main_task || 'Не определена')}
-      </div>
-    </div>
-
-    ${
-      savedNextSessionPlan.start_check
-        ? `
-          <div class="item">
-            <div class="item-title">
-              Проверить в начале
-            </div>
-
-            <div style="margin-top:6px">
-              ${esc(savedNextSessionPlan.start_check.action || '')}
-            </div>
-          </div>
-        `
-        : ''
-    }
-
-    ${savedWorkBlocks.slice(0, 3).map((block, index) => `
-      <div class="item">
-        <div class="item-title">
-          ${index + 1}. ${esc(block.title || 'Рабочий блок')}
-        </div>
-
-        <div style="margin-top:6px">
-          ${esc(block.action || '')}
-        </div>
-      </div>
-    `).join('')}
-
-    <details class="item" style="margin-top:12px">
-      <summary
-        class="item-title"
-        style="cursor:pointer"
-      >
-        Подробнее о плане
-      </summary>
-
-      ${
-        savedNextSessionPlan.start_check?.why
-          ? `
-            <div class="item-sub" style="margin-top:12px">
-              <b>Почему начинаем с проверки:</b><br>
-              ${esc(savedNextSessionPlan.start_check.why)}
-            </div>
-          `
-          : ''
-      }
-
-      ${
-        savedWhatToTrack.length
-          ? `
-            <div class="item-sub" style="margin-top:16px">
-              <b>Что отслеживать</b>
-              <ul>
-                ${savedWhatToTrack
-                  .map(item => `<li>${esc(item)}</li>`)
-                  .join('')}
-              </ul>
-            </div>
-          `
-          : ''
-      }
-
-      ${
-        savedSuccessCriteria.length
-          ? `
-            <div class="item-sub" style="margin-top:16px">
-              <b>Признаки прогресса</b>
-              <ul>
-                ${savedSuccessCriteria
-                  .map(item => `<li>${esc(item)}</li>`)
-                  .join('')}
-              </ul>
-            </div>
-          `
-          : ''
-      }
-
-      ${
-        savedCautions.length
-          ? `
-            <div class="item-sub" style="margin-top:16px">
-              <b>Учесть</b>
-              <ul>
-                ${savedCautions
-                  .map(item => `<li>${esc(item)}</li>`)
-                  .join('')}
-              </ul>
-            </div>
-          `
-          : ''
-      }
-    </details>
-  `;
-}
-
-if (prepareNextSessionBtn) {
-  prepareNextSessionBtn.onclick = async () => {
-    if (!accountIsCurrent()) return;
-    prepareNextSessionBtn.disabled = true;
-    prepareNextSessionBtn.textContent =
-      'Готовим план…';
-
-    nextSessionPlanStatus.textContent =
-      'Fizira анализирует цели и последние занятия...';
-
-    nextSessionPlan.innerHTML = '';
-
-    try {
-      const result =
-        await prepareNextSessionPlan(p.id);
-    if (!accountIsCurrent()) return;
-
-      const workBlocks =
-        Array.isArray(result.work_blocks)
-          ? result.work_blocks
-          : [];
-
-      const whatToTrack =
-        Array.isArray(result.what_to_track)
-          ? result.what_to_track
-          : [];
-
-      const successCriteria =
-        Array.isArray(result.session_success_criteria)
-          ? result.session_success_criteria
-          : [];
-
-      const cautions =
-        Array.isArray(result.cautions)
-          ? result.cautions
-          : [];
-
-     nextSessionPlan.innerHTML = `
-  <div class="item">
-    <div class="item-title">
-      Главная задача
-    </div>
-
-    <div style="margin-top:6px">
-      ${esc(result.main_task || 'Не определена')}
-    </div>
-  </div>
-
-  ${
-    result.start_check
-      ? `
-        <div class="item">
-          <div class="item-title">
-            Проверить в начале
-          </div>
-
-          <div style="margin-top:6px">
-            ${esc(result.start_check.action || '')}
-          </div>
-        </div>
-      `
-      : ''
-  }
-
-  ${workBlocks.slice(0, 3).map((block, index) => `
-    <div class="item">
-      <div class="item-title">
-        ${index + 1}. ${esc(block.title || 'Рабочий блок')}
-      </div>
-
-      <div style="margin-top:6px">
-        ${esc(block.action || '')}
-      </div>
-    </div>
-  `).join('')}
-
-  <details class="item" style="margin-top:12px">
-    <summary
-      class="item-title"
-      style="cursor:pointer"
-    >
-      Подробнее о плане
-    </summary>
-
-    ${
-      result.start_check?.why
-        ? `
-          <div class="item-sub" style="margin-top:12px">
-            <b>Почему начинаем с проверки:</b><br>
-            ${esc(result.start_check.why)}
-          </div>
-        `
-        : ''
-    }
-
-    ${workBlocks.slice(0, 3).map((block, index) => `
-      ${
-        block.why || block.progress_if
-          ? `
-            <div class="item-sub" style="margin-top:12px">
-              <b>${index + 1}. ${esc(block.title || 'Рабочий блок')}</b>
-
-              ${
-                block.why
-                  ? `
-                    <div style="margin-top:5px">
-                      Зачем: ${esc(block.why)}
-                    </div>
-                  `
-                  : ''
-              }
-
-              ${
-                block.progress_if
-                  ? `
-                    <div style="margin-top:5px">
-                      Усложнить, если: ${esc(block.progress_if)}
-                    </div>
-                  `
-                  : ''
-              }
-            </div>
-          `
-          : ''
-      }
-    `).join('')}
-
-    ${
-      whatToTrack.length
-        ? `
-          <div class="item-sub" style="margin-top:16px">
-            <b>Что отслеживать</b>
-            <ul>
-              ${whatToTrack
-                .map(item => `<li>${esc(item)}</li>`)
-                .join('')}
-            </ul>
-          </div>
-        `
-        : ''
-    }
-
-    ${
-      successCriteria.length
-        ? `
-          <div class="item-sub" style="margin-top:16px">
-            <b>Признаки прогресса</b>
-            <ul>
-              ${successCriteria
-                .map(item => `<li>${esc(item)}</li>`)
-                .join('')}
-            </ul>
-          </div>
-        `
-        : ''
-    }
-
-    ${
-      cautions.length
-        ? `
-          <div class="item-sub" style="margin-top:16px">
-            <b>Учесть</b>
-            <ul>
-              ${cautions
-                .map(item => `<li>${esc(item)}</li>`)
-                .join('')}
-            </ul>
-          </div>
-        `
-        : ''
-    }
-  </details>
-
-<div class="actions" style="margin-top:14px">
-  <button
-    type="button"
-    class="btn primary full"
-    id="useNextSessionPlanBtn"
-  >
-    Использовать как план занятия
-  </button>
-</div>
-
-`;
-
-const useNextSessionPlanBtn =
-  document.getElementById('useNextSessionPlanBtn');
-
-if (useNextSessionPlanBtn) {
-  useNextSessionPlanBtn.onclick = async () => {
-    if (!accountIsCurrent()) return;
-    useNextSessionPlanBtn.disabled = true;
-    useNextSessionPlanBtn.textContent =
-      'Сохраняю план...';
-
-    const savedPlan = {
-      ...result,
-      saved_at: new Date().toISOString()
-    };
-
-    const { error: savePlanError } = await sb
-      .from('patients')
-      .update({
-        next_session_plan: savedPlan
-      })
-      .eq('id', p.id)
-      .eq('therapist_id', user.id);
-    if (!accountIsCurrent()) return;
-
-    if (savePlanError) {
-      console.error(
-        'Не удалось сохранить план занятия:',
-        savePlanError
-      );
-
-      useNextSessionPlanBtn.disabled = false;
-      useNextSessionPlanBtn.textContent =
-        'Использовать как план занятия';
-
-      nextSessionPlanStatus.textContent =
-        `Ошибка сохранения: ${savePlanError.message}`;
-
-      return;
-    }
-
-    useNextSessionPlanBtn.textContent =
-      '✓ План сохранён';
-
-    nextSessionPlanStatus.textContent =
-      '✓ План выбран для следующего занятия.';
-  };
-}
-
-      nextSessionPlanStatus.textContent =
-        '✓ План подготовлен. Специалист принимает окончательное решение.';
-    } catch (error) {
-    if (!accountIsCurrent()) return;
-      console.error(
-        'Ошибка подготовки следующего занятия:',
-        error
-      );
-
-      nextSessionPlanStatus.textContent =
-        `Ошибка ИИ: ${error.message}`;
-    } finally {
-      prepareNextSessionBtn.disabled = false;
-      prepareNextSessionBtn.textContent =
-        'Подготовить следующее занятие';
-    }
-  };
-}
-
+const prepareNextSessionBtn = document.getElementById('prepareNextSessionBtn');
+const nextSessionPlanStatus = document.getElementById('nextSessionPlanStatus');
+const nextSessionPlan = document.getElementById('nextSessionPlan');
+const acceptedSessionPlan = document.getElementById('acceptedSessionPlan');
+let planDirty = false;
+let planSaving = false;
+let sessionSaving = false;
 let editingSessionId = null;
+
+// The patient JSONB plan is the pending plan; sessions.planned_session is its immutable snapshot.
+// Recovered from initial diff; unchanged in subsequent reviewed snapshots.
+function planEditor(root, plan, buttonId, buttonText) {
+  const field = (key, label, value) => `<label>${esc(label)}<textarea data-plan-field="${key}">${esc(value || '')}</textarea></label>`;
+  root.innerHTML = `
+    <h4>План следующего занятия</h4>
+    <p class="muted tiny">Планируемая работа. Запись проведённого занятия заполняется отдельно.</p>
+    ${field('main_task', 'Главная задача', plan.main_task)}
+    ${field('start_check.action', 'Проверить в начале', plan.start_check.action)}
+    ${plan.work_blocks.map((block, i) => `<div class="item">
+      ${field(`work_blocks.${i}.title`, `${i + 1}. Название активности`, block.title)}
+      ${field(`work_blocks.${i}.action`, 'Исходное положение и действия специалиста и ребёнка', block.action)}
+      ${field(`work_blocks.${i}.why`, 'Цель блока', block.why)}
+      ${field(`work_blocks.${i}.progress_if`, 'Критерий выполнения или прогрессии', block.progress_if)}
+    </div>`).join('')}
+    ${field('what_to_track', 'Что отслеживать — по одному признаку на строку', plan.what_to_track.join('\n'))}
+    ${field('session_success_criteria', 'Признаки прогресса — по одному критерию на строку', plan.session_success_criteria.join('\n'))}
+    ${field('cautions', 'Учесть', Array.isArray(plan.cautions) ? plan.cautions.join('\n') : '')}
+    <button type="button" class="btn primary full" id="${buttonId}">${buttonText}</button>
+    <div data-plan-status role="status" aria-live="polite" class="save-status"></div>`;
+  const read = () => {
+    const edited = structuredClone(plan);
+    root.querySelectorAll('[data-plan-field]').forEach(input => {
+      const parts = input.dataset.planField.split('.');
+      let target = edited;
+      for (const part of parts.slice(0, -1)) target = target[part];
+      const key = parts.at(-1);
+      target[key] = ['what_to_track','session_success_criteria','cautions'].includes(key)
+        ? input.value.split('\n').map(v => v.trim()).filter(Boolean) : input.value.trim();
+    });
+    return validateNextSessionPlan(edited);
+  };
+  return read;
+}
+
+
+
+async function persistPlan(plan) {
+  validateNextSessionPlan(plan);
+  const savedPlan = { ...plan, saved_at: new Date().toISOString() };
+  const query = sb.from('patients').update({next_session_plan:savedPlan})
+    .eq('id', p.id).eq('therapist_id', accountUserId);
+  // Do not overwrite a plan accepted in another tab while this form was open.
+  if (p.next_session_plan) query.eq('next_session_plan', JSON.stringify(p.next_session_plan));
+  else query.is('next_session_plan', null);
+  const {data, error} = await query.select('id').single();
+  if (error || !data) throw new Error('Не удалось сохранить план. Возможно, он изменён в другой вкладке. Обновите карточку и повторите.');
+  if (!sessionAccountIsCurrent()) return false;
+  p.next_session_plan = savedPlan;
+  return true;
+}
+
+function lockPlanFields(root, locked) {
+  root.querySelectorAll('[data-plan-field]').forEach(field => { field.disabled = locked; });
+}
+
+function showAcceptedPlan() {
+  acceptedSessionPlan.innerHTML = '';
+  planDirty = false;
+  if (!p.next_session_plan || editingSessionId) return;
+  try { validateNextSessionPlan(p.next_session_plan); }
+  catch {
+    acceptedSessionPlan.innerHTML = '<p role="status">Ранее сохранённый план неполный. Подготовьте новый план ниже. Исходные данные не изменены.</p>';
+    return;
+  }
+  const read = planEditor(acceptedSessionPlan, p.next_session_plan, 'saveAcceptedPlanBtn', 'Сохранить изменения плана');
+  const message = acceptedSessionPlan.querySelector('[data-plan-status]');
+  const button = document.getElementById('saveAcceptedPlanBtn');
+  message.textContent = '✓ План используется для следующего занятия';
+  acceptedSessionPlan.oninput = () => { planDirty = true; message.textContent = 'План изменён — сохраните изменения'; };
+  button.onclick = async () => {
+    if (!sessionIsCurrent() || planSaving || sessionSaving) return;
+    planSaving = true; button.disabled = true;
+    lockPlanFields(acceptedSessionPlan, true);
+    message.textContent = 'Сохраняю изменения плана…';
+    try {
+      if (await persistPlan(read()) && sessionIsCurrent()) { showAcceptedPlan(); acceptedSessionPlan.querySelector('[data-plan-status]').textContent = '✓ Изменения плана сохранены'; }
+    } catch (error) { if (sessionIsCurrent()) message.textContent = error.message; }
+    finally { planSaving = false; button.disabled = false; lockPlanFields(acceptedSessionPlan, false); }
+  };
+}
+showAcceptedPlan();
+
+prepareNextSessionBtn.onclick = async () => {
+  if (!sessionIsCurrent() || planSaving || sessionSaving) return;
+  if (planDirty && !confirm('В плане есть несохранённые правки. Подготовить новый черновик? Текущий план пока останется в форме.')) return;
+  prepareNextSessionBtn.disabled = true;
+  prepareNextSessionBtn.textContent = 'Готовим план…';
+  nextSessionPlanStatus.textContent = 'Fizira анализирует цели и сохранённые занятия…';
+  nextSessionPlan.innerHTML = '';
+  try {
+    const result = validateNextSessionPlan(await prepareNextSessionPlan(p.id));
+    if (!sessionIsCurrent()) return;
+    const read = planEditor(nextSessionPlan, result, 'useNextSessionPlanBtn', 'Использовать как план занятия');
+    nextSessionPlanStatus.textContent = '✓ Черновик плана готов. Проверьте и примите его.';
+    const button = document.getElementById('useNextSessionPlanBtn');
+    button.onclick = async () => {
+      if (!sessionIsCurrent() || planSaving || sessionSaving) return;
+      if (editingSessionId) { nextSessionPlanStatus.textContent = 'Завершите редактирование прошлого занятия, затем примите новый план.'; return; }
+      if (p.next_session_plan && !confirm('Заменить план следующего занятия новым?')) return;
+      planSaving = true; button.disabled = true;
+      lockPlanFields(nextSessionPlan, true);
+      lockPlanFields(acceptedSessionPlan, true);
+      const message = nextSessionPlan.querySelector('[data-plan-status]');
+      message.textContent = 'Сохраняю план…';
+      try {
+        if (!await persistPlan(read()) || !sessionIsCurrent()) return;
+        showAcceptedPlan();
+        const confirmation = '✓ План добавлен к следующему занятию';
+        acceptedSessionPlan.querySelector('[data-plan-status]').textContent = confirmation;
+        nextSessionPlanStatus.textContent = confirmation;
+        nextSessionPlan.innerHTML = '';
+        acceptedSessionPlan.scrollIntoView({behavior:'smooth', block:'start'});
+      } catch (error) { if (sessionIsCurrent()) message.textContent = error.message; }
+      finally { planSaving = false; button.disabled = false; lockPlanFields(nextSessionPlan, false); lockPlanFields(acceptedSessionPlan, false); }
+    };
+  } catch (error) { if (sessionIsCurrent()) nextSessionPlanStatus.textContent = error.message; }
+  finally { prepareNextSessionBtn.disabled = false; prepareNextSessionBtn.textContent = 'Подготовить следующее занятие'; }
+};
 
 
 document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
   editBtn.onclick = () => {
+    if (!sessionIsCurrent() || sessionSaving || planSaving) return;
     const session = state.sessions.find(
       s => s.id === editBtn.dataset.editSession
     );
@@ -8245,6 +8040,9 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
     if (!session) return;
 
     editingSessionId = session.id;
+    pendingGoalUpdates = [];
+    acceptedSessionPlan.innerHTML = plannedSessionHtml(session.planned_session);
+    planDirty = false;
 
     form.querySelector('h3').textContent =
       'Изменить занятие';
@@ -8275,123 +8073,102 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
 });
 
    form.onsubmit = async e => {
-    if (!accountIsCurrent()) return;
+  if (!sessionIsCurrent()) return;
   e.preventDefault();
-
+  if (sessionSaving || planSaving) return;
+  if (planDirty) { status.textContent = 'Сначала сохраните изменения плана занятия.'; return; }
+  sessionSaving = true;
   setButtonSaving(btn);
-
-  const fd = new FormData(e.target);
-
-  const payload = {
-    patient_id: p.id,
-    session_date: fd.get('session_date'),
-    note: fd.get('note').trim(),
-    tolerance: fd.get('tolerance') || null,
-    dynamics_status:
-      fd.get('dynamics_status') || null,
-    function_changes:
-      fd.get('function_changes').trim() || null
-  };
-
-  if (!editingSessionId && p.next_session_plan) {
-  payload.planned_session = p.next_session_plan;
-}
-
-  const { error } = editingSessionId
-    ? await sb
-        .from('sessions')
-        .update(payload)
-        .eq('id', editingSessionId)
-    : await sb
-        .from('sessions')
-        .insert(payload);
-    if (!accountIsCurrent()) return;
-
-  if (error) {
-    setButtonError(
-      btn,
-      editingSessionId
-        ? 'Сохранить изменения'
-        : 'Сохранить занятие'
-    );
-
-    return flash(
-      'error',
-      error.message
-    );
+  let sessionCommitted = false;
+  try {
+    const fd = new FormData(e.target);
+    const goalUpdatesToSave = pendingGoalUpdates.map(update => ({...update}));
+    const payload = {
+      patient_id: p.id,
+      session_date: fd.get('session_date'),
+      note: fd.get('note').trim(),
+      tolerance: fd.get('tolerance') || null,
+      dynamics_status: fd.get('dynamics_status') || null,
+      function_changes: fd.get('function_changes').trim() || null
+    };
+    if (!editingSessionId && p.next_session_plan) {
+      payload.planned_session = structuredClone(p.next_session_plan);
+    }
+    const { error } = editingSessionId
+      ? await sb.from('sessions').update(payload).eq('id', editingSessionId).eq('patient_id', p.id)
+      : await sb.from('sessions').insert(payload);
+    if (!sessionAccountIsCurrent()) return;
+    if (error) {
+      sessionSaving = false;
+      setButtonError(btn, editingSessionId ? 'Сохранить изменения' : 'Сохранить занятие');
+      return flash('error', error.message);
+    }
+    sessionCommitted = true;
+    let goalUpdateFailed = false;
+    let planCleanupWarning = '';
+    for (const update of goalUpdatesToSave) {
+      const goalQuery = sb.from('goals').update({progress: update.progress})
+        .eq('id', update.goal_id).eq('patient_id', p.id).eq('status', 'active');
+      if (update.updated_at) goalQuery.eq('updated_at', update.updated_at);
+      const { error: goalError } = await goalQuery.select('id').single();
+      if (!sessionAccountIsCurrent()) return;
+      if (goalError) {
+        console.error('Не удалось обновить прогресс цели:', goalError);
+        goalUpdateFailed = true;
+        break;
+      }
+    }
+    if (!editingSessionId && p.next_session_plan) {
+      const { data: clearedPlanRows, error: clearPlanError } = await sb.from('patients')
+        .update({next_session_plan: null}).eq('id', p.id).eq('therapist_id', accountUserId)
+        .eq('next_session_plan', JSON.stringify(payload.planned_session)).select('id');
+      if (!sessionAccountIsCurrent()) return;
+      if (clearPlanError) {
+        planCleanupWarning = 'Занятие сохранено, но план не удалось закрыть. Обновите страницу перед следующим занятием.';
+        console.error('Занятие сохранено, но план не удалось закрыть:', clearPlanError);
+      } else if (!clearedPlanRows || (Array.isArray(clearedPlanRows) && !clearedPlanRows.length)) {
+        // Another tab accepted a newer plan: retain it and refresh only this patient's cache.
+        const {data: latestPatient, error: refreshError} = await sb.from('patients')
+          .select('next_session_plan').eq('id', p.id).eq('therapist_id', accountUserId).single();
+        if (!sessionAccountIsCurrent()) return;
+        if (!refreshError && latestPatient) p.next_session_plan = latestPatient.next_session_plan;
+        else {
+          planCleanupWarning = 'Занятие сохранено, но план изменён в другой вкладке и не удалось обновить его. Обновите страницу.';
+          console.error('Не удалось обновить план после конфликта:', refreshError);
+        }
+      } else {
+        p.next_session_plan = null;
+      }
+    }
+    if (!sessionIsCurrent()) return;
+    setButtonSaved(btn, editingSessionId ? '✓ Изменения сохранены' : '✓ Занятие сохранено');
+    status.textContent = planCleanupWarning || (goalUpdateFailed
+      ? '⚠️ Занятие сохранено, но прогресс цели обновить не удалось.'
+      : '✓ Данные сохранены в облаке');
+    if (planCleanupWarning) return;
+    await sleep(700);
+    if (!sessionIsCurrent()) return;
+    await loadPatientData();
+    if (!sessionIsCurrent()) return;
+    renderPatient();
+  } catch (error) {
+    if (!sessionIsCurrent()) return;
+    if (sessionCommitted) {
+      setButtonSaved(btn, '✓ Занятие сохранено');
+      status.textContent = 'Занятие сохранено, но обновление целей или плана не завершено. Обновите страницу; повторно сохранять занятие не нужно.';
+    } else {
+      setButtonError(btn, editingSessionId ? 'Сохранить изменения' : 'Сохранить занятие');
+      status.textContent = 'Не удалось сохранить занятие. Проверьте соединение и повторите; введённые данные остались в форме.';
+    }
+  } finally {
+    if (!sessionCommitted) sessionSaving = false;
   }
-
-  let goalUpdateFailed = false;
-
-for (const update of pendingGoalUpdates) {
-  const goalQuery = sb
-    .from('goals')
-    .update({
-      progress: update.progress
-    })
-    .eq('id', update.goal_id)
-    .eq('patient_id', p.id)
-    .eq('status', 'active');
-  if (update.updated_at) goalQuery.eq('updated_at', update.updated_at);
-  const { error: goalError } = await goalQuery.select('id').single();
-    if (!accountIsCurrent()) return;
-
-  if (goalError) {
-    console.error(
-      'Не удалось обновить прогресс цели:',
-      goalError
-    );
-
-    goalUpdateFailed = true;
-    break;
-  }
-}
-
-if (!editingSessionId && p.next_session_plan) {
-  const { data: clearedPlanRows, error: clearPlanError } = await sb
-    .from('patients')
-    .update({
-      next_session_plan: null
-    })
-    .eq('id', p.id)
-    .select('id');
-    if (!accountIsCurrent()) return;
-
-  if (clearPlanError) {
-    console.error(
-      'Занятие сохранено, но план не удалось закрыть:',
-      clearPlanError
-    );
-  } else if (!clearedPlanRows || !clearedPlanRows.length) {
-    console.error(
-      'Занятие сохранено, но строка пациента не была обновлена.'
-    );
-  } else {
-    p.next_session_plan = null;
-  }
-}
-
-  setButtonSaved(
-    btn,
-    editingSessionId
-      ? '✓ Изменения сохранены'
-      : '✓ Занятие сохранено'
-  );
-
-  status.textContent = goalUpdateFailed
-  ? '⚠️ Занятие сохранено, но прогресс цели обновить не удалось.'
-  : '✓ Данные сохранены в облаке';
-
-  await sleep(700);
-    if (!accountIsCurrent()) return;
-  await loadPatientData();
-    if (!accountIsCurrent()) return;
-  renderPatient();
 };
-     
+
+
 document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
   deleteBtn.onclick = async () => {
-    if (!accountIsCurrent()) return;
+    if (!sessionIsCurrent()) return;
     const confirmed = confirm(
       'Удалить это занятие? Действие нельзя отменить.'
     );
@@ -8405,7 +8182,7 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
       .from('sessions')
       .delete()
       .eq('id', deleteBtn.dataset.delSession);
-    if (!accountIsCurrent()) return;
+    if (!sessionIsCurrent()) return;
 
     if (error) {
       deleteBtn.disabled = false;
@@ -8418,7 +8195,7 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
     }
 
     await loadPatientData();
-    if (!accountIsCurrent()) return;
+    if (!sessionIsCurrent()) return;
     renderPatient();
     
   };

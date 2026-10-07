@@ -7,7 +7,8 @@ import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 const baseline='7566dc412e4918b1ea3f65831e3c9f024545b65a';
 const release='2173a05341d40baa4285732c90a4686a3b189919';
-const assets=readFileSync('ops/release/frontend-assets.txt','utf8').trim().split('\n');
+// Immutable historical releases must use their own asset manifest.
+const assets=bytes(release,'ops/release/frontend-assets.txt').toString('utf8').trim().split('\n');
 const changed=['app.js','parent-specialist.js','styles.css','parent.html','index.html'];
 function bytes(ref,file){const r=spawnSync('git',['show',`${ref}:${file}`]);assert.equal(r.status,0);return r.stdout;}
 function fixture(t){const root=mkdtempSync(join(tmpdir(),'parent-ux-'));t.after(()=>rmSync(root,{recursive:true,force:true})); const target=join(root,'live'),payload=join(root,'payload'),backup=join(root,'backup'),ops=join(root,'ops');mkdirSync(target);mkdirSync(payload);mkdirSync(ops);writeFileSync(join(ops,'activate-parent-ux.sh'),readFileSync('ops/release/activate-parent-ux.sh'));for(const f of assets)writeFileSync(join(target,f),bytes(baseline,f));for(const f of changed)writeFileSync(join(payload,f),bytes(release,f));for(const [name,ref] of [['baseline',baseline],['release',release]])writeFileSync(join(ops,`parent-ux-${name}.sha256`),assets.map(file=>createHash('sha256').update(bytes(ref,file)).digest('hex')+'  '+file+'\n').join(''));return {root,target,payload,backup,ops};}

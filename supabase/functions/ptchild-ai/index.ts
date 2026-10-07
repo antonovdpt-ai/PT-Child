@@ -12,6 +12,8 @@ import {
   normalizePatientId,
   normalizeStoragePaths,
   parseJsonLines,
+  validateNextSessionPlan,
+  validateSessionDraft,
 } from "../_shared/ai-helpers.ts";
 
 class PublicError extends Error {
@@ -195,6 +197,11 @@ async function buildServerPrompt(
       ? 5
       : 40;
 
+  const goalsQuery = supabase.from("goals")
+    .select("id,title,baseline,criterion,progress,status")
+    .eq("patient_id", patientId);
+  if (["session_draft", "next_session_plan"].includes(operation)) goalsQuery.eq("status", "active");
+
   const [assessmentResult, goalsResult, sessionsResult] = await Promise.all([
     supabase
       .from("assessments")
@@ -205,17 +212,13 @@ async function buildServerPrompt(
       .order("assessment_date", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from("goals")
-      .select("id,title,baseline,criterion,progress,status")
-      .eq("patient_id", patientId)
-      .order("created_at", { ascending: true })
-      .limit(30),
+    goalsQuery.order("created_at", { ascending: true }).limit(30),
     supabase
       .from("sessions")
       .select("session_date,note,tolerance,dynamics_status,function_changes,planned_session")
       .eq("patient_id", patientId)
       .order("session_date", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(sessionLimit),
   ]);
 
@@ -241,7 +244,7 @@ async function buildServerPrompt(
 
   const goalAliases = new Map<string, string>();
   const goals = (goalsResult.data ?? [])
-    .filter((goal: any) => operation !== "session_draft" || goal.status === "active")
+    .filter((goal: any) => !["session_draft", "next_session_plan"].includes(operation) || goal.status === "active")
     .map((goal: any, index: number) => {
       const alias = `goal_${index + 1}`;
       if (typeof goal.id === "string") goalAliases.set(alias, goal.id);
@@ -281,13 +284,13 @@ async function buildServerPrompt(
     patient_analysis:
       "Сделай краткий клинический анализ: резюме, значимые моменты, функциональные приоритеты, измеримые цели, недостающие данные и уровень уверенности. Не ставь диагноз.",
     next_session_plan:
-      "Верни только JSON с main_task, start_check, work_blocks, what_to_track, session_success_criteria, cautions и needs_review. План должен опираться на активные цели и последние занятия.",
+      "Верни только JSON строго следующей формы:\n{\"main_task\":\"одна задача\",\"start_check\":{\"action\":\"2–4 конкретных наблюдаемых проверки, перечисленных в тексте\",\"why\":\"основание\"},\"work_blocks\":[{\"title\":\"название активности, не Рабочий блок\",\"action\":\"исходное положение, действия специалиста и ожидаемое действие ребёнка\",\"why\":\"цель блока\",\"progress_if\":\"наблюдаемый критерий выполнения или прогрессии\"}],\"what_to_track\":[\"наблюдаемый или измеримый признак\"],\"session_success_criteria\":[\"конкретный критерий сравнения\"],\"cautions\":[],\"needs_review\":true}.\nВсе перечисленные содержательные поля обязательны. Не возвращай пустые заголовки, строки вместо объектов или заглушки. Достаточно 1–3 обоснованных рабочих блоков. Опирайся на активные цели, последнее занятие (order=1), историю, переносимость, динамику, изменения функции и оценку. Отделяй запланированную активность от установленных фактов; не утверждай, что ребёнок уже умеет то, что лишь предлагается проверить. Объём указывай только при достаточных данных, без выдуманных норм и ложной точности. Если контекста недостаточно для безопасного плана, верни {\"error\":\"insufficient_context\"}.",
     parent_report_draft:
       "Верни только JSON с complaint, strengths, observations, goals, progress и recommendations. Пиши спокойно и понятно родителю, без диагнозов и новых упражнений.",
     dynamics_analysis:
       "Оцени динамику без ложной точности. Различай подтверждённое изменение, отсутствие документации, отсутствие повторной оценки и противоречие. Дай резюме, динамику целей, противоречия, что измерить и уровень уверенности.",
     session_draft:
-      "Структурируй только переданную расшифровку. Верни только JSON с session_note, tolerance, dynamics_status, function_changes, goal_updates и needs_review. В goal_updates используй только goal_ref из контекста; не снижай progress, не повышай более чем на 20 пунктов и не предлагай выше 90.",
+      "Структурируй только переданную расшифровку transcript, не переноси факты из прошлых занятий в сегодняшние наблюдения. Сохрани смысл, отрицания, сторону тела и степень помощи. Не добавляй упражнения, фиксацию, реакции, переносимость или динамику, о которых не сообщил специалист.\nВерни только JSON: {\"session_note\":\"описание выполненного\",\"tolerance\":null,\"dynamics_status\":null,\"function_changes\":\"\",\"goal_updates\":[],\"needs_review\":true}.\ntolerance допускает только good/medium/low/unclear/null; dynamics_status — improved/stable/worse/unclear/null. Если сведений нет, используй null, а для function_changes пустую строку. Отсутствие жалоб не означает хорошую переносимость, отсутствие сравнения не означает stable. В goal_updates используй goal_id со значением goal_ref из контекста, suggested_progress и reason; только при прямом подтверждении из transcript, не снижай progress, не повышай более чем на 20 и не предлагай выше 90.",
   };
 
   const prompt =
@@ -442,6 +445,19 @@ Deno.serve(async (req) => {
     const providerBody = await response.json().catch(() => null);
     let text = extractResponseText(providerBody);
     if (!text) throw new PublicError(502, "AI provider returned an empty response");
+    if (operation === "next_session_plan" || operation === "session_draft") {
+      try {
+        const parsed = JSON.parse(text.replace(/```(?:json)?/gi, "").trim());
+        if (operation === "next_session_plan") validateNextSessionPlan(parsed);
+        else validateSessionDraft(parsed);
+        text = JSON.stringify({ ...parsed, needs_review: true });
+      } catch {
+        throw new PublicError(502, operation === "next_session_plan"
+          ? "ИИ вернул неполный план. Повторите подготовку занятия."
+          : "ИИ вернул некорректный черновик. Повторите разбор занятия.");
+      }
+    }
+
     if (operation === "session_draft") {
       for (const [alias, goalId] of goalAliases) {
         text = text.replaceAll(`"${alias}"`, `"${goalId}"`);
