@@ -35,16 +35,205 @@ jobs:
           set -euo pipefail
           ssh -p "${PORT:-22}" -o BatchMode=yes "$USER@$HOST" 'bash -s' <<'SAFE_CODE_PREFLIGHT'
           set -eu
-          printf "SAFE_CODE_PREFLIGHT_BEGIN\n"
           cd /root/supabase-project
-          for file in volumes/proxy/app/app.js volumes/proxy/app/cabinet.js volumes/proxy/app/styles.css volumes/proxy/app/media-fallback.css volumes/proxy/app/auth-domain.mjs volumes/proxy/app/schedule-domain.mjs volumes/proxy/app/schedule-editor.js volumes/proxy/app/security-utils.mjs volumes/proxy/app/role-gate.mjs volumes/proxy/app/parent.html volumes/proxy/app/parent.js volumes/proxy/app/parent.css volumes/proxy/app/parent-domain.mjs volumes/proxy/app/parent-specialist.js volumes/proxy/app/report-pdf-export.mjs volumes/proxy/app/favicon.ico volumes/proxy/app/fizira-symbol.png volumes/proxy/app/index.html volumes/functions/_shared/ai-helpers.ts volumes/functions/ptchild-ai/index.ts volumes/functions/create-parent-invitation/index.ts volumes/functions/resend-parent-invitation/index.ts volumes/functions/revoke-parent-access/index.ts volumes/functions/generate-parent-report-pdf/index.ts volumes/functions/parent-report-file/index.ts volumes/functions/_shared/parent-portal.ts volumes/functions/_shared/parent-publication.ts volumes/functions/_shared/parent-pdf.ts volumes/functions/_shared/font-data.ts volumes/functions/_shared/fonts/NotoSans-Regular.ttf volumes/functions/_shared/fonts/OFL.txt; do
-            if [ -L "$file" ]; then printf "SYMLINK %s\n" "$file";
-            elif [ -f "$file" ]; then sha256sum "$file";
-            else printf "MISSING %s\n" "$file"; fi
+          printf "SAFE_RELEASE_PREFLIGHT_BEGIN\n"
+          file=volumes/proxy/app/app.js
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "40f47bdd8bff5cb532bacab291f8866b8d6598af9030d0a9ddecce45f5016b43" ]; then state=MATCH_HEAD; elif [ "$digest" = "6429f87320adba26883de52f5c626a13468b7eb1330c70ec3904d8aece242e7b" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/cabinet.js
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "eb1ab8004d792d7178a6b916dca327a18330fd4540d15fb5f72796d2e28f7ff4" ]; then state=MATCH_HEAD; elif [ "$digest" = "eb1ab8004d792d7178a6b916dca327a18330fd4540d15fb5f72796d2e28f7ff4" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/styles.css
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "d4f45909147b41b766aa7be7db7111b3ab117734223a5dc096d58fa44f7f5830" ]; then state=MATCH_HEAD; elif [ "$digest" = "6b4113558346142907d0aa4a9e3db7572700ae522585a526614855f3024a1125" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/media-fallback.css
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "bc5a6b19c92696fbabf546d700d2011998d5d7733ce452687636d766afcd1975" ]; then state=MATCH_HEAD; elif [ "$digest" = "bc5a6b19c92696fbabf546d700d2011998d5d7733ce452687636d766afcd1975" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/auth-domain.mjs
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "b902755b2064814f679c60a1db0bc5b5be491a5537d735a1ebd4d94ed4624c8f" ]; then state=MATCH_HEAD; elif [ "$digest" = "b902755b2064814f679c60a1db0bc5b5be491a5537d735a1ebd4d94ed4624c8f" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/schedule-domain.mjs
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "7d5a23ff85b15c775bc2463be0d91b988a1cfe1c22e0ace921450100a3a51625" ]; then state=MATCH_HEAD; elif [ "$digest" = "7d5a23ff85b15c775bc2463be0d91b988a1cfe1c22e0ace921450100a3a51625" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/schedule-editor.js
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "95066df029061e727e2b6e2092f6c17705e931abe6555320dcbdcbc3a89cd81b" ]; then state=MATCH_HEAD; elif [ "$digest" = "95066df029061e727e2b6e2092f6c17705e931abe6555320dcbdcbc3a89cd81b" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/security-utils.mjs
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "e5be09693f572215e3439c17851bd0cf0d1774285e8a4c6eeed08209af77423f" ]; then state=MATCH_HEAD; elif [ "$digest" = "e5be09693f572215e3439c17851bd0cf0d1774285e8a4c6eeed08209af77423f" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/role-gate.mjs
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "11872be290c68285d4845dabede1a5f07aaaef4d3d9f2dd18d41f8b30360cf85" ]; then state=MATCH_HEAD; elif [ "$digest" = "11872be290c68285d4845dabede1a5f07aaaef4d3d9f2dd18d41f8b30360cf85" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/parent.html
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "0d1fa71b59cd0d360f30f08dde9ffc784aa0ac797f8a39ef27ce1ff813256b02" ]; then state=MATCH_HEAD; elif [ "$digest" = "6753f9ba0039a2c578a5fd7943e212999954072cc85f99f3f0d12d420ddc33c6" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/parent.js
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "186cd708ed7b4fe1005c1d515288bf0c38e4b6f6821b5f3f9cbaaae8987811f0" ]; then state=MATCH_HEAD; elif [ "$digest" = "186cd708ed7b4fe1005c1d515288bf0c38e4b6f6821b5f3f9cbaaae8987811f0" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/parent.css
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "b9a86a9201ce5e309d8e2db4943202096e94e1300fd6f5f8917fdf7474ef383a" ]; then state=MATCH_HEAD; elif [ "$digest" = "b9a86a9201ce5e309d8e2db4943202096e94e1300fd6f5f8917fdf7474ef383a" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/parent-domain.mjs
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "e9118f5613166ee0476cb42059d0f019fa3a689ac45c57476f615b74e8733322" ]; then state=MATCH_HEAD; elif [ "$digest" = "e9118f5613166ee0476cb42059d0f019fa3a689ac45c57476f615b74e8733322" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/parent-specialist.js
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "d09b2242176247c6c563de4453fe093c4cd90a8e6ad8c0d7b196bc5768232d21" ]; then state=MATCH_HEAD; elif [ "$digest" = "b3b467467814463f48e1879c8b3f39630615e8fd878cda063b0f4a6d547fccb2" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/report-pdf-export.mjs
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "913b140a0e57975e5df7fa4a9634910091a659c9e24b3c7569f38b2fb5b4e4a6" ]; then state=MATCH_HEAD; else state=DRIFT_STOP; fi
+          else state=EXPECTED_NEW_ABSENT; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/favicon.ico
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "b36370b5afc4c3306ce9fe5a0f1535c5cab0be19db3e6e11475e76f6684ca5b0" ]; then state=MATCH_HEAD; elif [ "$digest" = "b36370b5afc4c3306ce9fe5a0f1535c5cab0be19db3e6e11475e76f6684ca5b0" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/fizira-symbol.png
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "f80f7c4aac35d56218cdc9e2d2f68d60d100915dcabbad6fd711d7525f137726" ]; then state=MATCH_HEAD; elif [ "$digest" = "f80f7c4aac35d56218cdc9e2d2f68d60d100915dcabbad6fd711d7525f137726" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/proxy/app/index.html
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "ee137d71d18672111627550cc83b4c93e0aac2a6b465f09877f35f69870fd6fa" ]; then state=MATCH_HEAD; elif [ "$digest" = "040bf130f4713ef8584332742cc52b42a2a81a1a8e72577d326794413e139723" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/_shared/ai-helpers.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "7c9e08ada04c6341f4d5c64de4f9c964cfc2d8a32860bd99101906737a07e5e8" ]; then state=MATCH_HEAD; elif [ "$digest" = "4c96d0c10bcd50cd5b07bd511790a28960a29bff250ac743584da398a60e1451" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/ptchild-ai/index.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "6181b7de17b9da29a8f7fe20dbb7a3e8c3e94408ca2cce2206f1e24e462308b6" ]; then state=MATCH_HEAD; elif [ "$digest" = "7050d95cca53769a1433f73443d553a80a2b9d824f5688299747e8bf5a81d4c9" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/create-parent-invitation/index.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "f1d5c288d61638aa8b86f9cb21765518c32419823bae2bbddaa704d896b6bb64" ]; then state=MATCH_HEAD; elif [ "$digest" = "f1d5c288d61638aa8b86f9cb21765518c32419823bae2bbddaa704d896b6bb64" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/resend-parent-invitation/index.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "2dc3a0aec24a0a1f70b6c2eb338f2136679a6fb8c64ea3748445c335c2bdd3fc" ]; then state=MATCH_HEAD; elif [ "$digest" = "2dc3a0aec24a0a1f70b6c2eb338f2136679a6fb8c64ea3748445c335c2bdd3fc" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/revoke-parent-access/index.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "dbbe1d087d81ce3c9a4d1d17a7a519c18181d483a8b8730fb884b34199eedab9" ]; then state=MATCH_HEAD; elif [ "$digest" = "dbbe1d087d81ce3c9a4d1d17a7a519c18181d483a8b8730fb884b34199eedab9" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/generate-parent-report-pdf/index.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "6a350fc2940df98a222d77684ef5bf6b8486eec444f40775b49a24936ff56872" ]; then state=MATCH_HEAD; elif [ "$digest" = "6a350fc2940df98a222d77684ef5bf6b8486eec444f40775b49a24936ff56872" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/parent-report-file/index.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "0cda79db0873d2f8fe1d101bc9f203673307ddd22d2fe120a5bdddf5fdff5df8" ]; then state=MATCH_HEAD; elif [ "$digest" = "0cda79db0873d2f8fe1d101bc9f203673307ddd22d2fe120a5bdddf5fdff5df8" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/_shared/parent-portal.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "ad75573bb150e94443f862a259e42ba4cf6b79276cf4bf921bfa8bd6242a8db4" ]; then state=MATCH_HEAD; elif [ "$digest" = "ad75573bb150e94443f862a259e42ba4cf6b79276cf4bf921bfa8bd6242a8db4" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/_shared/parent-publication.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "6f0d5aaf95dd5c85be672bc21baf7fcfa049657ec73e27490e4b5ab82f144bc0" ]; then state=MATCH_HEAD; elif [ "$digest" = "06bdf278bc2e52c662b69692246e911e70b0a98c91c39920ac9dd79bfc613924" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/_shared/parent-pdf.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "810baf02e3492d6c467112e680d5c785f5a00c50fc8ae9deefeda71992aee20f" ]; then state=MATCH_HEAD; elif [ "$digest" = "810baf02e3492d6c467112e680d5c785f5a00c50fc8ae9deefeda71992aee20f" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/_shared/font-data.ts
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "98186e6ed21fbf0a6df1eb748c60acf3d390889ddf69f9d304c3b234cd2e8fd8" ]; then state=MATCH_HEAD; elif [ "$digest" = "98186e6ed21fbf0a6df1eb748c60acf3d390889ddf69f9d304c3b234cd2e8fd8" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/_shared/fonts/NotoSans-Regular.ttf
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "f5f552c8c5edb61fe6efb824baf4d4de47b1a8689ab4925ff43f7bd6a4ebece5" ]; then state=MATCH_HEAD; elif [ "$digest" = "f5f552c8c5edb61fe6efb824baf4d4de47b1a8689ab4925ff43f7bd6a4ebece5" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          file=volumes/functions/_shared/fonts/OFL.txt
+          if [ -L "$file" ]; then state=SYMLINK_STOP; elif [ -f "$file" ]; then
+            digest=$(sha256sum "$file"); digest=${digest%% *}
+            if [ "$digest" = "3c200cfde6940eb9e953af2ceb44b3a8011df285a11f16fdf447aecf8339ae67" ]; then state=MATCH_HEAD; elif [ "$digest" = "3c200cfde6940eb9e953af2ceb44b3a8011df285a11f16fdf447aecf8339ae67" ]; then state=MATCH_BASE; else state=DRIFT_STOP; fi
+          else state=MISSING_STOP; fi
+          printf "%s %s\n" "$state" "$file"
+          for directory in volumes/proxy/app volumes/functions/_shared volumes/functions/ptchild-ai; do
+            if [ -w "$directory" ]; then printf "WRITE_ALLOWED %s\n" "$directory"; else printf "WRITE_BLOCKED %s\n" "$directory"; fi
           done
-          printf "EDGE_RUNTIME_STATUS\n"
-          docker ps --format "{{.Names}} {{.Status}}" --filter name=supabase-edge-functions
-          printf "SAFE_CODE_PREFLIGHT_END\n"
+          if docker ps -a --format "{{.Names}} {{.Status}}" --filter name=supabase-edge-functions 2>/dev/null; then
+            printf "DOCKER_DIRECT_ALLOWED\n"
+          elif sudo -n docker ps -a --format "{{.Names}} {{.Status}}" --filter name=supabase-edge-functions 2>/dev/null; then
+            printf "DOCKER_EXISTING_SUDO_ALLOWED\n"
+          else
+            printf "DOCKER_ACCESS_BLOCKED\n"
+          fi
+          printf "SAFE_RELEASE_PREFLIGHT_END\n"
           SAFE_CODE_PREFLIGHT
 
 # This branch-specific preflight never calls fizira-audit-export, prints file
