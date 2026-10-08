@@ -3130,7 +3130,7 @@ async function loadPatientData() {
 
     sb
   .from('parent_reports')
-  .select('id,patient_id,therapist_id,publication_status,published_at,created_at,updated_at,therapist_name,therapist_profession,therapist_organization,therapist_phone,therapist_logo_path,complaint,strengths,observations,goals,progress,recommendations')
+  .select('id,patient_id,therapist_id,publication_status,published_at,published_snapshot,created_at,updated_at,therapist_name,therapist_profession,therapist_organization,therapist_phone,therapist_logo_path,complaint,strengths,observations,goals,progress,recommendations')
   .eq('patient_id', pid)
   .order('created_at', { ascending: false })
   ]);
@@ -4909,6 +4909,7 @@ let editParentReportBtn = null;
   }
 let editingContactId = null;
 let editingParentReportId = null;
+let parentReportEditorRevision = 0;
 const setParentReportStatus = (status, message) => {
   const statusEl = document.getElementById('parentReportStatus');
   if (!statusEl) return;
@@ -5142,7 +5143,7 @@ if (state.tab === 'overview') {
   class="link report-history-action"
   data-pdf-parent-report="${report.id}"
 >
-  Просмотр черновика
+  Текст и PDF
 </button>
 
 <button
@@ -5189,6 +5190,8 @@ editParentReportBtn =
 
   if (parentReportBtn && parentReportEditor) {
     parentReportBtn.onclick = () => {
+      if (!accountIsCurrent()) return;
+      parentReportEditorRevision++;
       editingParentReportId = null;
       document.getElementById('parentReportPdfExport')?.replaceChildren();
       setParentReportStatus('', '');
@@ -5228,7 +5231,14 @@ if (editParentReportBtn) {
   editParentReportBtn.style.display = 'none';
 }
 
+if (saveParentReportPdfBtn) {
+  saveParentReportPdfBtn.style.display = 'block';
+  saveParentReportPdfBtn.disabled = false;
+  saveParentReportPdfBtn.textContent = 'Сохранить черновик';
+}
+
 if (generateParentReportBtn) {
+  generateParentReportBtn.disabled = false;
   generateParentReportBtn.style.display = 'block';
   generateParentReportBtn.textContent =
     '✨ Подготовить черновик ИИ';
@@ -5245,6 +5255,8 @@ if (generateParentReportBtn) {
 
   if (closeParentReportBtn && parentReportEditor) {
     closeParentReportBtn.onclick = () => {
+      if (!accountIsCurrent()) return;
+      parentReportEditorRevision++;
       parentReportEditor.style.display = 'none';
     };
   }
@@ -5253,6 +5265,8 @@ if (generateParentReportBtn) {
 if (generateParentReportBtn) {
   generateParentReportBtn.onclick = async () => {
     if (!accountIsCurrent()) return;
+    const editorRevision = parentReportEditorRevision;
+    const editorIsCurrent = () => accountIsCurrent() && editorRevision === parentReportEditorRevision;
     const oldText = generateParentReportBtn.textContent;
 
     generateParentReportBtn.disabled = true;
@@ -5264,7 +5278,7 @@ if (generateParentReportBtn) {
     try {
       const draft =
         await prepareParentReportDraft(p.id);
-    if (!accountIsCurrent()) return;
+    if (!editorIsCurrent()) return;
 
       document.getElementById('reportComplaint').value =
         draft.complaint || '';
@@ -5288,7 +5302,7 @@ if (generateParentReportBtn) {
         '✓ Черновик подготовлен';
       setParentReportStatus('saved', 'Черновик готов. Проверьте текст перед сохранением.');
     } catch (error) {
-    if (!accountIsCurrent()) return;
+    if (!editorIsCurrent()) return;
       console.error(
         'Ошибка подготовки отчёта:',
         error
@@ -5300,7 +5314,7 @@ if (generateParentReportBtn) {
       generateParentReportBtn.textContent =
         oldText;
     } finally {
-      generateParentReportBtn.disabled = false;
+      if (editorIsCurrent()) generateParentReportBtn.disabled = false;
     }
   };
 }
@@ -5309,6 +5323,8 @@ if (generateParentReportBtn) {
 if (saveParentReportPdfBtn) {
   saveParentReportPdfBtn.onclick = async () => {
     if (!accountIsCurrent()) return;
+    const editorRevision = parentReportEditorRevision;
+    const editorIsCurrent = () => accountIsCurrent() && editorRevision === parentReportEditorRevision;
 
 if (editingParentReportId) {
   const existing = state.parentReports.find(r => r.id === editingParentReportId);
@@ -5390,14 +5406,14 @@ if (editingParentReportId) {
     .eq('patient_id', p.id)
     .eq('therapist_id', user.id)
     .select('id').single();
-    if (!accountIsCurrent()) return;
+    if (!editorIsCurrent()) return;
 } else {
   saveResult = await sb
     .from('parent_reports')
     .insert(reportPayload)
     .select('id')
     .single();
-    if (!accountIsCurrent()) return;
+    if (!editorIsCurrent()) return;
 
   if (!saveResult.error && saveResult.data?.id) {
     editingParentReportId = saveResult.data.id;
@@ -5423,14 +5439,14 @@ const { error } = saveResult;
     }
 
     await loadPatientData();
-    if (!accountIsCurrent()) return;
+    if (!editorIsCurrent()) return;
     saveParentReportPdfBtn.textContent =
       '✓ Черновик сохранён';
     setParentReportStatus('saved', 'Черновик сохранён. Подготовьте PDF для скачивания или передачи файла. Отправка в кабинет родителя — отдельно.');
     if (document.getElementById('parentReportPdfExport')) mountOverviewPdfExport({...report, id:editingParentReportId, therapist_name:therapistName});
 
     setTimeout(() => {
-      if (!accountIsCurrent()) return;
+      if (!editorIsCurrent()) return;
       saveParentReportPdfBtn.disabled = false;
       saveParentReportPdfBtn.textContent =
         oldText;
@@ -5446,130 +5462,52 @@ document
   .querySelectorAll('[data-open-parent-report]')
   .forEach(openBtn => {
     openBtn.onclick = () => {
-      const report = (state.parentReports || []).find(
-        item =>
-          String(item.id) ===
-          String(openBtn.dataset.openParentReport)
-      );
-
-      if (!report || !parentReportEditor) {
-        return;
-      }
-      if (!accountIsCurrent()) return;
-      if (report.published_at || !['draft', 'publication_error'].includes(report.publication_status || 'draft')) {
-        state.tab = 'parent'; renderPatient(); return;
-      }
+      if (!accountIsCurrent() || !parentReportEditor) return;
+      const report = (state.parentReports || []).find(item =>
+        String(item.id) === String(openBtn.dataset.openParentReport));
+      if (!report) return;
+      parentReportEditorRevision++;
       editingParentReportId = report.id;
-
-      const reportTherapistName =
-  document.getElementById('reportTherapistName');
-
-if (reportTherapistName) {
-  reportTherapistName.value =
-    report.therapist_name ||
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    user.email ||
-    '';
-}
-
-      document.getElementById('reportComplaint').value =
-        report.complaint || '';
-
-      document.getElementById('reportStrengths').value =
-        report.strengths || '';
-
-      document.getElementById('reportObservations').value =
-        report.observations || '';
-
-      document.getElementById('reportGoals').value =
-        report.goals || '';
-
-      document.getElementById('reportProgress').value =
-        report.progress || '';
-
-      document.getElementById('reportRecommendations').value =
-        report.recommendations || '';
-
-        [
-  'reportTherapistName',
-  'reportComplaint',
-  'reportStrengths',
-  'reportObservations',
-  'reportGoals',
-  'reportProgress',
-  'reportRecommendations'
-].forEach(id => {
-  const field = document.getElementById(id);
-
-  if (field) {
-    field.readOnly = true;
-  }
-});
-
-
-
-if (editParentReportBtn) {
-  editParentReportBtn.onclick = () => {
-    [
-      'reportTherapistName',
-      'reportComplaint',
-      'reportStrengths',
-      'reportObservations',
-      'reportGoals',
-      'reportProgress',
-      'reportRecommendations'
-    ].forEach(id => {
-      const field = document.getElementById(id);
-
-      if (field) {
-        field.readOnly = false;
+      const editable = !report.published_at && ['draft', 'publication_error'].includes(report.publication_status || 'draft');
+      const frozen = !!report.published_at || ['published', 'archived'].includes(report.publication_status);
+      const text = frozen ? report.published_snapshot : report;
+      const fields = {therapist_name:'reportTherapistName', complaint:'reportComplaint', strengths:'reportStrengths', observations:'reportObservations', goals:'reportGoals', progress:'reportProgress', recommendations:'reportRecommendations'};
+      const displayed = {...report};
+      for (const [key, id] of Object.entries(fields)) {
+        const field = document.getElementById(id);
+        displayed[key] = typeof text?.[key] === 'string' ? text[key] : '';
+        if (field) { field.value = displayed[key]; field.readOnly = true; }
       }
-    });
-
-    editParentReportBtn.style.display = 'none';
-  };
-}
-
-if (editParentReportBtn) {
-  editParentReportBtn.style.display = 'block';
-}
-
-if (generateParentReportBtn) {
-  generateParentReportBtn.style.display = 'none';
-}
-
-[
-  'reportTherapistName',
-  'reportComplaint',
-  'reportStrengths',
-  'reportObservations',
-  'reportGoals',
-  'reportProgress',
-  'reportRecommendations'
-].forEach(id => {
-  const field = document.getElementById(id);
-
-  if (field) {
-    field.readOnly = true;
-  }
-});
-
-if (editParentReportBtn) {
-  editParentReportBtn.style.display = 'block';
-}
-
-if (generateParentReportBtn) {
-  generateParentReportBtn.style.display = 'none';
-}
-
+      if (editParentReportBtn) {
+        editParentReportBtn.style.display = editable ? 'block' : 'none';
+        editParentReportBtn.onclick = () => {
+          if (!accountIsCurrent() || editingParentReportId !== report.id || !editable) return;
+          const live = state.parentReports.find(item => item.id === report.id);
+          if (!live || live.published_at || !['draft', 'publication_error'].includes(live.publication_status || 'draft')) return;
+          for (const id of Object.values(fields)) {
+            const field = document.getElementById(id);
+            if (field) field.readOnly = false;
+          }
+          editParentReportBtn.style.display = 'none';
+        };
+      }
+      if (saveParentReportPdfBtn) {
+        saveParentReportPdfBtn.style.display = editable ? 'block' : 'none';
+        saveParentReportPdfBtn.disabled = false;
+        saveParentReportPdfBtn.textContent = 'Сохранить черновик';
+      }
+      if (generateParentReportBtn) generateParentReportBtn.style.display = 'none';
+      setParentReportStatus('', frozen
+        ? (text ? 'Сохранённая версия отчёта. Её можно скачать или отправить файлом без кабинета родителя.' : 'Текст сохранённой версии недоступен. Подготовьте PDF, чтобы получить сохранённый документ.')
+        : 'Проверьте текст. PDF можно скачать или отправить без кабинета родителя.');
       parentReportEditor.style.display = 'block';
-      mountOverviewPdfExport(report);
-
-      parentReportEditor.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      });
+      document.getElementById('parentReportPdfExport')?.replaceChildren();
+      if (report.publication_status === 'publishing') {
+        setParentReportStatus('loading', 'Отчёт ещё публикуется. Откройте его повторно после завершения.');
+      } else {
+        mountOverviewPdfExport(displayed);
+      }
+      parentReportEditor.scrollIntoView({behavior:'smooth', block:'start'});
     };
   });
 
@@ -5577,42 +5515,10 @@ if (generateParentReportBtn) {
   .querySelectorAll('[data-pdf-parent-report]')
   .forEach(pdfBtn => {
     pdfBtn.onclick = () => {
-      const report = (state.parentReports || []).find(
-        item =>
-          String(item.id) ===
-          String(pdfBtn.dataset.pdfParentReport)
-      );
-
       if (!accountIsCurrent()) return;
-      if (report?.published_at || !['draft','publication_error'].includes(report?.publication_status || 'draft')) { state.tab = 'parent'; renderPatient(); return; }
-      if (!report) {
-        return;
-      }
-
-      openParentReportPrintView(
-  p,
-  report,
-
-  report.therapist_name ||
-    state.profile?.full_name ||
-    '',
-
-  report.therapist_profession ||
-    state.profile?.profession ||
-    '',
-
-  report.therapist_organization ||
-    state.profile?.organization ||
-    '',
-
-  report.therapist_phone ||
-    state.profile?.phone ||
-    '',
-
-  report.therapist_logo_path ||
-    state.profile?.logo_path ||
-    ''
-);
+      const openBtn = [...document.querySelectorAll('[data-open-parent-report]')].find(button =>
+        String(button.dataset.openParentReport) === String(pdfBtn.dataset.pdfParentReport));
+      openBtn?.click();
     };
   });
 
