@@ -6,13 +6,17 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+
 jobs:
-  audit:
+  safe-code-preflight:
+    if: github.ref == 'refs/heads/codex/recovered-session-pdf-20261008'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-
     steps:
-      - name: Configure SSH
+      - name: Configure existing SSH identity
         env:
           SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
@@ -22,44 +26,26 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-
-      - name: Export server audit
+      - name: Read code hashes and Edge status only
         env:
           HOST: ${{ secrets.TIMEWEB_HOST }}
           PORT: ${{ secrets.TIMEWEB_PORT }}
           USER: ${{ secrets.TIMEWEB_USER }}
         run: |
           set -euo pipefail
-          ssh \
-            -p "${PORT:-22}" \
-            -i ~/.ssh/id_ed25519 \
-            -o BatchMode=yes \
-            "$USER@$HOST" \
-            "sudo /usr/local/sbin/fizira-audit-export" \
-            > fizira-server-audit.raw.txt
+          ssh -p "${PORT:-22}" -o BatchMode=yes "$USER@$HOST" 'bash -s' <<'SAFE_CODE_PREFLIGHT'
+          set -eu
+          printf "SAFE_CODE_PREFLIGHT_BEGIN\n"
+          cd /root/supabase-project
+          for file in volumes/proxy/app/app.js volumes/proxy/app/cabinet.js volumes/proxy/app/styles.css volumes/proxy/app/media-fallback.css volumes/proxy/app/auth-domain.mjs volumes/proxy/app/schedule-domain.mjs volumes/proxy/app/schedule-editor.js volumes/proxy/app/security-utils.mjs volumes/proxy/app/role-gate.mjs volumes/proxy/app/parent.html volumes/proxy/app/parent.js volumes/proxy/app/parent.css volumes/proxy/app/parent-domain.mjs volumes/proxy/app/parent-specialist.js volumes/proxy/app/report-pdf-export.mjs volumes/proxy/app/favicon.ico volumes/proxy/app/fizira-symbol.png volumes/proxy/app/index.html volumes/functions/_shared/ai-helpers.ts volumes/functions/ptchild-ai/index.ts volumes/functions/create-parent-invitation/index.ts volumes/functions/resend-parent-invitation/index.ts volumes/functions/revoke-parent-access/index.ts volumes/functions/generate-parent-report-pdf/index.ts volumes/functions/parent-report-file/index.ts volumes/functions/_shared/parent-portal.ts volumes/functions/_shared/parent-publication.ts volumes/functions/_shared/parent-pdf.ts volumes/functions/_shared/font-data.ts volumes/functions/_shared/fonts/NotoSans-Regular.ttf volumes/functions/_shared/fonts/OFL.txt; do
+            if [ -L "$file" ]; then printf "SYMLINK %s\n" "$file";
+            elif [ -f "$file" ]; then sha256sum "$file";
+            else printf "MISSING %s\n" "$file"; fi
+          done
+          printf "EDGE_RUNTIME_STATUS\n"
+          docker ps --format "{{.Names}} {{.Status}}" --filter name=supabase-edge-functions
+          printf "SAFE_CODE_PREFLIGHT_END\n"
+          SAFE_CODE_PREFLIGHT
 
-      - name: Redact sensitive configuration
-        run: |
-          set -euo pipefail
-          awk '
-            /^=== FILE: volumes\/proxy\/caddy\/Caddyfile ===$/ {
-              skip=1
-              print
-              print "[REDACTED: Caddyfile contents omitted from artifact]"
-              next
-            }
-            /^=== FUNCTIONS \/ EDGE RUNTIME COMPOSE REFERENCES ===$/ {
-              skip=0
-            }
-            !skip { print }
-          ' fizira-server-audit.raw.txt > fizira-server-audit.txt
-          rm -f fizira-server-audit.raw.txt
-
-      - name: Upload audit artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: fizira-server-audit
-          path: fizira-server-audit.txt
-          if-no-files-found: error
-          retention-days: 7
+# This branch-specific preflight never calls fizira-audit-export, prints file
+# contents, reads configuration/environment, creates artifacts, or changes production.
