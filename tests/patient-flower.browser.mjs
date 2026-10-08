@@ -45,6 +45,26 @@ async function install(page,variant='normal'){
   await page.locator('[data-overview-report][aria-busy="false"]').waitFor();
 }
 
+async function checkFlowerSurfaces(page,mode){
+  const geometry=await page.evaluate(mode=>{
+    const circle=document.querySelector('.flower-identity').getBoundingClientRect(),cx=circle.left+circle.width/2,cy=circle.top+circle.height/2;
+    const buttons=[...document.querySelectorAll('.flower-petal')],paths=buttons.map(b=>b.querySelector(`.flower-petal-${mode}:not(.flower-petal-rim)`));
+    const edges=paths.map(path=>{const length=path.getTotalLength(),matrix=path.getScreenCTM();return Array.from({length:120},(_,i)=>{
+      const p=path.getPointAtLength(length*i/120);return new DOMPoint(p.x,p.y).matrixTransform(matrix);
+    }).filter(p=>Math.hypot(p.x-cx,p.y-cy)>circle.width/2+6);});
+    const count=mode==='compact'?6:7;
+    const gaps=edges.slice(0,count).map((points,i)=>Math.min(...points.flatMap(a=>edges[(i+1)%7].map(b=>Math.hypot(a.x-b.x,a.y-b.y)))));
+    const overlaps=edges.flatMap((points,i)=>paths.flatMap((path,j)=>i===j?[]:points.filter(p=>path.isPointInFill(p.matrixTransform(path.getScreenCTM().inverse()))).map(()=>[i,j])));
+    const taps=buttons.map(button=>({key:button.dataset.tab,reachable:['.flower-icon','.flower-petal-content>span'].every(selector=>{
+      const r=button.querySelector(selector).getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest('.flower-petal')===button;
+    })}));
+    return {gaps,overlaps,taps,limit:Math.max(3,parseFloat(getComputedStyle(document.querySelector('.flower-stage')).width)*.01)};
+  },mode);
+  assert.deepEqual(geometry.overlaps,[],`${mode}: painted petals must not intersect`);
+  assert.ok(geometry.gaps.every(g=>g<=geometry.limit),`${mode}: keep only a narrow seam ${JSON.stringify(geometry)}`);
+  for(const p of geometry.taps)assert.ok(p.reachable,`${mode}: the icon and label must both be tappable: ${p.key}`);
+}
+
 test('real patient renderer: responsive flower, navigation, keyboard, reports and schedule',async t=>{
   assert.ok(process.env.CHROMIUM_EXECUTABLE,'Chromium is required');
   const server=createServer(async(req,res)=>{try{const path=new URL(req.url,'http://localhost').pathname;if(path==='/fixture'){res.setHeader('Content-Type','text/html');res.end(shell);return;}if(!/^\/[a-zA-Z0-9.-]+$/.test(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.css')?'text/css':path.endsWith('.png')?'image/png':'text/javascript');res.end(await readFile(new URL(path.slice(1),root)));}catch{res.writeHead(404);res.end();}});
@@ -63,7 +83,12 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
         await writeFile(`${process.env.FLOWER_SCREENSHOT_DIR}/overflow-${width}.json`,JSON.stringify({expanded,overflow},null,2));}
       assert.ok(expanded.scroll<=width,JSON.stringify(expanded));
       for(const p of expanded.petals){assert.ok(p.left>=-1&&p.right<=width+1,JSON.stringify(p));assert.ok(p.width>=44&&p.height>=44);assert.ok(p.reachable,`Petal occluded: ${JSON.stringify(p)}`);}
+      await checkFlowerSurfaces(page,'expanded');
       if(width===390){
+        await page.locator('[data-flower-toggle]').click();await page.waitForTimeout(300);
+        assert.equal(await page.evaluate(()=>scrollY),0,'Folding must keep the page in place when its focused control moves');
+        await page.locator('[data-flower-toggle]').click();await page.waitForTimeout(300);
+        assert.equal(await page.evaluate(()=>scrollY),0,'Expanding must keep the page in place');
         const motion=await page.evaluate(async()=>{
           const stage=document.querySelector('.flower-stage'),petal=document.querySelector('[data-tab="goals"]'),content=petal.querySelector('.flower-petal-content');
           const duration=getComputedStyle(stage).transitionDuration;
@@ -80,8 +105,19 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
       // CSS transitions finish before layout assertions; this is a bounded browser wait.
       await page.waitForTimeout(300);
       const compact=await measure();evidence.push({width,state:'compact',...compact});
+      const baseDirections=await page.evaluate(()=>{
+        const circle=document.querySelector('.flower-identity').getBoundingClientRect(),cx=circle.left+circle.width/2,cy=circle.top+circle.height/2;
+        return [...document.querySelectorAll('.flower-petal')].map(button=>{
+          const svg=button.querySelector('.flower-petal-shape'),box=svg.viewBox.baseVal,matrix=svg.getScreenCTM();
+          const point=y=>new DOMPoint(box.x+box.width/2,box.y+box.height*y).matrixTransform(matrix);
+          const base=point(.92),outer=point(.08),distance=p=>Math.hypot(p.x-cx,p.y-cy);
+          return {key:button.dataset.tab,base:distance(base),outer:distance(outer)};
+        });
+      });
+      for(const p of baseDirections)assert.ok(p.base+20<p.outer,`The compact petal base must point toward the circle: ${JSON.stringify(p)}`);
       assert.ok(compact.scroll<=width,JSON.stringify(compact));assert.ok(compact.stage.height<=310,JSON.stringify(compact));assert.ok(compact.stage.height<expanded.stage.height*.75);
       for(const p of compact.petals){assert.ok(p.left>=-1&&p.right<=width+1&&p.bottom<=compact.stage.bottom+1,JSON.stringify(p));assert.ok(p.width>=44&&p.height>=44);assert.ok(p.reachable,`Compact petal occluded: ${JSON.stringify(p)}`);}
+      await checkFlowerSurfaces(page,'compact');
       if(width===1440){await page.setViewportSize({width:390,height:844});await page.waitForTimeout(300);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.setViewportSize({width,height:1000});await page.waitForTimeout(300);}
       assert.equal(await page.locator('[aria-current="page"]').getAttribute('data-tab'),'goals');
       await page.locator('#goalFormToggle').click();await page.locator('[name="title"]').fill('Несохранённая цель');

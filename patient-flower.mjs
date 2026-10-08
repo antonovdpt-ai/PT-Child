@@ -18,6 +18,10 @@ const paths = {
   report:'<path d="M14 2H5v20h14V7zM14 2v5h5M8 12h8M8 17h5"/>', arrow:'<path d="m9 6 6 6-6 6"/>'
 };
 export const flowerIcon = key => `<svg class="flower-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths[key] || paths.overview}</svg>`;
+const petalContours = {
+  expanded:'M100 2C130 2 153 6 171 13C188 19 197 32 190 49L156 120Q150 132 136 130Q100 121 64 130Q50 132 44 120L10 49C3 32 12 19 29 13C47 6 70 2 100 2Z',
+  compact:'M100 2C128 2 151 14 176 34Q197 51 187 72L169 116Q165 129 150 129Q100 123 50 129Q35 129 31 116L13 72Q3 51 24 34C49 14 72 2 100 2Z'
+};
 
 // The only persisted value is a global presentation preference, never a patient ID or content.
 export function readFlowerCompact(view) {
@@ -39,20 +43,26 @@ export function patientFlowerHtml({patient, tab, age, sex, dob, compact = false}
     <div class="flower-toolbar">
       <button id="backPatients" class="flower-tool" type="button">${flowerIcon('back')}<span>Пациенты</span></button>
       <button id="editPatient" class="flower-tool flower-edit" type="button" aria-label="Редактировать карточку" title="Редактировать карточку">${flowerIcon('edit')}</button>
-      <button class="flower-tool flower-toggle" type="button" data-flower-toggle aria-expanded="${!compact}" aria-controls="patientFlowerStage">${flowerIcon('chevron')}<span>${compact ? 'Развернуть' : 'Свернуть'}</span></button>
     </div>
     <div class="flower-stage" id="patientFlowerStage">
       <nav class="patient-tabs flower-navigation" aria-label="Разделы карточки пациента">
         ${patientSections.map(([key,label],i) => {
           const angle = -90 + i * 360/7, radians = angle * Math.PI/180;
-          const compactX=[-1,-.71,-.36,0,.36,.71,1][i], compactY=[.50,.68,.79,.83,.79,.68,.50][i];
-          return `<button type="button" class="flower-petal ${key === tab ? 'is-active' : ''}" data-tab="${key}" aria-controls="tabContent" ${key === tab ? 'aria-current="page"' : ''} style="--compact-x:${compactX};--compact-y:${compactY};--compact-turn:${[-38,-26,-13,0,13,26,38][i]}deg;--petal-x:${Math.cos(radians).toFixed(4)};--petal-y:${Math.sin(radians).toFixed(4)};--petal-turn:${(angle+90).toFixed(2)}deg">
-            <svg class="flower-petal-shape" viewBox="0 0 120 132" preserveAspectRatio="none" aria-hidden="true"><path d="M12 25Q60 -9 108 25Q123 38 113 69L87 121Q60 139 33 121L7 69Q-3 38 12 25Z"/></svg>
+          // The narrow end is the bottom of the SVG. In the fan it always faces
+          // the circle; equivalent angles keep the fold below a half turn.
+          const compactX=[-.383,-.267,-.14,0,.14,.267,.383][i],compactY=[.104,.209,.272,.294,.272,.209,.104][i];
+          const compactTurn=[-106,-127,208,180,152,127,466][i],compactScale=[1.26,1.1,1,1,1,1.1,1.26][i];
+          const compactWidthScale=i>=2&&i<=4 ? 1.08 : 1;
+          return `<button type="button" class="flower-petal ${key === tab ? 'is-active' : ''}" data-tab="${key}" aria-controls="tabContent" ${key === tab ? 'aria-current="page"' : ''} style="--compact-x:${compactX};--compact-y:${compactY};--compact-turn:${compactTurn}deg;--compact-scale:${compactScale};--compact-width-scale:${compactWidthScale};--petal-x:${Math.cos(radians).toFixed(4)};--petal-y:${Math.sin(radians).toFixed(4)};--petal-turn:${(angle+90).toFixed(2)}deg">
+            <svg class="flower-petal-shape" viewBox="0 0 200 132" preserveAspectRatio="none" aria-hidden="true" style="--petal-fill:url(#flower-surface-${key});--petal-active-fill:url(#flower-active-${key})">
+              <defs><linearGradient id="flower-surface-${key}" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#f0f8fa"/></linearGradient><radialGradient id="flower-active-${key}" cx=".5" cy=".55" r=".7"><stop stop-color="#cdfbf1"/><stop offset="1" stop-color="#87e4d5"/></radialGradient></defs>
+              ${Object.entries(petalContours).map(([mode,d])=>`<path class="flower-petal-${mode}" d="${d}"/><path class="flower-petal-${mode} flower-petal-rim" transform="translate(3 2) scale(.97 .96)" d="${d}"/>`).join('')}
+            </svg>
             <span class="flower-petal-content">${flowerIcon(key)}<span>${esc(label)}</span><span class="flower-active-mark" aria-hidden="true"></span></span>
           </button>`;
         }).join('')}
       </nav>
-      <section class="patient-hero flower-identity" aria-labelledby="flowerPatientName">
+      <section class="patient-hero flower-identity ${(patient.display_name || '').length > 12 ? 'has-long-name' : ''}" aria-labelledby="flowerPatientName">
         <span class="flower-avatar">${flowerIcon('child')}</span>
         <div class="flower-identity-copy"><h1 id="flowerPatientName" title="${esc(patient.display_name)}">${esc(patient.display_name || 'Имя не указано')}</h1>
           <div class="patient-hero-meta">${esc(age)} · ${esc(sex)}</div>
@@ -65,7 +75,10 @@ export function patientFlowerHtml({patient, tab, age, sex, dob, compact = false}
       </section>
     </div>
     <p class="flower-scroll-hint">Сдвиньте разделы, чтобы увидеть все <span aria-hidden="true">→</span></p>
-    <details class="flower-support"><summary>ИИ и документы</summary><div class="actions patient-hero-actions"></div></details>
+    <div class="flower-footer">
+      <button class="flower-tool flower-toggle" type="button" data-flower-toggle aria-expanded="${!compact}" aria-controls="patientFlowerStage">${flowerIcon('chevron')}<span>${compact ? 'Развернуть' : 'Свернуть'}</span></button>
+      <details class="flower-support"><summary>ИИ и документы</summary><div class="actions patient-hero-actions"></div></details>
+    </div>
     <dialog class="flower-details-dialog" aria-labelledby="flowerDetailsTitle"><div>
       <h2 id="flowerDetailsTitle">${esc(patient.display_name || 'Пациент')}</h2><div class="muted">${esc(age)} · ${esc(sex)} · ${esc(dob)}</div>
       <h3>Причина обращения</h3><p>${esc(patient.primary_complaint || 'Причина обращения пока не заполнена')}</p>
