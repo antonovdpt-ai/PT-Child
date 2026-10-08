@@ -6,7 +6,7 @@ import { createSpecialistRoleGate } from './role-gate.mjs';
 import { mountParentReportWorkspace, leaveParentReportWorkspace } from './parent-report-workspace.mjs?v=2';
 import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=8';
 import { renderCabinet } from './cabinet.js?v=8';
-import { patientFlowerHtml, mountPatientFlower, readFlowerCompact, saveFlowerCompact, collapsePatientFlower } from './patient-flower.mjs?v=2';
+import { patientFlowerHtml, mountPatientFlower, readFlowerCompact, saveFlowerCompact, collapsePatientFlower } from './patient-flower.mjs?v=3';
 import { patientOverviewHtml, mountPatientOverview, updateOverviewReport } from './patient-overview.mjs?v=1';
 import { openScheduleEditor } from './schedule-editor.js?v=8';
 
@@ -3849,7 +3849,7 @@ aiToggleBtn.style.display = "block";
   aiToggleBtn.textContent = "Развернуть анализ";
   
 
-  aiBtn.textContent = "Обновить анализ";
+  aiBtn.textContent = "Анализ пациента";
   }
 
   aiBtn.onclick = async () => {
@@ -4054,9 +4054,7 @@ const answer =
 
       setTimeout(() => {
       if (!accountIsCurrent()) return;
-        aiBtn.textContent = p.ai_analysis
-          ? "Обновить анализ"
-          : "Анализ пациента";
+        aiBtn.textContent = "Анализ пациента";
         aiBtn.disabled = false;
       }, 1200);
 
@@ -4066,7 +4064,7 @@ const answer =
       aiResult.textContent =
         "Не удалось выполнить анализ ИИ. Попробуйте ещё раз.";
 
-      aiBtn.textContent = "Повторить анализ";
+      aiBtn.textContent = "Анализ пациента";
       aiBtn.disabled = false;
     }
   };

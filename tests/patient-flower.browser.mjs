@@ -6,7 +6,7 @@ import {chromium} from 'playwright-core';
 
 const root=new URL('../',import.meta.url), source=await readFile(new URL('app.js',root),'utf8');
 const slice=(a,b)=>source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)));
-const snippets={patient:slice('function renderPatient(','function option('),tab:slice('function renderTab(','\ninit().catch('),assessment:slice('function option(','function renderTab('),goals:slice('function goalsHtml(','function renderPatient('),session:slice('const toleranceLabel','function validateNextSessionPlan('),header:slice('function renderHeader()','function setButtonSaving('),dirty:slice('function watchFormDirty(','window.addEventListener(\'beforeunload\''),assessmentControls:slice('function enableAssessmentSectionCollapse(','async function loadProfile(')};
+const snippets={identityFormatters:slice('const fmtDate =','const toleranceLabel'),patient:slice('function renderPatient(','function option('),tab:slice('function renderTab(','\ninit().catch('),assessment:slice('function option(','function renderTab('),goals:slice('function goalsHtml(','function renderPatient('),session:slice('const toleranceLabel','function validateNextSessionPlan('),header:slice('function renderHeader()','function setButtonSaving('),dirty:slice('function watchFormDirty(','window.addEventListener(\'beforeunload\''),assessmentControls:slice('function enableAssessmentSectionCollapse(','async function loadProfile(')};
 const shell=(await readFile(new URL('index.html',root),'utf8')).replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
 
 async function install(page,variant='normal'){
@@ -32,10 +32,10 @@ async function install(page,variant='normal'){
         const wait=variant==='saving'&&['goals','sessions'].includes(table)&&op==='insert'?new Promise(r=>window.finishSyntheticSave=r):Promise.resolve();
         return wait.then(()=>({data:one?data[0]||null:data,error:variant==='error'&&table==='appointments'?{message:'Synthetic read failure'}:null})).then(resolve);
       }},{get(target,key){return target[key]||((...args)=>{if(key==='eq')filters.push(args);if(key==='single')one=true;if(['insert','update','delete','upsert'].includes(key)){op=key;payload=args[0];}return q;});}});return q;
-    },functions:{invoke:async(name,options)=>{if(name==='ptchild-ai'){window.aiCalls.push([options.body.operation,options.body.patient_id,options.body.input,options.body.files]);return {data:{text:'## Краткое резюме\nВымышленные данные'},error:null};}return {data:{ok:true},error:null};}},storage:{from:()=>({createSignedUrl:async()=>({data:{signedUrl:'https://auth.fizira.test/fictional.jpg'},error:null})})}};
+    },functions:{invoke:async(name,options)=>{if(name==='ptchild-ai'){window.aiCalls.push([options.body.operation,options.body.patient_id,options.body.input,options.body.files]);if(variant==='ai-error')return {data:null,error:{message:'Synthetic AI failure'}};return {data:{text:'## Краткое резюме\nВымышленные данные'},error:null};}return {data:{ok:true},error:null};}},storage:{from:()=>({createSignedUrl:async()=>({data:{signedUrl:'https://auth.fizira.test/fictional.jpg'},error:null})})}};
     const env={window,document,app:document.getElementById('app'),headerActions:document.getElementById('headerActions'),p,state,sb,user:{id:p.therapist_id,email:'fictional@example.test',user_metadata:{}},authViewRevision:1,passwordRecoveryActive:false,roleGate:{canNavigate:()=>true},SUPABASE_URL:'https://auth.fizira.test',currentPatient:()=>p,esc:escapeHtml,
       ageFromDob:()=>p.date_of_birth?'5 лет':'Возраст не указан',sexLabel:()=> 'Мальчик',fmtDate:v=>v,renderPatients(){env.app.innerHTML='<div data-patient-list>Пациенты</div>';},renderEditPatient(){env.app.innerHTML='<div data-patient-edit>Редактирование карточки</div>';},renderProfile(){},
-      mountParentReportWorkspace,leaveParentReportWorkspace,renderParentPortalSpecialist,renderParentSessionReportEditor,openScheduleEditor,...flower,...overview,
+      mountParentReportWorkspace,leaveParentReportWorkspace,renderParentPortalSpecialist,renderParentSessionReportEditor,openScheduleEditor,...flower,...overview,...new Function(snippets.identityFormatters+';return {ageFromDob,sexLabel,fmtDate};')(),
       enableVoiceInput(){},prepareParentReportDraft:async()=>({complaint:'Вымышленная жалоба',recommendations:'Вымышленная рекомендация'}),loadPatientData:async()=>{},loadAiAnalysisHistory:async()=>[],buildGeneralAnalysisContext:()=>({}),callAI:async(...args)=>{window.aiCalls.push(args);return '## Краткое резюме\nВымышленные данные';},formatAIAnalysisBlock:a=>escapeHtml(a),formatAIAnalysisDate:x=>x,aiDocumentTypeLabels:{},sleep:ms=>new Promise(r=>setTimeout(r,ms)),setButtonSaving(b){b.disabled=true;},setButtonSaved(b){b.disabled=true;},setButtonError(b){b.disabled=false;},setButtonDirty(button,text){button.textContent=text;}};
     window.flowerEnvironment=env;
     new Function('env',`with(env){${snippets.header}\n${snippets.dirty}\n${snippets.assessmentControls}\n${snippets.session}\n${snippets.goals}\n${snippets.assessment}\n${snippets.patient}\n${snippets.tab}\nenv.renderPatient=renderPatient;renderHeader();renderPatient();}`)(env);
@@ -65,13 +65,39 @@ async function checkFlowerSurfaces(page,mode){
   for(const p of geometry.taps)assert.ok(p.reachable,`${mode}: the icon and label must both be tappable: ${p.key}`);
 }
 
+async function checkFlowerIdentity(page){
+  const identity=await page.locator('.flower-identity').evaluate(circle=>{
+    const r=circle.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+    const elements=[...circle.children].map(el=>{
+      const b=el.getBoundingClientRect(),s=getComputedStyle(el);
+      return {key:el.id||el.className,visible:s.display!=='none'&&s.visibility==='visible',
+        inside:[[b.left,b.top],[b.right,b.top],[b.left,b.bottom],[b.right,b.bottom]].every(([x,y])=>Math.hypot(x-cx,y-cy)<=r.width/2-1),
+        top:b.top,bottom:b.bottom};
+    });
+    const button=circle.querySelector('#aiAnalyzeBtn'),buttonRect=button.getBoundingClientRect(),buttonStyle=getComputedStyle(button),textRange=document.createRange();textRange.selectNodeContents(button);const textRect=textRange.getBoundingClientRect();
+    return {elements,metaFits:circle.querySelector('.patient-hero-meta').scrollWidth<=circle.clientWidth-16,
+      buttonTextFits:textRect.left>=buttonRect.left+parseFloat(buttonStyle.paddingLeft)-.5&&textRect.right<=buttonRect.right-parseFloat(buttonStyle.paddingRight)+.5,
+      nameStyle:getComputedStyle(circle.querySelector('h1')).textOverflow,
+      aiText:circle.querySelector('#aiAnalyzeBtn').textContent,
+      forbidden:!!circle.querySelector('.flower-complaint,.patient-hero-date,[data-patient-details],.patient-hero-actions')};
+  });
+  assert.equal(identity.elements.length,4,JSON.stringify(identity));
+  for(const el of identity.elements){assert.ok(el.visible,`Identity element is hidden: ${JSON.stringify(identity)}`);assert.ok(el.inside,`Identity element crosses circle: ${JSON.stringify(identity)}`);}
+  for(let i=1;i<identity.elements.length;i++)assert.ok(identity.elements[i].top>=identity.elements[i-1].bottom+3,`Identity elements need space: ${JSON.stringify(identity)}`);
+  assert.ok(identity.metaFits,`Age and sex must fit one line: ${JSON.stringify(identity)}`);
+  assert.ok(identity.buttonTextFits,`The analysis label must fit with padding: ${JSON.stringify(identity)}`);
+  assert.equal(identity.nameStyle,'ellipsis');
+  assert.equal(identity.aiText,'Анализ пациента');
+  assert.equal(identity.forbidden,false);
+}
+
 test('real patient renderer: responsive flower, navigation, keyboard, reports and schedule',async t=>{
   assert.ok(process.env.CHROMIUM_EXECUTABLE,'Chromium is required');
   const server=createServer(async(req,res)=>{try{const path=new URL(req.url,'http://localhost').pathname;if(path==='/fixture'){res.setHeader('Content-Type','text/html');res.end(shell);return;}if(!/^\/[a-zA-Z0-9.-]+$/.test(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.css')?'text/css':path.endsWith('.png')?'image/png':'text/javascript');res.end(await readFile(new URL(path.slice(1),root)));}catch{res.writeHead(404);res.end();}});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;const evidence=[];
   try{
     browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
-    for(const width of [320,375,390,430,768,1024,1440])await t.test(`${width}px`,async()=>{
+    for(const width of [320,350,360,375,390,430,768,1024,1440])await t.test(`${width}px`,async()=>{
       const page=await browser.newPage({viewport:{width,height:width<701?844:1000},isMobile:width<701,hasTouch:width<701});const errors=[];page.on('pageerror',e=>errors.push(e.message));
       page.setDefaultTimeout(10000);
       try {
@@ -84,6 +110,7 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
       assert.ok(expanded.scroll<=width,JSON.stringify(expanded));
       for(const p of expanded.petals){assert.ok(p.left>=-1&&p.right<=width+1,JSON.stringify(p));assert.ok(p.width>=44&&p.height>=44);assert.ok(p.reachable,`Petal occluded: ${JSON.stringify(p)}`);}
       await checkFlowerSurfaces(page,'expanded');
+      await checkFlowerIdentity(page);
       if(width===390){
         await page.locator('[data-flower-toggle]').click();await page.waitForTimeout(300);
         assert.equal(await page.evaluate(()=>scrollY),0,'Folding must keep the page in place when its focused control moves');
@@ -105,6 +132,7 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
       // CSS transitions finish before layout assertions; this is a bounded browser wait.
       await page.waitForTimeout(300);
       const compact=await measure();evidence.push({width,state:'compact',...compact});
+      await checkFlowerIdentity(page);
       const baseDirections=await page.evaluate(()=>{
         const circle=document.querySelector('.flower-identity').getBoundingClientRect(),cx=circle.left+circle.width/2,cy=circle.top+circle.height/2;
         return [...document.querySelectorAll('.flower-petal')].map(button=>{
@@ -153,7 +181,26 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
       if(process.env.FLOWER_SCREENSHOT_DIR){await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:`${process.env.FLOWER_SCREENSHOT_DIR}/flower-compact-${width}.png`,fullPage:true});}
       } finally {await page.close();}
     });
-    for(const variant of ['long','empty','error','session-report','ai','assessment','saving'])await t.test(`390px ${variant}`,async()=>{
+    for(const width of [320,350,360,390])await t.test(`${width}px identity names and missing facts`,async()=>{
+      const page=await browser.newPage({viewport:{width,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
+      try {
+        await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);await install(page);
+        for(const name of ['Миша','Александр','Тест','Анна-Мария','Александрина'.repeat(12),'']) {
+          await page.evaluate(async name=>{const env=window.flowerEnvironment;env.p.display_name=name;env.p.date_of_birth=name? '2021-04-12':null;env.p.sex=name?'male':'unspecified';await env.renderPatient();},name);
+          await page.locator('[data-overview-report][aria-busy="false"]').waitFor();
+          for(const compact of [false,true]) {
+            await page.locator('.patient-flower').evaluate((root,compact)=>{if(root.classList.contains('is-compact')!==compact)root.querySelector('[data-flower-toggle]').click();},compact);
+            await checkFlowerIdentity(page);
+            assert.equal(await page.locator('.flower-identity h1').textContent(),name||'Имя не указано');
+            if(!name)assert.equal(await page.locator('.flower-identity .patient-hero-meta').textContent(),'Возраст — · Пол —');
+            assert.equal(await page.evaluate(()=>window.flowerEnvironment.p.display_name),name);
+            assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+          }
+        }
+        assert.deepEqual(await page.evaluate(()=>window.networkCalls.filter(c=>c.op!=='read')),[]);
+      } finally {await page.close();}
+    });
+    for(const variant of ['long','empty','error','session-report','ai','ai-error','assessment','saving'])await t.test(`390px ${variant}`,async()=>{
       const page=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);await install(page,variant);
       page.setDefaultTimeout(10000);
       assert.equal(await page.locator('.flower-stage').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
@@ -162,6 +209,13 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
       if(variant==='empty'){await page.locator('[data-overview-add-goal]').click();await page.locator('#goalForm').waitFor({state:'visible'});assert.equal(await page.evaluate(()=>document.activeElement.name),'title');await page.locator('[data-tab="overview"]').click();await page.locator('[data-overview-appointment]').click();await page.locator('.schedule-dialog').waitFor();assert.equal(await page.locator('.schedule-dialog [data-search]').inputValue(),'Михаил Тестовый');assert.equal(await page.locator('.schedule-dialog [name="price"]').inputValue(),'3500');assert.equal(await page.locator('.schedule-dialog [name="save_tariff"]').isChecked(),false);await page.locator('.schedule-dialog [data-close]').first().click();}
       if(variant==='session-report'){await page.locator('[data-overview-report]').click();await page.locator('[data-parent-session-editor] [name="what_did"]').waitFor();assert.equal(await page.locator('[data-parent-session-editor] [name="what_did"]').inputValue(),'Сохранённый отчёт занятия');assert.equal(await page.locator('[aria-current="page"]').getAttribute('data-tab'),'sessions');assert.equal(await page.evaluate(()=>document.activeElement.name),'what_did');assert.deepEqual(await page.evaluate(()=>window.networkCalls.filter(c=>c.op!=='read')),[]);}
       if(variant==='ai'){await page.locator('#aiAnalyzeBtn').click();await page.waitForFunction(()=>document.getElementById('aiAnalyzeBtn').textContent!=='Анализируем…');assert.match(await page.locator('.ai-result-card').textContent(),/Вымышленные данные/,JSON.stringify(errors));assert.ok(await page.locator('.ai-result-card').isVisible());assert.match(await page.locator('.ai-result-card').textContent(),/Вымышленные данные/);assert.deepEqual(await page.evaluate(()=>window.aiCalls),[['patient_analysis','fictional-child',{},[]]]);assert.deepEqual(await page.evaluate(()=>window.networkCalls.filter(c=>c.op!=='read').map(c=>[c.table,c.op])),[['patients','update'],['ai_analysis_history','insert']]);}
+      if(variant==='ai-error'){
+        await page.locator('[data-flower-toggle]').click();await page.locator('#aiAnalyzeBtn').click();
+        await page.getByText('Не удалось выполнить анализ ИИ. Попробуйте ещё раз.',{exact:true}).waitFor();
+        assert.equal(await page.locator('#aiAnalyzeBtn').isEnabled(),true);await checkFlowerIdentity(page);
+        assert.deepEqual(await page.evaluate(()=>window.networkCalls.filter(c=>c.op!=='read')),[]);
+        assert.equal(errors.length,1);assert.match(errors[0],/Synthetic AI failure/);errors.length=0;
+      }
       if(variant==='assessment'){
         await page.locator('[data-tab="assessment"]').click();
         const form=page.locator('#assessmentForm');

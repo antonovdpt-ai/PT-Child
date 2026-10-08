@@ -39,6 +39,12 @@ export async function collapsePatientFlower(root) {
 }
 
 export function patientFlowerHtml({patient, tab, age, sex, dob, compact = false}) {
+  // The existing form accepts a free-form name/pseudonym, not an ordered FIO.
+  // Keep the stored value intact and never infer a given name from word position.
+  const displayName = String(patient.display_name || '').trim();
+  const givenName = /^[\p{L}\p{M}]+(?:[-'’][\p{L}\p{M}]+)*$/u.test(displayName) ? displayName : '';
+  const name = givenName || (displayName ? 'Имя не уточнено' : 'Имя не указано');
+  const meta = `${patient.date_of_birth ? age : 'Возраст —'} · ${!patient.sex || patient.sex === 'unspecified' ? 'Пол —' : sex}`;
   return `<section class="patient-flower ${compact ? 'is-compact' : ''}" aria-label="Карточка пациента">
     <div class="flower-toolbar">
       <button id="backPatients" class="flower-tool" type="button">${flowerIcon('back')}<span>Пациенты</span></button>
@@ -62,21 +68,17 @@ export function patientFlowerHtml({patient, tab, age, sex, dob, compact = false}
           </button>`;
         }).join('')}
       </nav>
-      <section class="patient-hero flower-identity ${(patient.display_name || '').length > 12 ? 'has-long-name' : ''}" aria-labelledby="flowerPatientName">
+      <section class="patient-hero flower-identity" aria-labelledby="flowerPatientName" data-name-unresolved="${!givenName}" data-long-meta="${meta.length > 23}">
         <span class="flower-avatar">${flowerIcon('child')}</span>
-        <div class="flower-identity-copy"><h1 id="flowerPatientName" title="${esc(patient.display_name)}">${esc(patient.display_name || 'Имя не указано')}</h1>
-          <div class="patient-hero-meta">${esc(age)} · ${esc(sex)}</div>
-          <div class="patient-hero-date">${esc(dob)}</div>
-        </div>
-        <button type="button" class="flower-complaint" data-patient-details aria-haspopup="dialog" aria-label="Сведения о пациенте и полная причина обращения">
-          <span>Причина обращения</span><strong>${esc(patient.primary_complaint || 'Пока не указана')}</strong>
-        </button>
+        <h1 id="flowerPatientName" title="${esc(name)}">${esc(name)}</h1>
+        <div class="patient-hero-meta" aria-label="${esc(`${age} · ${sex}`)}">${esc(meta)}</div>
         <div class="flower-ai-host"></div>
       </section>
     </div>
     <p class="flower-scroll-hint">Сдвиньте разделы, чтобы увидеть все <span aria-hidden="true">→</span></p>
     <div class="flower-footer">
       <button class="flower-tool flower-toggle" type="button" data-flower-toggle aria-expanded="${!compact}" aria-controls="patientFlowerStage">${flowerIcon('chevron')}<span>${compact ? 'Развернуть' : 'Свернуть'}</span></button>
+      <button class="flower-tool" type="button" data-patient-details aria-haspopup="dialog" aria-label="Сведения о пациенте и полная причина обращения">Сведения о пациенте</button>
       <details class="flower-support"><summary>ИИ и документы</summary><div class="actions patient-hero-actions"></div></details>
     </div>
     <dialog class="flower-details-dialog" aria-labelledby="flowerDetailsTitle"><div>

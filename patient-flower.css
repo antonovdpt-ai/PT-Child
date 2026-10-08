@@ -35,18 +35,15 @@
 .flower-petal:hover .flower-petal-shape path{fill:#e8f9f3}.flower-petal.is-active:hover .flower-petal-shape path{fill:#a0e6d8}
 .flower-petal-shape .flower-petal-rim{fill:none!important;stroke:#d7e9ec;stroke-width:1.4;stroke-opacity:.8;pointer-events:none!important}
 .flower-petal.is-active .flower-petal-shape .flower-petal-rim{stroke:#74d6c6;stroke-opacity:.6}
-.patient-flower .flower-identity{position:absolute;left:50%;top:50%;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:var(--identity-size);height:var(--identity-size);margin:0;padding:24px;border:1px solid #e1eef0;border-radius:50%;background:linear-gradient(145deg,#fff 40%,#f3fafb);box-shadow:0 0 0 6px #fff,0 7px 25px rgb(17 101 108 / 10%);transform:translate(-50%,-50%);text-align:center;transition:top var(--flower-duration) ease,transform var(--flower-duration) ease,width var(--flower-duration) ease,height var(--flower-duration) ease,border-radius var(--flower-duration) ease,box-shadow var(--flower-duration) ease}
-.flower-avatar{display:grid;place-items:center;flex:0 0 auto;width:52px;height:52px;border-radius:50%;background:#def8f0;color:var(--flower-teal)}
-.flower-avatar .flower-icon{width:32px;height:32px}
-.flower-identity-copy{width:100%;min-width:0;max-width:100%}
-.patient-flower .flower-identity h1{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;margin:0 0 4px;font-size:28px;line-height:1.13;letter-spacing:-.025em;overflow-wrap:anywhere}
-.patient-flower .patient-hero-meta{font-size:16px;color:var(--flower-muted);line-height:1.3}
-.patient-flower .patient-hero-date{margin-top:1px;font-size:14px;color:var(--flower-muted)}
-.flower-complaint{width:100%;min-height:44px;padding:8px 2px 2px;border:0;border-top:1px solid var(--flower-line);background:transparent;color:var(--flower-ink);text-align:center}
-.flower-complaint>span{display:block;color:var(--flower-muted);font-size:12px;line-height:1.3}
-.flower-complaint strong{display:-webkit-box;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:14px;line-height:1.25;overflow-wrap:anywhere}
-.flower-ai-host{width:82%;max-width:220px}
-.patient-flower .ai-action-button{width:100%;min-height:44px;padding:10px 8px;border-radius:99px;border-color:var(--flower-teal);background:linear-gradient(110deg,#00888b,#00757b);color:white;font-size:13px;line-height:1.2}
+.patient-flower .flower-identity{position:absolute;left:50%;top:50%;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:var(--identity-size);height:var(--identity-size);margin:0;padding:24px;border:1px solid #e1eef0;border-radius:50%;background:linear-gradient(145deg,#fff 40%,#f3fafb);box-shadow:0 0 0 6px #fff,0 7px 25px rgb(17 101 108 / 10%);transform:translate(-50%,-50%);text-align:center;transition:top var(--flower-duration) ease,transform var(--flower-duration) ease,width var(--flower-duration) ease,height var(--flower-duration) ease,border-radius var(--flower-duration) ease,box-shadow var(--flower-duration) ease}
+/* Four identity elements only; text never changes the circle or hides its icon. */
+.flower-avatar{display:grid;place-items:center;flex:0 0 auto;width:32px;height:32px;border-radius:50%;background:#def8f0;color:var(--flower-teal)}
+.flower-avatar .flower-icon{width:22px;height:22px}
+.patient-flower .flower-identity h1{flex:0 0 auto;width:90%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0;font-size:32px;line-height:1.15;letter-spacing:-.025em}
+.patient-flower .patient-hero-meta{flex:0 0 auto;max-width:98%;white-space:nowrap;font-size:clamp(10px,calc(var(--identity-size)*.064),16px);color:var(--flower-muted);line-height:1.3}
+.patient-flower .flower-identity[data-long-meta="true"] .patient-hero-meta{font-size:clamp(9px,calc(var(--identity-size)*.054),12px)}
+.flower-ai-host{flex:0 0 auto;width:78%;max-width:220px}
+.patient-flower .ai-action-button{width:100%;min-height:44px;padding:10px 8px;border-radius:99px;border-color:var(--flower-teal);background:linear-gradient(110deg,#00888b,#00757b);color:white;font-size:13px;line-height:1.2;white-space:nowrap}
 .patient-flower .ai-action-button:hover{background:#00666e;transform:none}.patient-flower .ai-action-button:disabled{cursor:wait;opacity:.7}
 .flower-scroll-hint{display:none;margin:3px 0 8px;color:var(--flower-muted);font-size:12px;line-height:1.4}
 .flower-scroll-hint[hidden]{display:none!important}
@@ -70,15 +67,11 @@
 /* Reference proportions: wide outer petals, a tight fan, bases toward the circle. */
 .patient-flower.is-compact .flower-stage{height:clamp(230px,66cqw,310px);--flower-size:min(100cqw,500px);--identity-size:clamp(166px,calc(var(--flower-size)*.45),234px);--fan-center-y:calc(8px + var(--identity-size)*.5 + max(0px,166px - var(--flower-size)*.45)*.65)}
 .patient-flower.is-compact .flower-stage:before{height:100%;opacity:.7}
-.patient-flower.is-compact .flower-identity{top:8px;transform:translate(-50%,0);gap:2px;padding:8px;border-radius:50%}
-.patient-flower.is-compact .has-long-name .flower-avatar,.patient-flower.is-compact .patient-hero-date{display:none}
+.patient-flower.is-compact .flower-identity{top:8px;transform:translate(-50%,0);gap:4px;padding:8px 8px 12px;border-radius:50%}
 .patient-flower.is-compact .flower-avatar{width:22px;height:22px}.patient-flower.is-compact .flower-avatar .flower-icon{width:18px;height:18px}
-.patient-flower.is-compact .patient-hero-meta{font-size:12px}
-.patient-flower.is-compact .flower-identity h1{font-size:18px;margin-bottom:2px}
-.patient-flower.is-compact .flower-complaint{min-height:44px;padding:3px 0}
-.patient-flower.is-compact .flower-complaint>span{font-size:11px}
-.patient-flower.is-compact .flower-complaint strong{font-size:12px;-webkit-line-clamp:2}
-.patient-flower.is-compact .flower-ai-host{width:90%;max-width:170px}
+.patient-flower.is-compact .flower-identity h1{font-size:20px}
+.patient-flower.is-compact .flower-ai-host{width:80%;max-width:170px}
+.patient-flower.is-compact .ai-action-button{font-size:11px;padding:7px 4px}
 .patient-flower.is-compact .flower-navigation{inset:0;overflow:visible}
 .patient-flower.is-compact .flower-petal{left:calc(50% + var(--compact-x)*var(--flower-size));top:calc(var(--fan-center-y) + var(--compact-y)*var(--flower-size));width:max(44px,calc(var(--flower-size)*.142*var(--compact-scale)*var(--compact-width-scale)));height:calc(var(--flower-size)*.155*var(--compact-scale));transform:translate(-50%,-50%) rotate(var(--compact-turn))}
 .patient-flower.is-compact .flower-petal-content{font-size:12px;gap:3px;transform:translateY(-3px) rotate(calc(-1*var(--compact-turn)))}
@@ -106,30 +99,30 @@
 .shell:has(.patient-flower) .sidebar-nav-item{min-height:44px}
 
 @container (max-width:580px){
-  .patient-flower .flower-identity{gap:2px;padding:8px;box-shadow:0 0 0 5px #fff,0 5px 20px rgb(17 101 108 / 9%)}
+  .patient-flower .flower-identity{gap:4px;padding:8px;box-shadow:0 0 0 5px #fff,0 5px 20px rgb(17 101 108 / 9%)}
   .flower-avatar{width:26px;height:26px}.flower-avatar .flower-icon{width:20px;height:20px}
-  .patient-flower:not(.is-compact) .has-long-name .flower-avatar{display:none}
-  .patient-flower:not(.is-compact) .has-long-name .flower-identity-copy{max-width:80%}
-  .patient-flower .flower-identity h1{font-size:18px}.patient-flower .patient-hero-meta{font-size:12px}.patient-flower .patient-hero-date{font-size:11px}
+  .patient-flower .flower-identity h1{font-size:24px}
   .flower-petal-content{font-size:13px;gap:4px;transform:translateY(-14px) rotate(calc(-1*var(--petal-turn)))}.flower-petal-content>span:not(.flower-active-mark){max-width:90px}
   .flower-petal .flower-icon{width:29px;height:29px}
-  .flower-complaint{min-height:44px;padding:4px 0 0}.flower-complaint>span{font-size:11px}.flower-complaint strong{font-size:13px}
   .patient-flower .ai-action-button{padding:7px 5px;font-size:12px}
-  .patient-flower.is-compact .flower-identity h1{font-size:17px}
+  .patient-flower.is-compact .flower-identity h1{font-size:20px}
   .patient-flower.is-compact .flower-petal-content{font-size:11px;font-weight:500;letter-spacing:-.025em;gap:2px}
   .patient-flower.is-compact .flower-petal-content>span:not(.flower-active-mark){max-width:66px}
   .patient-flower.is-compact .flower-petal .flower-icon{width:21px;height:21px}
   .overview-grid{grid-template-columns:1fr}
 
 }
+@container (max-width:350px){
+  .patient-flower .flower-ai-host{width:79%}
+  .patient-flower .ai-action-button{font-size:11px;padding:7px 3px}
+  .patient-flower .flower-avatar{width:22px;height:22px}.patient-flower .flower-avatar .flower-icon{width:18px;height:18px}
+  .patient-flower .flower-identity h1{font-size:20px}
+}
 @container (max-width:315px){
   .flower-stage{--identity-size:58cqw}
-  .patient-flower:not(.is-compact) .flower-avatar,.patient-flower:not(.is-compact) .patient-hero-date{display:none}
-  .patient-flower .flower-identity h1{font-size:18px}
   .flower-petal-content{font-size:12px}.flower-petal-content>span:not(.flower-active-mark){max-width:76px}
   .flower-petal .flower-icon{width:23px;height:23px}
-  .patient-flower:not(.is-compact) .flower-complaint>span{display:none}
-  .patient-flower.is-compact .flower-identity h1{font-size:16px}
+  .patient-flower.is-compact .flower-identity h1{font-size:20px}
   .patient-flower.is-compact .flower-petal-content{font-size:10px}
 
 }
@@ -148,3 +141,5 @@
 @media(prefers-reduced-motion:reduce){.patient-flower *,.patient-flower *:before,.patient-overview *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media(max-width:350px){.shell:has(.patient-flower) .sidebar-nav-item{padding-inline:2px;font-size:10.5px}}
 @media(forced-colors:active){.flower-petal-shape path{fill:Canvas;stroke:CanvasText}.flower-petal.is-active .flower-petal-shape path{fill:Highlight}.flower-petal.is-active{color:HighlightText}.flower-active-mark{background:currentColor}.patient-flower.is-compact .flower-petal.is-active{outline:2px solid Highlight}}
+
+.patient-flower .flower-identity[data-name-unresolved="true"] h1{font-size:clamp(14px,calc(var(--identity-size)*.083),20px)}

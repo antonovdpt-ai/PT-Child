@@ -3,6 +3,54 @@ import assert from 'node:assert/strict';
 import {flowerFixture} from './patient-flower-fixture.mjs';
 import {updateOverviewReport} from '../patient-overview.mjs';
 
+test('the identity circle contains only icon, name, age/sex and the existing analysis button', async () => {
+  const h=await flowerFixture({patient:{display_name:'Александр',primary_complaint:'Причина вне круга'}});
+  try {
+    const identity=h.document.querySelector('.flower-identity');
+    assert.deepEqual([...identity.children].map(el=>el.className||el.id),['flower-avatar','flowerPatientName','patient-hero-meta','flower-ai-host']);
+    assert.equal(identity.querySelector('h1').textContent,'Александр');
+    assert.equal(identity.querySelector('.patient-hero-meta').textContent,'5 лет · Мальчик');
+    assert.equal(identity.querySelector('#aiAnalyzeBtn').textContent,'Анализ пациента');
+    assert.ok(!identity.querySelector('[data-patient-details],.patient-hero-date,.flower-complaint,.patient-hero-actions'));
+    assert.doesNotMatch(identity.textContent,/Причина вне круга|2021-04-12/);
+    h.document.querySelector('[data-patient-details]').click();
+    assert.match(h.document.querySelector('dialog').textContent,/Причина вне круга/);
+    assert.match(h.document.querySelector('dialog').textContent,/2021-04-12/);
+    assert.equal(h.patient.display_name,'Александр');
+  } finally {await h.close();}
+});
+
+test('ambiguous full names and initials are not guessed or modified for the circle', async () => {
+  for(const display_name of ['Михаил Тестовый','Тестовый Михаил Александрович','И. О. Тестовый','И.О.']) {
+    const h=await flowerFixture({patient:{display_name}});
+    try {
+      assert.equal(h.document.querySelector('.flower-identity h1').textContent,'Имя не уточнено');
+      assert.equal(h.document.querySelector('.flower-identity h1').title,'Имя не уточнено');
+      assert.equal(h.document.querySelector('dialog h2').textContent,display_name);
+      assert.equal(h.patient.display_name,display_name);
+    } finally {await h.close();}
+  }
+});
+
+test('single given names and hyphenated names display without changing the source value', async () => {
+  for(const [display_name,expected] of [[' Миша ','Миша'],['Тест','Тест'],['Анна-Мария','Анна-Мария'],['Александрина'.repeat(12),'Александрина'.repeat(12)],['','Имя не указано']]) {
+    const h=await flowerFixture({patient:{display_name}});
+    try {
+      assert.equal(h.document.querySelector('.flower-identity h1').textContent,expected);
+      assert.equal(h.patient.display_name,display_name);
+    } finally {await h.close();}
+  }
+});
+
+test('an existing analysis keeps the approved action label and handler', async () => {
+  const h=await flowerFixture({patient:{display_name:'Тест',ai_analysis:'Сохранённый вымышленный анализ'}});
+  try {
+    assert.equal(h.document.querySelector('#aiAnalyzeBtn').textContent,'Анализ пациента');
+    assert.equal(typeof h.document.querySelector('#aiAnalyzeBtn').onclick,'function');
+    assert.match(h.document.querySelector('.ai-result-card').textContent,/Сохранённый вымышленный анализ/);
+  } finally {await h.close();}
+});
+
 test('simultaneous overview transitions leave exactly one active section', async () => {
   const h = await flowerFixture({overview:true});
   try {

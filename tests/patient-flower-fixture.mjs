@@ -28,7 +28,7 @@ export async function flowerFixture(options = {}) {
   try { modules = {...await import('../patient-flower.mjs'), ...await import('../patient-overview.mjs')}; } catch (e) {if(e.code !== 'ERR_MODULE_NOT_FOUND') throw e;}
   const env = {window, document, app:document.querySelector('main'), state, user:{id:'owner',email:'fictional@example.test'}, authViewRevision:1, passwordRecoveryActive:false,
     roleGate:{canNavigate:() => true}, sb, SUPABASE_URL:'https://auth.fizira.test', currentPatient:() => patient, esc:escapeHtml,
-    ageFromDob:() => '5 лет', sexLabel:() => 'Мальчик', fmtDate:x => x,
+    ageFromDob:() => '5 лет', sexLabel:() => 'Мальчик', fmtDate:x => x, formatAIAnalysisBlock:escapeHtml,
     renderPatients:() => calls.push({action:'patients'}), renderEditPatient:() => calls.push({action:'edit'}),
     mountParentReportWorkspace, leaveParentReportWorkspace, prepareParentReportDraft:async() => ({complaint:'Вымышленная жалоба'}),
     loadAiAnalysisHistory:async() => [], loadPatientData:async() => {}, renderParentPortalSpecialist:() => {},
