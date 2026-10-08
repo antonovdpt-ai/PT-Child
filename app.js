@@ -3,9 +3,12 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
 import { shouldRenderAuthEvent } from './auth-domain.mjs?v=1';
 import { createSpecialistRoleGate } from './role-gate.mjs';
-import { mountParentReportWorkspace, leaveParentReportWorkspace } from './parent-report-workspace.mjs?v=1';
-import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=7';
-import { renderCabinet } from './cabinet.js?v=7';
+import { mountParentReportWorkspace, leaveParentReportWorkspace } from './parent-report-workspace.mjs?v=2';
+import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=8';
+import { renderCabinet } from './cabinet.js?v=8';
+import { patientFlowerHtml, mountPatientFlower, readFlowerCompact, saveFlowerCompact, collapsePatientFlower } from './patient-flower.mjs?v=1';
+import { patientOverviewHtml, mountPatientOverview, updateOverviewReport } from './patient-overview.mjs?v=1';
+import { openScheduleEditor } from './schedule-editor.js?v=8';
 
 const SUPABASE_URL = "https://auth.fizira.com";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5NjU2NzI5LCJleHAiOjE5NDczMzY3Mjl9.gWkGsKODazY419TdwTGoSL9InQK3Yzt5YYC7UGVFllo";
@@ -70,6 +73,7 @@ const createEmptyState = () => ({
   profile: null,
   contacts: [],
   parentReports: [],
+  parentSessionReports: [],
   aiDocumentIdsByPatient: {}
 });
 let state = createEmptyState();
@@ -2615,7 +2619,7 @@ async function loadPatients() {
   const { data, error } = await sb
     .from("patients")
     .select(
-  "id,therapist_id,display_name,date_of_birth,sex,primary_complaint,status,created_at,ai_analysis,ai_analysis_updated_at,ai_dynamics_analysis,ai_dynamics_updated_at,next_session_plan"
+  "id,therapist_id,display_name,date_of_birth,sex,primary_complaint,status,created_at,ai_analysis,ai_analysis_updated_at,ai_dynamics_analysis,ai_dynamics_updated_at,next_session_plan,schedule_price_kopecks"
 )
     .order("created_at", { ascending: false });
 
@@ -3195,36 +3199,90 @@ function renderPatient(parentInvitationSent = false) {
   if (!roleGate.canNavigate() || passwordRecoveryActive) return;
   if (app.querySelector('.parent-report-workspace')?.parentReportController) return leaveParentReportWorkspace(app).then(ok => { if (ok && accountIsCurrent()) renderPatient(parentInvitationSent); });
   const p = currentPatient(); if (!p) return renderPatients();
-  const tabs = [['overview', 'Обзор'], ['assessment', 'Оценка'], ['goals', 'Цели'], ['sessions', 'Занятия'], ['progress', 'Динамика'], ['media', 'Медиа'], ['parent', 'Кабинет родителя']];
   app.innerHTML = `
-    <section class="card patient-hero">
-      <div class="patient-hero-top">
-        <div class="patient-hero-identity">
-          <div class="patient-eyebrow">Карточка ребёнка</div>
-          <h1>${esc(p.display_name)}</h1>
-          <div class="patient-hero-meta">${esc(ageFromDob(p.date_of_birth))} · ${esc(sexLabel(p.sex))}</div>
-          <div class="patient-hero-date">Дата рождения: ${p.date_of_birth ? esc(fmtDate(p.date_of_birth)) : "Не указана"}</div>
-        </div>
-        <span class="badge patient-cloud-status">Облако</span>
-      </div>
-      <div class="patient-complaint-summary">
-        <span>Причина обращения</span>
-        <p>${esc(p.primary_complaint || 'Причина обращения пока не заполнена')}</p>
-      </div>
-      <div class="actions patient-hero-actions">
-        <button class="btn" id="editPatient" type="button">Редактировать карточку</button>
-        <button class="btn" id="backPatients" type="button">К пациентам</button>
-      </div>
-    </section>
-    <nav class="tabs patient-tabs" aria-label="Разделы карточки пациента">${tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" data-tab="${k}" ${state.tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('')}</nav>
+    ${patientFlowerHtml({patient:p, tab:state.tab, age:ageFromDob(p.date_of_birth), sex:sexLabel(p.sex), dob:p.date_of_birth ? fmtDate(p.date_of_birth) : 'Дата рождения не указана', compact:readFlowerCompact(window)})}
     <div id="flash"></div>
     <div id="tabContent"></div>`;
   document.getElementById('editPatient').onclick = renderEditPatient; document.getElementById('backPatients').onclick = renderPatients;
-  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => {
-    if (!accountIsCurrent() || !await leaveParentReportWorkspace(app) || !accountIsCurrent()) return;
-    state.tab = b.dataset.tab; renderPatient();
-  });
-  renderTab(p, parentInvitationSent === true);
+  const flowerRoot = app.querySelector('.patient-flower');
+  const flowerIsCurrent = () => accountIsCurrent() && state.patientId === p.id && flowerRoot.isConnected;
+  const firstPanel = document.getElementById('tabContent');
+  firstPanel.dataset.patientSection = state.tab;
+  const panels = new Map([[state.tab, firstPanel]]);
+  let navigating = false;
+  async function navigatePatientSection(tab) {
+    if (!flowerIsCurrent() || navigating || tab === state.tab) return false;
+    navigating = true;
+    try {
+      const activePanel = document.getElementById('tabContent');
+      // Keep the report controller alive; its existing save gate still blocks failed saves.
+      const reportController = activePanel.querySelector('.parent-report-workspace')?.parentReportController;
+      if (reportController && !await reportController.beforeLeave()) return false;
+      if (!flowerIsCurrent()) return false;
+      await collapsePatientFlower(flowerRoot);
+      if (!flowerIsCurrent()) return false;
+      let panel = panels.get(tab);
+      if (panel?.dataset.needsRefresh && panel.querySelector('.parent-report-workspace')?.parentReportController) {
+        if (!await leaveParentReportWorkspace(panel) || !flowerIsCurrent()) return false;
+      }
+      saveFlowerCompact(window,true);
+      activePanel.hidden = true;
+      activePanel.removeAttribute('id');
+      state.tab = tab;
+      if (panel?.dataset.needsRefresh) { panel.remove(); panels.delete(tab); panel = null; }
+      if (!panel) {
+        panel = document.createElement('div');
+        panel.dataset.patientSection = tab;
+        panel.id = 'tabContent';
+        activePanel.after(panel);
+        panels.set(tab, panel);
+        renderTab(p, false, navigatePatientSection);
+      } else {
+        panel.id = 'tabContent';
+        panel.hidden = false;
+        if (tab === 'overview') {
+          panel.querySelector('.parent-report-workspace')?.parentReportController?.refreshReports(state.parentReports);
+          panel.querySelector('.patient-overview')?.refreshOverview?.();
+        }
+        if (tab === 'parent') panel.refreshPatientFacts?.();
+      }
+      flowerRoot.querySelectorAll('[data-tab]').forEach(button => {
+        const active = button.dataset.tab === tab;
+        button.classList.toggle('is-active', active);
+        if (active) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');
+      });
+      const selected = app.querySelector(`[data-tab="${tab}"]`);
+      selected?.focus({preventScroll:true});
+      selected?.scrollIntoView({block:'nearest',inline:'nearest'});
+      return true;
+    } finally { navigating = false; }
+  }
+  // A completed save refreshes its section, keeping drafts in every other section alive.
+  navigatePatientSection.refresh = async (tab, invitationSent = false) => {
+    if (!flowerIsCurrent()) return;
+    if (['goals','sessions'].includes(tab)) {
+      const progress = panels.get('progress');
+      if (progress) {
+        if (state.tab === 'progress' && !navigating) navigatePatientSection.refresh('progress');
+        else progress.dataset.needsRefresh = 'true';
+      }
+      panels.get('parent')?.refreshPatientFacts?.();
+    }
+    const panel = panels.get(tab);
+    if (!panel) return;
+    if (state.tab !== tab || navigating) { panel.dataset.needsRefresh = 'true'; return; }
+    navigating = true;
+    try {
+      if (panel.querySelector('.parent-report-workspace')?.parentReportController && !await leaveParentReportWorkspace(panel)) return;
+      if (!flowerIsCurrent()) return;
+      const replacement = document.createElement('div');
+      replacement.id = 'tabContent'; replacement.dataset.patientSection = tab;
+      panel.replaceWith(replacement); panels.set(tab, replacement);
+      renderTab(p, invitationSent, navigatePatientSection);
+    } finally { navigating = false; }
+  };
+  mountPatientFlower({root:flowerRoot, isCurrent:flowerIsCurrent, navigate:navigatePatientSection});
+  renderTab(p, parentInvitationSent === true, navigatePatientSection);
   const actions = app.querySelector(".actions");
   
   const deletePatientWrap = document.createElement("div");
@@ -3325,7 +3383,7 @@ if (!deletedPatients || deletedPatients.length !== 1) {
   aiBtn.id = "aiAnalyzeBtn";
   aiBtn.className = "btn primary ai-action-button";
   aiBtn.textContent = "Анализ пациента";
-  actions.prepend(aiBtn);
+  app.querySelector('.flower-ai-host').append(aiBtn);
 
   const aiDocumentsPanel = document.createElement("div");
 
@@ -3666,7 +3724,7 @@ loadAiDocumentChoices();
   historyBtn.className = "btn ai-history-button";
   historyBtn.textContent = "История анализов";
 
-  aiBtn.insertAdjacentElement("afterend", historyBtn);
+  actions.append(historyBtn);
 
   const aiResult = document.createElement("div");
   aiResult.className = "card ai-result-card";
@@ -4893,9 +4951,10 @@ function structuredFromAssessmentForm(fd) {
   };
 }
 
-function renderTab(p, parentInvitationSent = false) {
+function renderTab(p, parentInvitationSent = false, navigateSection = null) {
   const accountRevision = authViewRevision, accountUserId = user?.id;
   const accountPatientId = p.id;
+  const renderedSection = state.tab;
   let box;
   const accountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && state.patientId === accountPatientId && box?.isConnected && roleGate.canNavigate();
 
@@ -4904,14 +4963,17 @@ function renderTab(p, parentInvitationSent = false) {
     if (!accountIsCurrent()) return;
     await loadPatientData();
     if (!accountIsCurrent()) return;
-    renderPatient(invitationSent === true);
+    if (navigateSection?.refresh) await navigateSection.refresh(renderedSection, invitationSent === true);
+    else renderPatient(invitationSent === true);
   };
   if (state.tab === 'parent') {
-    renderParentPortalSpecialist({ root: box, sb, user: { id: accountUserId }, patient: p, contacts: state.contacts, storageOrigin: SUPABASE_URL, isCurrent: accountIsCurrent, refresh: refreshParentControls, invitationSent: parentInvitationSent === true, manageGoals: () => { if (accountIsCurrent()) { state.tab = 'goals'; renderPatient(); } } });
+    renderParentPortalSpecialist({ root: box, sb, user: { id: accountUserId }, patient: p, contacts: state.contacts, storageOrigin: SUPABASE_URL, isCurrent: accountIsCurrent, refresh: refreshParentControls, invitationSent: parentInvitationSent === true, manageGoals: () => { if (accountIsCurrent()) { if (navigateSection) return navigateSection('goals'); state.tab = 'goals'; renderPatient(); } } });
     return;
   }
 let editingContactId = null;
 if (state.tab === 'overview') {
+  box.insertAdjacentHTML('beforeend', patientOverviewHtml({patientId:p.id, goals:state.goals, sessions:state.sessions, reports:state.parentReports, sessionReports:state.parentSessionReports}));
+  const overviewRoot = box.querySelector('.patient-overview');
   const reportRoot = document.createElement('div');
   box.append(reportRoot);
   mountParentReportWorkspace({
@@ -4923,9 +4985,74 @@ if (state.tab === 'overview') {
       if (!accountIsCurrent()) return;
       const index = state.parentReports.findIndex(row => row.id === report.id);
       if (index < 0) state.parentReports.unshift(report); else state.parentReports[index] = report;
+      updateOverviewReport(overviewRoot,{patientId:p.id,reports:state.parentReports,sessionReports:state.parentSessionReports});
     },
     onDeleted(reportId) {
       if (accountIsCurrent()) state.parentReports = state.parentReports.filter(row => row.id !== reportId);
+      if (accountIsCurrent()) updateOverviewReport(overviewRoot,{patientId:p.id,reports:state.parentReports,sessionReports:state.parentSessionReports});
+    }
+  });
+  const navigateFromOverview = async (tab,addGoal) => {
+      if (!accountIsCurrent()) return false;
+      if (navigateSection) {
+        if (!await navigateSection(tab)) return false;
+      } else {
+        if (!await leaveParentReportWorkspace(app) || !accountIsCurrent()) return false;
+        saveFlowerCompact(window,true); state.tab = tab; renderPatient();
+      }
+      if (addGoal && document.getElementById('goalForm')?.hidden) document.getElementById('goalFormToggle')?.click();
+      const destination = addGoal ? document.querySelector('#goalForm [name="title"]') : app.querySelector(`[data-tab="${tab}"]`);
+      destination?.focus({preventScroll:true});
+      document.getElementById('tabContent')?.scrollIntoView({block:'start'});
+      return true;
+  };
+  mountPatientOverview({
+    root:overviewRoot, sb, patient:p, user:{id:accountUserId}, isCurrent:accountIsCurrent,
+    getOverviewData:() => ({patientId:p.id,goals:state.goals,sessions:state.sessions,reports:state.parentReports,sessionReports:state.parentSessionReports}),
+    navigate:navigateFromOverview,
+    onSessionReports:rows => {
+      if (!accountIsCurrent()) return;
+      state.parentSessionReports = rows;
+      updateOverviewReport(overviewRoot,{patientId:p.id,reports:state.parentReports,sessionReports:rows});
+    },
+    openReport:async (reportId,kind,sessionId) => {
+      if (!accountIsCurrent()) return;
+      if (kind === 'session') {
+        if (!await navigateFromOverview('sessions')) return;
+        const button = [...app.querySelectorAll('[data-parent-session]')].find(b => b.dataset.parentSession === sessionId);
+        if (!button) return;
+        button.closest('details').open = true;
+        await button.onclick(undefined,reportId);
+        if (accountRevision !== authViewRevision || accountUserId !== user?.id || state.patientId !== p.id) return;
+        const editor = app.querySelector('[data-parent-session-editor]');
+        editor?.querySelector('textarea')?.focus({preventScroll:true});
+        editor?.scrollIntoView({block:'start'});
+        return;
+      }
+      const button = reportId
+        ? [...reportRoot.querySelectorAll('[data-open-parent-report]')].find(b => b.dataset.openParentReport === reportId)
+        : reportRoot.querySelector('[data-start-report]');
+      if (button) await button.onclick();
+      if (accountIsCurrent()) reportRoot.scrollIntoView({block:'start'});
+    },
+    openAppointment:async (row,onSaved) => {
+      const appointments = [];
+      // The existing picker can replace the patient; preserve complete balances for every selection.
+      for (let offset=0; ; offset+=500) {
+        const {data,error} = await sb.from('appointments').select('*').eq('therapist_id',accountUserId).order('id').range(offset,offset+499);
+        if (!accountIsCurrent()) return;
+        if (error) throw error;
+        appointments.push(...(data || []));
+        if ((data || []).length < 500) break;
+      }
+      if (!accountIsCurrent()) return;
+      openScheduleEditor({app:box, sb, user:{id:accountUserId}, patients:state.patients, appointments, row, patientId:p.id, esc, isCurrent:accountIsCurrent,
+        onSaved:async () => {
+          if (!accountIsCurrent()) return;
+          await loadPatients();
+          if (accountIsCurrent()) await onSaved();
+        }
+      });
     }
   });
 }
@@ -5273,7 +5400,7 @@ editingContactId = null;
 
     await loadPatientData();
     if (!accountIsCurrent()) return;
-    renderPatient();
+    if (navigateSection?.refresh) await navigateSection.refresh('overview'); else renderPatient();
   };
 }
 const findContactById = contactId =>
@@ -5433,7 +5560,7 @@ document
 
       await loadPatientData();
     if (!accountIsCurrent()) return;
-      renderPatient();
+      if (navigateSection?.refresh) await navigateSection.refresh('overview'); else renderPatient();
     };
   });
 
@@ -6666,7 +6793,7 @@ if (saveStandardizedHistoryBtn) {
   }
 
   if (state.tab === 'goals') {
-    const goalCurrent = () => accountIsCurrent() && state.patientId === p.id && state.tab === 'goals' && box.isConnected;
+    const goalCurrent = () => accountIsCurrent() && state.patientId === p.id && box.isConnected;
     const notice = state.goalSaveNotice?.patientId === p.id ? state.goalSaveNotice.text : '';
     box.innerHTML = `<section class="card goals-workspace"><div class="workspace-heading"><div><h3>Активные цели</h3><p>Рабочая цель и её прогресс. Родитель видит только явно опубликованные цели.</p></div></div>${goalsHtml(state.goals.filter(g => g.status === 'active'), true)}</section>
       ${state.goals.some(g => g.status !== 'active') ? `<section class="card goals-achieved"><h3>Завершённые и приостановленные цели</h3>${goalsHtml(state.goals.filter(g => g.status !== 'active'), true)}</section>` : ''}
@@ -6695,7 +6822,7 @@ if (saveStandardizedHistoryBtn) {
     const reloadGoals = async message => {
       state.goalSaveNotice = {patientId: p.id, text: message};
       status.textContent = message;
-      try { await loadPatientData(); if (goalCurrent()) renderPatient(); }
+      try { await loadPatientData(); if (goalCurrent()) { if (typeof navigateSection === 'function' && navigateSection.refresh) await navigateSection.refresh('goals'); else renderPatient(); } }
       catch { if (goalCurrent()) status.textContent = message + '. Не удалось обновить список. Перейдите во вкладку заново.'; }
     };
     document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
@@ -6905,18 +7032,19 @@ ${state.sessions.map(s => `
 </div>
 </details>`).join('') || `<div class="empty compact-empty">Занятий пока нет.</div>`}</section>`;
     const parentSessionRoot = document.createElement('div');
+    parentSessionRoot.dataset.parentSessionEditor = '';
     box.append(parentSessionRoot);
     box.querySelectorAll('[data-parent-session]').forEach(button => {
-      button.onclick = () => {
+      button.onclick = (event,reportId) => {
         if (!accountIsCurrent()) return;
         const source = state.sessions.find(row => row.id === button.dataset.parentSession);
         if (!source) return;
-        renderParentSessionReportEditor({ root: parentSessionRoot, sb, user: { id: accountUserId }, patient: p,
+        return renderParentSessionReportEditor({ root: parentSessionRoot, sb, user: { id: accountUserId }, patient: p, reportId,
           session: { id: source.id, patient_id: p.id, therapist_id: accountUserId }, storageOrigin: SUPABASE_URL, isCurrent: accountIsCurrent, refresh: refreshParentControls });
       };
     });
     const form = document.getElementById('sessionForm'), btn = document.getElementById('sessionSaveBtn'), status = document.getElementById('sessionStatus'); watchFormDirty(form, btn, 'Сохранить занятие');
-const sessionIsCurrent = () => accountIsCurrent() && form.isConnected && state.tab === 'sessions';
+const sessionIsCurrent = () => accountIsCurrent() && form.isConnected;
 // Finish already-confirmed writes for the captured patient even if the view changes.
 const sessionAccountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && roleGate.canNavigate();
 
@@ -7407,7 +7535,7 @@ document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
     if (!sessionIsCurrent()) return;
     await loadPatientData();
     if (!sessionIsCurrent()) return;
-    renderPatient();
+    if (typeof navigateSection === 'function' && navigateSection.refresh) await navigateSection.refresh('sessions'); else renderPatient();
   } catch (error) {
     if (!sessionIsCurrent()) return;
     if (sessionCommitted) {
@@ -7453,7 +7581,7 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
 
     await loadPatientData();
     if (!sessionIsCurrent()) return;
-    renderPatient();
+    if (typeof navigateSection === 'function' && navigateSection.refresh) await navigateSection.refresh('sessions'); else renderPatient();
     
   };
   
@@ -8605,8 +8733,8 @@ mediaForm.onsubmit = async e => {
 
     setTimeout(() => {
       if (!accountIsCurrent()) return;
-      state.tab = 'media';
-      renderPatient();
+      if (navigateSection?.refresh) navigateSection.refresh('media');
+      else { state.tab = 'media'; renderPatient(); }
     }, 900);
 
   } catch (error) {

@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "TZ=UTC node --test --test-concurrency=2 tests/*.test.mjs supabase/functions/_shared/*.test.mjs ops/security/*.test.mjs ops/release/*.test.mjs ops/schedule/*.test.mjs ops/ai-evaluation/*.test.mjs",
-    "test:responsive": "node --test tests/responsive.browser.mjs"
+    "test:responsive": "node --test tests/responsive.browser.mjs",
+    "test:flower": "node --test tests/patient-flower.browser.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

@@ -1,8 +1,8 @@
 import { rub, dayKey, hourSlot, debt, appointmentPayload, repeatDates, scheduleError } from './schedule-domain.mjs?v=2';
 
-export function openScheduleEditor({ app, sb, user, patients, appointments, row, date, hour, esc, onSaved, isCurrent = () => true }) {
+export function openScheduleEditor({ app, sb, user, patients, appointments, row, patientId = '', date = dayKey(new Date()), hour = new Date().getHours(), esc, onSaved, isCurrent = () => true }) {
   const dialog = document.createElement('dialog'); dialog.className = 'schedule-dialog';
-  let selected = row?.patient_id || '', initial = !!row && !row.patient_id, busy = false, contactVersion = 0, dirty = false;
+  let selected = row?.patient_id || patientId, initial = !!row && !row.patient_id, busy = false, contactVersion = 0, dirty = false;
   const originalPartial = row && row.paid_kopecks > 0 && row.paid_kopecks < row.price_kopecks ? row.paid_kopecks : 0;
   const start = row ? new Date(row.starts_at) : hourSlot(date, hour);
   const selectedName = () => patients.find(p => p.id === selected)?.display_name || 'Первичный приём';
@@ -14,7 +14,7 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
     <section class="schedule-editor-section schedule-visit-section" data-visit><label>Найти пациента<input type="search" data-search placeholder="Имя пациента" autocomplete="off" value="${selected ? esc(selectedName()) : ''}"></label><div class="patient-picker" data-results role="group" aria-label="Выбор пациента"></div>
       <p class="calendar-selection" data-selection></p><label data-initial ${initial ? '' : 'hidden'}>Имя на первичном приёме<input name="initial_name" maxlength="120" value="${esc(row?.initial_name || '')}" placeholder="Можно заполнить позже"></label>
       <div class="calendar-contact" data-contact aria-live="polite"></div>
-      <div class="schedule-finance-fields"><label>Стоимость занятия, ₽<input name="price" type="number" min="0" max="1000000" step="0.01" required value="${(row?.price_kopecks || 0) / 100}"></label>
+      <div class="schedule-finance-fields"><label>Стоимость занятия, ₽<input name="price" type="number" min="0" max="1000000" step="0.01" required value="${(row ? row.price_kopecks || 0 : selectedPatient()?.schedule_price_kopecks || 0) / 100}"></label>
       <label class="calendar-check" data-tariff><input name="save_tariff" type="checkbox" ${selected && hasTariff() ? '' : 'checked'}>Закрепить эту стоимость за пациентом для новых записей</label>
       <label class="calendar-check"><input name="paid" type="checkbox" ${row?.price_kopecks > 0 && row.paid_kopecks === row.price_kopecks ? 'checked' : ''}>Занятие оплачено</label></div>
       ${originalPartial ? `<p class="help">Ранее внесено ${rub(originalPartial)}. Частичная оплата сохранится; галочка отмечает полную оплату.</p>` : ''}

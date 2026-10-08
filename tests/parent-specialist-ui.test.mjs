@@ -43,6 +43,23 @@ function harness(seed={}) {
  return {window,root,rows,calls,options,setCurrent(v){current=v},setConfirm(v){confirm=v},setDelay(fn){delayed=fn},setReadDelay(fn){readDelay=fn},setResponseDelay(fn){responseDelay=fn},get refreshes(){return refreshes}};
 }
 async function click(h,selector){const b=h.root.querySelector(selector);assert.ok(b,selector);b.click();await tick();await tick();}
+test('cached parent facts refresh saved lists and retain unsaved contact and report forms',async()=>{
+ const h=harness({parent_reports:[{id:'initial',patient_id:patient.id,therapist_id:user.id,publication_status:'draft',complaint:'Сохранённый текст'}]});
+ try {
+  await renderParentPortalSpecialist(h.options);await click(h,'[data-add-parent]');
+  const form=h.root.querySelector('[data-parent-contact-form]');form.querySelector('[name=full_name]').value='Вымышленный черновик';
+  await click(h,'[data-open-initial]');
+  const editor=h.root.querySelector('[data-initial-editor]');editor.querySelector('[name=complaint]').value='Несохранённая правка';
+  h.rows.parent_goal_publications.push({id:'publication',patient_id:patient.id,therapist_id:user.id,title:'Новая опубликованная цель',published_at:'2026-10-08',status:'in_progress'});
+  h.rows.sessions.push({...session,id:'new-session',session_date:'2026-10-08'});
+  await h.root.refreshPatientFacts();
+  assert.ok(h.root.querySelector('[data-parent-contact-form]')===form);assert.equal(form.querySelector('[name=full_name]').value,'Вымышленный черновик');
+  assert.ok(h.root.querySelector('[data-initial-editor]')===editor);assert.equal(editor.querySelector('[name=complaint]').value,'Несохранённая правка');
+  assert.match(h.root.querySelector('[data-parent-goal-list]').textContent,/Новая опубликованная цель/);
+  assert.ok(h.root.querySelector('[data-session="new-session"]'));
+  assert.match(h.root.querySelector('[data-parent-visibility]').textContent,/цели — 1/);
+ } finally {await h.window.happyDOM.abort();}
+});
 test('contact lifecycle states use IDs only, confirmation and no sensitive markup',async()=>{
  const h=harness({parent_invitations:[{id:'invite',contact_id:'contact',patient_id:'child',therapist_id:'therapist',expires_at:'2099-01-01',token_digest:'TOKEN_SECRET'}]});await renderParentPortalSpecialist(h.options);
  assert.match(h.root.textContent,/Кабинет родителя|Приглашение отправлено/);assert.match(h.root.textContent,/anna@example.test/);assert.doesNotMatch(h.root.innerHTML,/TOKEN_SECRET|PRIVATE_PATH|SOURCE_SECRET/);

@@ -199,7 +199,12 @@ export function mountParentReportWorkspace(o) {
     finally { leaving = false; if (editorCurrent(captured)) enableFields(); }
   }
   function dispose() { if (disposed) return; disposed = true; retireEditor(); observer.disconnect(); if (root.parentReportController === controller) delete root.parentReportController; }
-  const controller = {flush, beforeLeave, dispose};
+  function refreshReports(rows) {
+    if (!current()) return;
+    reports = (rows || []).filter(r => r.patient_id === patientId && r.therapist_id === specialistId).map(r => ({...r}));
+    updateHistory();
+  }
+  const controller = {flush, beforeLeave, dispose, refreshReports};
   root.parentReportController = controller;
   updateHistory(); phase('EMPTY');
   return controller;

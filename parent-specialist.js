@@ -188,7 +188,7 @@ export async function renderParentPortalSpecialist(o) {
   const s=scope(o); if(!s.current()) return;
   o.root.innerHTML='<p data-status role="status">Загружаем кабинет родителя…</p>';
   try {
-    const [invitations,access,initial,reports,publications,sessions]=await Promise.all([
+    let [invitations,access,initial,reports,publications,sessions]=await Promise.all([
       result(query(o,'parent_invitations','id,contact_id,patient_id,therapist_id,created_at,expires_at,accepted_at,revoked_at,email_normalized,accepted_by').order('created_at',{ascending:false})),
       result(query(o,'parent_child_access','id,contact_id,patient_id,therapist_id,status,granted_at,parent_user_id').order('granted_at',{ascending:false})),
       result(query(o,'parent_reports',reportColumns('initial')).order('created_at',{ascending:false})),
@@ -204,7 +204,7 @@ export async function renderParentPortalSpecialist(o) {
     const selections=await result(query(o,'parent_session_report_media','parent_session_report_id,patient_media_id,patient_id,therapist_id'));
     if(!s.current()) return;
     const photoCount=safe(selections).filter(m=>published.some(r=>r.id===m.parent_session_report_id)).length;
-    o.root.innerHTML=`<section class="card parent-specialist"><h2>Кабинет родителя</h2><p>Видимость: первичный отчёт — ${safe(initial).some(r=>r.publication_status==='published')?'опубликован':'не опубликован'}; отчёт занятия — ${published.length?'опубликован':'не опубликован'}; цели — ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}; фото — ${photoCount}.</p>
+    o.root.innerHTML=`<section class="card parent-specialist"><h2>Кабинет родителя</h2><p data-parent-visibility>Видимость: первичный отчёт — ${safe(initial).some(r=>r.publication_status==='published')?'опубликован':'не опубликован'}; отчёт занятия — ${published.length?'опубликован':'не опубликован'}; цели — ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}; фото — ${photoCount}.</p>
       <p data-status role="status" aria-live="polite">${o.invitationSent === true ? 'Приглашение отправлено. Проверьте получение письма родителем.' : ''}</p>
       <section aria-label="Родители и представители"><div class="parent-contacts-heading"><h3>Родители и представители</h3><button type="button" class="btn" data-add-parent>Добавить родителя / представителя</button><button type="button" class="btn" data-refresh-parent>Обновить статус</button></div>
       <p>Сохраните имя, родство и email представителя, затем отправьте ему приглашение.</p>
@@ -240,11 +240,11 @@ export async function renderParentPortalSpecialist(o) {
       <section class="parent-active-access"><h3>Доступы без сохранённого контакта</h3><p>Удаление контакта не отключает доступ родителя.</p>${safe(access).filter(a=>a.status==='active'&&!contacts.some(c=>c.id===a.contact_id)).map((a,i)=>
         `<article class="parent-contact"><h4>Доступ ${i+1} · Контакт удалён</h4><p>Доступ активен · Активирован ${esc(a.granted_at?new Date(a.granted_at).toLocaleString('ru-RU'):'Дата не указана')}</p><button type="button" class="btn danger" data-revoke="${esc(a.id)}">Отозвать доступ</button></article>`
       ).join('')||'<p>Таких доступов нет.</p>'}</section></section>
-      <section class="card"><h3>Первичные отчёты</h3><button class="btn" data-create-initial>Новый черновик</button>${safe(initial).map(r=>`<p>${esc(publicationLabel(r.publication_status))} <button class="btn" data-open-initial="${esc(r.id)}">Открыть отчёт</button></p>`).join('')}<div data-initial-editor></div></section>
-      <section class="card"><h3>Отчёты занятий</h3>${safe(sessions).map((r,i)=>`<button class="btn" data-session="${esc(r.id)}">Отчёт занятия ${esc(r.session_date||String(i+1))}</button>`).join('')}<div data-session-editor></div></section>
-      <section class="card"><h3>Цели для родителя</h3><p>Опубликовано целей: ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}</p>
+      <section class="card"><h3>Первичные отчёты</h3><button class="btn" data-create-initial>Новый черновик</button><div data-initial-report-list>${safe(initial).map(r=>`<p>${esc(publicationLabel(r.publication_status))} <button class="btn" data-open-initial="${esc(r.id)}">Открыть отчёт</button></p>`).join('')}</div><div data-initial-editor></div></section>
+      <section class="card"><h3>Отчёты занятий</h3><div data-parent-session-list>${safe(sessions).map((r,i)=>`<button class="btn" data-session="${esc(r.id)}">Отчёт занятия ${esc(r.session_date||String(i+1))}</button>`).join('')}</div><div data-session-editor></div></section>
+      <section class="card"><h3>Цели для родителя</h3><div data-parent-goal-list><p>Опубликовано целей: ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}</p>
       ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).map(g=>`<article class="goal"><h4>${esc(g.title)}</h4>${g.description?`<p>${esc(g.description)}</p>`:''}<p>${esc(({new:'Новая',in_progress:'В работе',achieved:'Достигнута',paused:'Приостановлена',cancelled:'Отменена',revised:'Пересмотрена'})[g.status]||'Статус не указан')}</p></article>`).join('')||'<p>Опубликованных целей пока нет.</p>'}
-      <button type="button" class="btn" data-manage-goals>Управлять целями</button></section>`;
+      </div><button type="button" class="btn" data-manage-goals>Управлять целями</button></section>`;
     s.action(o.root.querySelector('[data-manage-goals]'),()=>o.manageGoals?.());
     let savedContactId=null;
     const contactForm=o.root.querySelector('[data-parent-contact-form]');
@@ -318,7 +318,33 @@ export async function renderParentPortalSpecialist(o) {
       const row=await result(o.sb.from('parent_reports').insert({patient_id:o.patient.id,therapist_id:o.user.id}).select('id').single());
       if(!s.current())return;await renderReportEditor({...editorOptions(initialRoot),kind:'initial',reportId:row.id});
     });
-    o.root.querySelectorAll('[data-open-initial]').forEach(b=>s.action(b,()=>renderReportEditor({...editorOptions(initialRoot),kind:'initial',reportId:b.dataset.openInitial})));
-    o.root.querySelectorAll('[data-session]').forEach(b=>s.action(b,()=>renderParentSessionReportEditor({...editorOptions(o.root.querySelector('[data-session-editor]')),session:safe(sessions).find(x=>x.id===b.dataset.session)})));
+    const bindReportLists=()=>{
+      o.root.querySelectorAll('[data-open-initial]').forEach(b=>s.action(b,()=>renderReportEditor({...editorOptions(initialRoot),kind:'initial',reportId:b.dataset.openInitial})));
+      o.root.querySelectorAll('[data-session]').forEach(b=>s.action(b,()=>renderParentSessionReportEditor({...editorOptions(o.root.querySelector('[data-session-editor]')),session:safe(sessions).find(x=>x.id===b.dataset.session)})));
+    };
+    bindReportLists();
+    let factsRevision=0;
+    o.root.refreshPatientFacts=async()=>{
+      const revision=++factsRevision;
+      try {
+        const rows=await Promise.all([
+          result(query(o,'parent_reports',reportColumns('initial')).order('created_at',{ascending:false})),
+          result(query(o,'parent_session_reports',reportColumns('session')).order('created_at',{ascending:false})),
+          result(query(o,'parent_goal_publications','id,goal_id,patient_id,therapist_id,title,description,status,published_at,unpublished_at')),
+          result(query(o,'sessions','id,patient_id,therapist_id,session_date').order('session_date',{ascending:false})),
+          result(query(o,'parent_session_report_media','parent_session_report_id,patient_media_id,patient_id,therapist_id'))
+        ]);
+        if(!s.current()||revision!==factsRevision)return;
+        [initial,reports,publications,sessions]=rows;
+        const goals=safe(publications).filter(g=>g.published_at&&!g.unpublished_at);
+        const published=safe(reports).filter(r=>r.publication_status==='published');
+        const photos=safe(rows[4]).filter(m=>published.some(r=>r.id===m.parent_session_report_id)).length;
+        o.root.querySelector('[data-parent-visibility]').textContent=`Видимость: первичный отчёт — ${safe(initial).some(r=>r.publication_status==='published')?'опубликован':'не опубликован'}; отчёт занятия — ${published.length?'опубликован':'не опубликован'}; цели — ${goals.length}; фото — ${photos}.`;
+        o.root.querySelector('[data-parent-goal-list]').innerHTML=`<p>Опубликовано целей: ${goals.length}</p>`+goals.map(g=>`<article class="goal"><h4>${esc(g.title)}</h4>${g.description?`<p>${esc(g.description)}</p>`:''}<p>${esc(({new:'Новая',in_progress:'В работе',achieved:'Достигнута',paused:'Приостановлена',cancelled:'Отменена',revised:'Пересмотрена'})[g.status]||'Статус не указан')}</p></article>`).join('')+(goals.length?'':'<p>Опубликованных целей пока нет.</p>');
+        o.root.querySelector('[data-initial-report-list]').innerHTML=safe(initial).map(r=>`<p>${esc(publicationLabel(r.publication_status))} <button class="btn" data-open-initial="${esc(r.id)}">Открыть отчёт</button></p>`).join('');
+        o.root.querySelector('[data-parent-session-list]').innerHTML=safe(sessions).map((r,i)=>`<button class="btn" data-session="${esc(r.id)}">Отчёт занятия ${esc(r.session_date||String(i+1))}</button>`).join('');
+        bindReportLists();
+      } catch {if(s.current()&&revision===factsRevision)s.status('Не удалось обновить сводку. Повторите переход в кабинет.');}
+    };
   } catch {s.status('Не удалось загрузить кабинет родителя. Обновите вкладку.');}
 }

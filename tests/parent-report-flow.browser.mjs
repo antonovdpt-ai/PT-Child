@@ -39,6 +39,7 @@ test('actual consultation flow renders, saves, previews, downloads and shares on
    await page.evaluate(async ({initialRenderer,patientRenderer})=>{
     const {mountParentReportWorkspace,leaveParentReportWorkspace}=await import('/parent-report-workspace.mjs');
     const {escapeHtml}=await import('/security-utils.mjs');
+    const flower=await import('/patient-flower.mjs'),overview=await import('/patient-overview.mjs');
     const p={id:'fictional-child',therapist_id:'fictional-owner',display_name:'Тестовый ребёнок'};
     const state={tab:'overview',patientId:p.id,parentReports:[],profile:{full_name:'Анна Тестовая',profession:'Физический терапевт',phone:'+7 000'}};
     window.reportCalls=[];window.savedReports=[];window.shareCalls=[];window.shareMode='cancel';window.failReportSave=false;
@@ -57,7 +58,7 @@ test('actual consultation flow renders, saves, previews, downloads and shares on
     Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>window.shareMode!=='fallback'});
     Object.defineProperty(navigator,'share',{configurable:true,value:data=>{window.shareCalls.push({active:navigator.userActivation.isActive,keys:Object.keys(data),type:data.files[0].type,name:data.files[0].name});return window.shareMode==='cancel'?Promise.reject(new DOMException('cancel','AbortError')):Promise.resolve();}});
     document.body.classList.add('is-authenticated');document.body.dataset.specialistReady='true';
-    const env={window,document,state,sb,p,app:document.getElementById('app'),authViewRevision:1,user:{id:p.therapist_id,user_metadata:{}},roleGate:{canNavigate:()=>true},mountParentReportWorkspace,leaveParentReportWorkspace,
+    const env={...flower,...overview,window,document,state,sb,p,app:document.getElementById('app'),authViewRevision:1,user:{id:p.therapist_id,user_metadata:{}},roleGate:{canNavigate:()=>true},mountParentReportWorkspace,leaveParentReportWorkspace,
      passwordRecoveryActive:false,currentPatient:()=>p,esc:escapeHtml,ageFromDob:()=> '6 лет',sexLabel:()=>'',fmtDate:x=>x,renderEditPatient(){},renderPatients(){},
      prepareParentReportDraft:async()=>({complaint:'Причина обращения',strengths:'Самостоятельно меняет положение на полу.',observations:'Наблюдения специалиста',goals:'Цели терапии',recommendations:'Исходная рекомендация'}),loadPatientData(){throw Error('Must not reload the card during autosave');},renderPatient(){throw Error('Unexpected navigation');}};
     window.reportEnvironment=env;
@@ -86,10 +87,11 @@ test('actual consultation flow renders, saves, previews, downloads and shares on
    if(process.env.RESPONSIVE_SCREENSHOT_DIR){await mkdir(process.env.RESPONSIVE_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.RESPONSIVE_SCREENSHOT_DIR}/parent-report-ready-${width}.png`,fullPage:true});}
    await page.locator('[data-edit-pdf]').click();await page.locator('[name=complaint]').fill('Новая правка после PDF');assert.equal(await page.locator('[data-share-pdf]').isVisible(),false);await page.locator('[data-close-report]').click();
    assert.equal(await page.evaluate(()=>window.savedReports[0].complaint),'Новая правка после PDF');
-   await page.locator('.parent-report-history summary').click();await page.locator('[data-open-parent-report]').click();assert.equal(await page.locator('[name=complaint]').inputValue(),'Новая правка после PDF');
+   await page.locator('.parent-report-history details').evaluate(el=>el.open=true);await page.locator('[data-open-parent-report]').click();assert.equal(await page.locator('[name=complaint]').inputValue(),'Новая правка после PDF');
    await page.evaluate(()=>window.failReportSave=true);await page.locator('[name=complaint]').fill('Сохранение перед переходом временно недоступно');await page.locator('[data-tab=progress]').click();await page.locator('[data-save-status]').getByText(/Изменения пока не сохранены/).waitFor();assert.equal(await page.evaluate(()=>window.reportEnvironment.state.tab),'overview');assert.equal(await page.locator('[name=complaint]').inputValue(),'Сохранение перед переходом временно недоступно');await page.evaluate(()=>window.failReportSave=false);
    await page.locator('[name=complaint]').fill('Последняя правка перед переходом');await page.locator('[data-tab=progress]').click();await page.waitForFunction(()=>window.reportEnvironment.state.tab==='progress');assert.equal(await page.evaluate(()=>window.savedReports[0].complaint),'Последняя правка перед переходом');
-   await page.locator('[data-tab=overview]').click();await page.locator('.parent-report-history summary').click();await page.locator('[data-open-parent-report]').click();assert.equal(await page.locator('[name=complaint]').inputValue(),'Последняя правка перед переходом');
+   await page.locator('[data-tab=overview]').click();await page.locator('[data-report-editor]').waitFor({state:'visible'});assert.equal(await page.locator('[name=complaint]').inputValue(),'Последняя правка перед переходом');
+   await page.locator('[data-close-report]').click();await page.locator('.parent-report-history details').evaluate(el=>el.open=true);await page.locator('[data-open-parent-report]').click();assert.equal(await page.locator('[name=complaint]').inputValue(),'Последняя правка перед переходом');
    if(width===390){
     await page.locator('[name=recommendations]').fill('Фиктивная рекомендация: повторять движение в спокойном темпе с поддержкой специалиста. '.repeat(120)+'Завершение длинного отчёта.');await page.locator('[data-prepare-pdf]').click();await page.locator('[data-pdf-preview][data-ready="true"]').waitFor();
     const pages=Number((await page.locator('[data-pdf-preview-note]').textContent()).match(/из (\d+)/)[1]);assert.ok(pages>1,`Multipage preview: ${pages}`);

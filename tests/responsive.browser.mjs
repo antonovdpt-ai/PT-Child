@@ -30,20 +30,22 @@ test('actual specialist renderer fits all requested widths with contact form and
    await page.evaluate(async snippets=>{
     const {renderParentPortalSpecialist,renderParentSessionReportEditor}=await import('/parent-specialist.js');
     const {escapeHtml}=await import('/security-utils.mjs');
+    const flower=await import('/patient-flower.mjs');const {leaveParentReportWorkspace}=await import('/parent-report-workspace.mjs');
     const patient={id:'fictional-child',therapist_id:'fictional-specialist',display_name:'Тестовый ребёнок '+('Оченьдлинноеимя'.repeat(5)),date_of_birth:'2020-04-15',primary_complaint:'Вымышленные данные для проверки вёрстки '+('Длинныйтекст'.repeat(20))};
     const contacts=[{id:'fictional-contact',patient_id:patient.id,therapist_id:patient.therapist_id,full_name:'Анна Тестовая '+('Длиннаяфамилия'.repeat(8)),relation:'Законный представитель',email:'long.test.address@example.test',phone:'+70000000000'}];
     const sb={from(){const q=new Proxy({then(resolve){return Promise.resolve({data:[],error:null}).then(resolve)}},{get(target,key){return target[key]||(()=>q)}});return q;},functions:{invoke:async()=>({data:{ok:true,expires_at:'2099-01-01'},error:null})}};
-    const env={document,window,app:document.getElementById('app'),headerActions:document.getElementById('headerActions'),user:{id:patient.therapist_id,email:'fictional.specialist@example.test'},state:{patientId:patient.id,tab:'parent',contacts,aiDocumentIdsByPatient:{},sessions:[],goals:[]},authViewRevision:1,passwordRecoveryActive:false,roleGate:{canNavigate:()=>true},sb,SUPABASE_URL:'https://auth.fizira.com',currentPatient:()=>patient,esc:escapeHtml,ageFromDob:()=> '6 лет',sexLabel:()=> 'Пол не указан',fmtDate:v=>v,renderPatients(){},renderEditPatient(){},loadPatientData:async()=>{},renderParentPortalSpecialist,renderParentSessionReportEditor};
+    const env={...flower,leaveParentReportWorkspace,document,window,app:document.getElementById('app'),headerActions:document.getElementById('headerActions'),user:{id:patient.therapist_id,email:'fictional.specialist@example.test'},state:{patientId:patient.id,tab:'parent',contacts,aiDocumentIdsByPatient:{},sessions:[],goals:[]},authViewRevision:1,passwordRecoveryActive:false,roleGate:{canNavigate:()=>true},sb,SUPABASE_URL:'https://auth.fizira.com',currentPatient:()=>patient,esc:escapeHtml,ageFromDob:()=> '6 лет',sexLabel:()=> 'Пол не указан',fmtDate:v=>v,renderPatients(){},renderEditPatient(){},loadPatientData:async()=>{},renderParentPortalSpecialist,renderParentSessionReportEditor};
     new Function('env',`with(env){${snippets.header}\n${snippets.patient}\n${snippets.tab}\nrenderHeader();renderPatient();}`)(env);
     document.body.dataset.specialistReady='true';document.body.classList.add('is-authenticated');
    },snippets);
    await page.locator('[data-add-parent]').waitFor();await page.locator('[data-add-parent]').click();
    await page.locator('[data-parent-contact-form]').waitFor({state:'visible'});
+   await page.locator('.flower-support summary').click();
    await page.evaluate(()=>window.scrollTo(0,0));
    const metrics=await page.evaluate(()=>{
     const r=el=>{const x=el.getBoundingClientRect();return {left:x.left,right:x.right,top:x.top,bottom:x.bottom,width:x.width,height:x.height}};
     const selectors=['.patient-hero','.patient-tabs','#tabContent','#deletePatientBtn','[data-parent-contact-form]','#sidePatients','#sideCabinet','#sideProfile','#logoutBtn','#aiHistoryBtn','#editPatient','#backPatients'];
-    return {viewport:innerWidth,scroll:document.documentElement.scrollWidth,boxes:selectors.map(s=>({selector:s,...r(document.querySelector(s))})),nav:[...document.querySelectorAll('.sidebar-nav-item,#logoutBtn')].map(r),tabs:[...document.querySelectorAll('.patient-tabs .tab')].map(r)};
+    return {viewport:innerWidth,scroll:document.documentElement.scrollWidth,boxes:selectors.map(s=>({selector:s,...r(document.querySelector(s))})),nav:[...document.querySelectorAll('.sidebar-nav-item,#logoutBtn')].map(r),tabs:[...document.querySelectorAll('.patient-tabs .flower-petal')].map(r)};
    });
    assert.ok(metrics.scroll<=width,`horizontal overflow ${JSON.stringify(metrics)}`);
    for(const box of metrics.boxes)assert.ok(box.left>=-1&&box.right<=width+1&&box.width>0,`${box.selector} outside viewport: ${JSON.stringify(box)}`);
@@ -72,10 +74,11 @@ test('actual specialist Goals and parent Goals fit requested widths with publica
    await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);
    await page.evaluate(async ({snippets,goalBranch,goalCards})=>{
     const {escapeHtml}=await import('/security-utils.mjs');
+    const flower=await import('/patient-flower.mjs');const {leaveParentReportWorkspace}=await import('/parent-report-workspace.mjs');
     const goal={id:'goal',patient_id:'child',title:'Открывать дверь '+('Оченьдлиннаяформулировка'.repeat(12)),baseline:'Не может открыть',criterion:'Три попытки '+('Длинныйкритерий'.repeat(8)),deadline:'2027-01-01',progress:60,status:'active',parent_visible:true};
     const p={id:'child',therapist_id:'specialist',display_name:'Вымышленный ребёнок',date_of_birth:'2020-01-01'};
     const state={patientId:p.id,tab:'goals',goals:[goal],contacts:[],sessions:[]};
-    const env={document,window,app:document.getElementById('app'),headerActions:document.getElementById('headerActions'),user:{id:'specialist'},state,authViewRevision:1,passwordRecoveryActive:false,roleGate:{canNavigate:()=>true},currentPatient:()=>p,esc:escapeHtml,fmtDate:v=>v,ageFromDob:()=> '6 лет',sexLabel:()=>'',renderPatients(){},renderEditPatient(){},loadPatientData:async()=>{},sb:{},SUPABASE_URL:'https://auth.fizira.com'};
+    const env={...flower,leaveParentReportWorkspace,document,window,app:document.getElementById('app'),headerActions:document.getElementById('headerActions'),user:{id:'specialist'},state,authViewRevision:1,passwordRecoveryActive:false,roleGate:{canNavigate:()=>true},currentPatient:()=>p,esc:escapeHtml,fmtDate:v=>v,ageFromDob:()=> '6 лет',sexLabel:()=>'',renderPatients(){},renderEditPatient(){},loadPatientData:async()=>{},sb:{},SUPABASE_URL:'https://auth.fizira.com'};
     new Function('env',`with(env){${snippets.header}\n${snippets.patient}\nfunction renderTab(){}\nrenderHeader();renderPatient();}`)(env);
     env.box=document.getElementById('tabContent');env.p=p;env.accountIsCurrent=()=>true;
     new Function('env',`with(env){${goalCards}\n${goalBranch}}`)(env);document.body.classList.add('is-authenticated');document.body.dataset.specialistReady='true';
