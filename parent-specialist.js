@@ -1,4 +1,4 @@
-import { mountReportPdfExport } from './report-pdf-export.mjs?v=1';
+import { mountReportPdfExport } from './report-pdf-export.mjs?v=2';
 import { escapeHtml as esc, safeSameOriginHttpsUrl } from './security-utils.mjs';
 import { publicationLabel } from './parent-domain.mjs';
 

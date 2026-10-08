@@ -13,6 +13,11 @@ parent.css
 parent-domain.mjs
 parent-specialist.js
 report-pdf-export.mjs
+parent-report-workspace.mjs
+report-pdf-preview.mjs
+pdfjs-5.6.205.min.mjs
+pdfjs-worker-5.6.205.min.mjs
+pdfjs-LICENSE.txt
 favicon.ico
 fizira-symbol.png
 index.html

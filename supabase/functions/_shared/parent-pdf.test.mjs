@@ -16,7 +16,7 @@ test('real PDF embeds Noto Sans and extracts exact Cyrillic snapshot/revision wi
     await writeFile(join(dir,'report.pdf'),bytes);
     const extracted=spawnSync('pdftotext',[join(dir,'report.pdf'),'-'],{encoding:'utf8'});
     assert.equal(extracted.status,0,extracted.stderr);
-    for(const text of ['Артём Смирнов','Анна Иванова','Фиксированная жалоба','Точная рекомендация','2026-10-03','7']) assert.ok(extracted.stdout.includes(text),text);
+    for(const text of ['Артём Смирнов','Анна Иванова','Фиксированная жалоба','Точная рекомендация','03.10.2026','7']) assert.ok(extracted.stdout.includes(text),text);
     const long=await renderParentPublicationPdf({...snapshot,recommendations:'Длинный текст '.repeat(3000)});
     await writeFile(join(dir,'long.pdf'),long);
     assert.ok(Number(spawnSync('pdfinfo',[join(dir,'long.pdf')],{encoding:'utf8'}).stdout.match(/Pages:\s+(\d+)/)[1])>1);
@@ -26,6 +26,17 @@ test('renderer rejects unknown schema and oversized body',async()=>{
   const {renderParentPublicationPdf}=await import('./parent-pdf.ts');
   await assert.rejects(renderParentPublicationPdf({...snapshot,schema_version:2}));
   await assert.rejects(renderParentPublicationPdf({...snapshot,complaint:'x'.repeat(200001)}));
+});
+test('branded PDF embeds the approved asset and omits empty section headings',async()=>{
+ const {renderParentPublicationPdf}=await import('./parent-pdf.ts');
+ const {PDFDocument,PDFName}=await import('pdf-lib');
+ const bytes=await renderParentPublicationPdf(snapshot),doc=await PDFDocument.load(bytes);
+ assert.ok([...doc.context.enumerateIndirectObjects()].some(([,object])=>object.dict?.get(PDFName.of('Subtype'))?.toString()==='/Image'),'Approved logo image must be embedded');
+ const dir=await mkdtemp(join(tmpdir(),'fizira-brand-'));
+ try {await writeFile(join(dir,'brand.pdf'),bytes);const text=spawnSync('pdftotext',[join(dir,'brand.pdf'),'-'],{encoding:'utf8'}).stdout;
+ assert.match(text,/Fizira/);assert.match(text,/Сформировано в Fizira/);assert.match(text,/1\s*\/\s*1/);
+ assert.doesNotMatch(text,/Сильные стороны|Над чем будем работать|Динамика/);
+ } finally {await rm(dir,{recursive:true,force:true});}
 });
 test('server endpoints bind checked contracts and do not accept authored paths',async()=>{
   for(const name of ['generate-parent-report-pdf','parent-report-file']) {

@@ -3,9 +3,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
 import { shouldRenderAuthEvent } from './auth-domain.mjs?v=1';
 import { createSpecialistRoleGate } from './role-gate.mjs';
-import { mountReportPdfExport } from './report-pdf-export.mjs?v=1';
-import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=6';
-import { publicationLabel } from './parent-domain.mjs';
+import { mountParentReportWorkspace, leaveParentReportWorkspace } from './parent-report-workspace.mjs?v=1';
+import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=7';
 import { renderCabinet } from './cabinet.js?v=7';
 
 const SUPABASE_URL = "https://auth.fizira.com";
@@ -807,10 +806,11 @@ function renderHeader() {
   </div>
 `;
 
-function openSchedule() {
+async function openSchedule() {
   if (!roleGate.canNavigate()) return;
   const revision = authViewRevision, userId = user?.id;
   const isCurrent = () => revision === authViewRevision && userId === user?.id && roleGate.canNavigate();
+  if (!await leaveParentReportWorkspace(app) || !isCurrent()) return;
   renderCabinet({ app, sb, state, user, esc, renderPatients, renderProfile, isCurrent }).catch(error => {
     if (!isCurrent()) return;
     console.error('Ошибка личного кабинета:', error);
@@ -2086,6 +2086,7 @@ registerForm.onsubmit = async e => {
 function renderProfile() {
   const accountRevision = authViewRevision, accountUserId = user?.id;
   const accountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && roleGate.canNavigate();
+  if (app.querySelector('.parent-report-workspace')?.parentReportController) return leaveParentReportWorkspace(app).then(ok => { if (ok && accountIsCurrent()) renderProfile(); });
 
   if (!roleGate.canNavigate() || passwordRecoveryActive) return;
   const profile = state.profile || {};
@@ -2731,6 +2732,7 @@ async function loadAiDynamicsHistory(patientId) {
 async function renderPatients() {
   if (!roleGate.canNavigate() || passwordRecoveryActive) return;
   const revision = authViewRevision;
+  if (app.querySelector('.parent-report-workspace')?.parentReportController && (!await leaveParentReportWorkspace(app) || revision !== authViewRevision || !roleGate.canNavigate())) return;
   const counts = await countsForPatients();
   if (revision !== authViewRevision || !roleGate.canNavigate()) return;
   const activity = await activityForPatients();
@@ -2988,6 +2990,7 @@ const currentPatient = () => state.patients.find(p => p.id === state.patientId);
 function renderEditPatient() {
   const accountRevision = authViewRevision, accountUserId = user?.id;
   const accountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && roleGate.canNavigate();
+  if (app.querySelector('.parent-report-workspace')?.parentReportController) return leaveParentReportWorkspace(app).then(ok => { if (ok && accountIsCurrent()) renderEditPatient(); });
 
   if (!roleGate.canNavigate() || passwordRecoveryActive) return;
   const p = currentPatient();
@@ -3190,6 +3193,7 @@ function renderPatient(parentInvitationSent = false) {
   const accountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && roleGate.canNavigate();
 
   if (!roleGate.canNavigate() || passwordRecoveryActive) return;
+  if (app.querySelector('.parent-report-workspace')?.parentReportController) return leaveParentReportWorkspace(app).then(ok => { if (ok && accountIsCurrent()) renderPatient(parentInvitationSent); });
   const p = currentPatient(); if (!p) return renderPatients();
   const tabs = [['overview', 'Обзор'], ['assessment', 'Оценка'], ['goals', 'Цели'], ['sessions', 'Занятия'], ['progress', 'Динамика'], ['media', 'Медиа'], ['parent', 'Кабинет родителя']];
   app.innerHTML = `
@@ -3215,7 +3219,12 @@ function renderPatient(parentInvitationSent = false) {
     <nav class="tabs patient-tabs" aria-label="Разделы карточки пациента">${tabs.map(([k, l]) => `<button class="tab ${state.tab === k ? 'active' : ''}" data-tab="${k}" ${state.tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('')}</nav>
     <div id="flash"></div>
     <div id="tabContent"></div>`;
-  document.getElementById('editPatient').onclick = renderEditPatient; document.getElementById('backPatients').onclick = renderPatients; document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; renderPatient() }); renderTab(p, parentInvitationSent === true);
+  document.getElementById('editPatient').onclick = renderEditPatient; document.getElementById('backPatients').onclick = renderPatients;
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => {
+    if (!accountIsCurrent() || !await leaveParentReportWorkspace(app) || !accountIsCurrent()) return;
+    state.tab = b.dataset.tab; renderPatient();
+  });
+  renderTab(p, parentInvitationSent === true);
   const actions = app.querySelector(".actions");
   
   const deletePatientWrap = document.createElement("div");
@@ -4890,12 +4899,6 @@ function renderTab(p, parentInvitationSent = false) {
   let box;
   const accountIsCurrent = () => accountRevision === authViewRevision && accountUserId === user?.id && state.patientId === accountPatientId && box?.isConnected && roleGate.canNavigate();
 
-  let parentReportBtn = null;
-let parentReportEditor = null;
-let closeParentReportBtn = null;
-let generateParentReportBtn = null;
-let saveParentReportPdfBtn = null;
-let editParentReportBtn = null;
   box = document.getElementById('tabContent');
   const refreshParentControls = async invitationSent => {
     if (!accountIsCurrent()) return;
@@ -4908,676 +4911,24 @@ let editParentReportBtn = null;
     return;
   }
 let editingContactId = null;
-let editingParentReportId = null;
-let parentReportEditorRevision = 0;
-const setParentReportStatus = (status, message) => {
-  const statusEl = document.getElementById('parentReportStatus');
-  if (!statusEl) return;
-  statusEl.textContent = message;
-  statusEl.dataset.state = status;
-};
-
-
-function mountOverviewPdfExport(report) {
-  const root = document.getElementById('parentReportPdfExport');
-  if (!root || !report?.id || !parentReportEditor) return;
-  const fields = {therapist_name:'reportTherapistName', complaint:'reportComplaint', strengths:'reportStrengths', observations:'reportObservations', goals:'reportGoals', progress:'reportProgress', recommendations:'reportRecommendations'};
-  const control = mountReportPdfExport({root, sb, reportId:report.id, reportKind:'initial',
-    isCurrent:() => accountIsCurrent() && parentReportEditor.style.display !== 'none',
-    canPrepare:() => Object.entries(fields).every(([key, id]) => (document.getElementById(id)?.value.trim() || '') === (String(report[key] || '').trim()))});
-  parentReportEditor.oninput = () => control.invalidate();
-}
-
 if (state.tab === 'overview') {
-  box.insertAdjacentHTML('beforeend', `
-    <section class="card parent-report-launch">
-      <div class="parent-report-launch-copy">
-        <div class="workspace-eyebrow">Обратная связь</div>
-        <h3>Отчёт для родителя</h3>
-        <p>Сохраните отчёт, скачайте PDF или поделитесь файлом без кабинета родителя. Отправка в кабинет — отдельное действие.</p>
-      </div>
-      <button
-        type="button"
-        class="btn primary parent-report-launch-button"
-        id="parentReportBtn"
-      >
-        Подготовить отчёт
-      </button>
-    </section>
-
-    <div
-      id="parentReportEditor"
-      class="card parent-report-editor"
-      style="
-        margin-top:12px;
-        display:none;
-      "
-    >
-      <header class="parent-report-editor-heading">
-        <div>
-          <div class="workspace-eyebrow">Отчёт для родителя</div>
-          <h3>Проверьте текст перед сохранением черновика</h3>
-          <p>ИИ готовит черновик, а решение о содержании всегда остаётся за специалистом.</p>
-        </div>
-      </header>
-
-      <label>Специалист</label>
-<input
-  id="reportTherapistName"
-  type="text"
-  value="${esc(
-  state.profile?.full_name ||
-  user.user_metadata?.full_name ||
-  user.user_metadata?.name ||
-  user.email ||
-  ''
-)}"
-  placeholder="Имя специалиста"
-/>
-
-      <label>1. С чем обратились</label>
-      <textarea
-        id="reportComplaint"
-        rows="3"
-        placeholder="Кратко опиши причину обращения"
-      ></textarea>
-
-      <label>2. Что ребёнок сейчас умеет</label>
-      <textarea
-        id="reportStrengths"
-        rows="4"
-        placeholder="Сильные стороны и двигательные возможности ребёнка"
-      ></textarea>
-
-      <label>3. На что мы обратили внимание</label>
-      <textarea
-        id="reportObservations"
-        rows="4"
-        placeholder="Основные наблюдения специалиста"
-      ></textarea>
-
-      <label>4. Над чем будем работать</label>
-      <textarea
-        id="reportGoals"
-        rows="4"
-        placeholder="Основные цели работы"
-      ></textarea>
-
-      <label>5. Динамика</label>
-      <textarea
-        id="reportProgress"
-        rows="4"
-        placeholder="Что изменилось и что стало получаться лучше"
-      ></textarea>
-
-      <label>6. Рекомендации домой</label>
-      <textarea
-        id="reportRecommendations"
-        rows="5"
-        placeholder="Практические рекомендации для родителей"
-      ></textarea>
-
-      <div class="parent-report-actions">
-        <button
-          type="button"
-          class="btn primary full"
-          id="generateParentReportBtn"
-        >
-          Подготовить черновик ИИ
-        </button>
-<button
-  type="button"
-  class="btn full"
-  id="editParentReportBtn"
-  style="display:none"
->
-  Редактировать
-</button>
-        <button
-  type="button"
-  class="btn full"
-  id="saveParentReportPdfBtn"
->
-  Сохранить черновик
-</button>
-
-        <button
-          type="button"
-          class="btn full"
-          id="closeParentReportBtn"
-        >
-          Закрыть
-        </button>
-      </div>
-      <div id="parentReportStatus" class="parent-report-status" aria-live="polite"></div>
-      <div id="parentReportPdfExport"></div>
-    </div>
-
-<section class="card parent-report-history">
-  <details>
-    <summary class="parent-report-history-summary">
-      История отчётов
-      ${
-        (state.parentReports || []).length
-          ? `(${state.parentReports.length})`
-          : ''
-      }
-    </summary>
-
-    <div style="margin-top:12px">
-      ${
-        (state.parentReports || []).length
-          ? (state.parentReports || [])
-              .map(report => `
-                <article class="item parent-report-history-item">
-                  <p>${esc(publicationLabel(report.publication_status || 'draft'))}</p>
-                  <div class="item-title">
-                    Отчёт от
-                    ${esc(
-                      new Date(report.created_at)
-                        .toLocaleDateString('ru-RU')
-                    )}
-                  </div>
-
-                  <div class="item-sub">
-                    ${esc(
-                      new Date(report.created_at)
-                        .toLocaleTimeString(
-                          'ru-RU',
-                          {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          }
-                        )
-                    )}
-                  </div>
-
-                 <div class="item-sub">
-  Специалист:
-  ${esc(
-    report.therapist_name ||
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    user.email ||
-    'Не указан'
-  )}
-</div>
-
-<div class="item-sub">
-  ${esc(
-    report.therapist_profession ||
-    state.profile?.profession ||
-    ''
-  )}
-</div>
-
-<div class="item-sub">
-  Последнее сохранение:
-  ${esc(
-    new Date(
-      report.updated_at ||
-      report.created_at
-    ).toLocaleString(
-      'ru-RU',
-      {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }
-    )
-  )}
-</div>
-
-<button
-  type="button"
-  class="link report-history-action"
-  data-open-parent-report="${report.id}"
->
-  Открыть
-</button>
-
-<button
-  type="button"
-  class="link report-history-action"
-  data-pdf-parent-report="${report.id}"
->
-  Текст и PDF
-</button>
-
-<button
-  type="button"
-  class="link report-history-action report-history-delete"
-  data-delete-parent-report="${report.id}"
->
-  Удалить
-</button>
-
-                  <div data-report-pdf-export="${esc(report.id)}"></div>
-                </article>
-              `)
-              .join('')
-          : `
-              <div class="empty">
-                Сохранённых отчётов пока нет.
-              </div>
-            `
-      }
-    </div>
-  </details>
-</section>
-
-  `);
-
-  parentReportBtn =
-  document.getElementById('parentReportBtn');
-
-parentReportEditor =
-  document.getElementById('parentReportEditor');
-
-closeParentReportBtn =
-  document.getElementById('closeParentReportBtn');
-
-generateParentReportBtn =
-  document.getElementById('generateParentReportBtn');
-
-saveParentReportPdfBtn =
-  document.getElementById('saveParentReportPdfBtn');
-
-editParentReportBtn =
-  document.getElementById('editParentReportBtn');
-
-  if (parentReportBtn && parentReportEditor) {
-    parentReportBtn.onclick = () => {
+  const reportRoot = document.createElement('div');
+  box.append(reportRoot);
+  mountParentReportWorkspace({
+    root: reportRoot, sb, patient: p,
+    specialist: {id: accountUserId, full_name: state.profile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email || ''},
+    profile: state.profile || {}, reports: state.parentReports,
+    prepareDraft: () => prepareParentReportDraft(accountPatientId), isCurrent: accountIsCurrent,
+    onSaved(report) {
       if (!accountIsCurrent()) return;
-      parentReportEditorRevision++;
-      editingParentReportId = null;
-      document.getElementById('parentReportPdfExport')?.replaceChildren();
-      setParentReportStatus('', '');
-
-      const reportTherapistName =
-  document.getElementById('reportTherapistName');
-
-if (reportTherapistName) {
-  reportTherapistName.value =
-  state.profile?.full_name ||
-  user.user_metadata?.full_name ||
-  user.user_metadata?.name ||
-  user.email ||
-  '';
-
-  reportTherapistName.readOnly = false;
-}
-
-[ 
-
-  'reportComplaint',
-  'reportStrengths',
-  'reportObservations',
-  'reportGoals',
-  'reportProgress',
-  'reportRecommendations'
-].forEach(id => {
-  const field = document.getElementById(id);
-
-  if (field) {
-    field.value = '';
-    field.readOnly = false;
-  }
-});
-
-if (editParentReportBtn) {
-  editParentReportBtn.style.display = 'none';
-}
-
-if (saveParentReportPdfBtn) {
-  saveParentReportPdfBtn.style.display = 'block';
-  saveParentReportPdfBtn.disabled = false;
-  saveParentReportPdfBtn.textContent = 'Сохранить черновик';
-}
-
-if (generateParentReportBtn) {
-  generateParentReportBtn.disabled = false;
-  generateParentReportBtn.style.display = 'block';
-  generateParentReportBtn.textContent =
-    '✨ Подготовить черновик ИИ';
-}
-
-      parentReportEditor.style.display = 'block';
-
-      parentReportEditor.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      });
-    };
-  }
-
-  if (closeParentReportBtn && parentReportEditor) {
-    closeParentReportBtn.onclick = () => {
-      if (!accountIsCurrent()) return;
-      parentReportEditorRevision++;
-      parentReportEditor.style.display = 'none';
-    };
-  }
-}
-
-if (generateParentReportBtn) {
-  generateParentReportBtn.onclick = async () => {
-    if (!accountIsCurrent()) return;
-    const editorRevision = parentReportEditorRevision;
-    const editorIsCurrent = () => accountIsCurrent() && editorRevision === parentReportEditorRevision;
-    const oldText = generateParentReportBtn.textContent;
-
-    generateParentReportBtn.disabled = true;
-    generateParentReportBtn.textContent =
-      'Подготавливаю черновик...';
-    document.getElementById('parentReportPdfExport')?.replaceChildren();
-    setParentReportStatus('loading', 'ИИ подготавливает черновик отчёта…');
-
-    try {
-      const draft =
-        await prepareParentReportDraft(p.id);
-    if (!editorIsCurrent()) return;
-
-      document.getElementById('reportComplaint').value =
-        draft.complaint || '';
-
-      document.getElementById('reportStrengths').value =
-        draft.strengths || '';
-
-      document.getElementById('reportObservations').value =
-        draft.observations || '';
-
-      document.getElementById('reportGoals').value =
-        draft.goals || '';
-
-      document.getElementById('reportProgress').value =
-        draft.progress || '';
-
-      document.getElementById('reportRecommendations').value =
-        draft.recommendations || '';
-
-      generateParentReportBtn.textContent =
-        '✓ Черновик подготовлен';
-      setParentReportStatus('saved', 'Черновик готов. Проверьте текст перед сохранением.');
-    } catch (error) {
-    if (!editorIsCurrent()) return;
-      console.error(
-        'Ошибка подготовки отчёта:',
-        error
-      );
-
-      alert('Не удалось подготовить черновик отчёта. Попробуйте ещё раз.');
-      setParentReportStatus('error', 'Не удалось подготовить черновик. Повторите попытку.');
-
-      generateParentReportBtn.textContent =
-        oldText;
-    } finally {
-      if (editorIsCurrent()) generateParentReportBtn.disabled = false;
+      const index = state.parentReports.findIndex(row => row.id === report.id);
+      if (index < 0) state.parentReports.unshift(report); else state.parentReports[index] = report;
+    },
+    onDeleted(reportId) {
+      if (accountIsCurrent()) state.parentReports = state.parentReports.filter(row => row.id !== reportId);
     }
-  };
-}
-
-
-if (saveParentReportPdfBtn) {
-  saveParentReportPdfBtn.onclick = async () => {
-    if (!accountIsCurrent()) return;
-    const editorRevision = parentReportEditorRevision;
-    const editorIsCurrent = () => accountIsCurrent() && editorRevision === parentReportEditorRevision;
-
-if (editingParentReportId) {
-  const existing = state.parentReports.find(r => r.id === editingParentReportId);
-  if (!existing || existing.published_at || !['draft','publication_error'].includes(existing.publication_status || 'draft')) return;
-}
-const therapistName =
-  document.getElementById('reportTherapistName')
-    ?.value.trim() || '';
-
-    const report = {
-      complaint:
-        document.getElementById('reportComplaint')?.value.trim() || '',
-
-      strengths:
-        document.getElementById('reportStrengths')?.value.trim() || '',
-
-      observations:
-        document.getElementById('reportObservations')?.value.trim() || '',
-
-      goals:
-        document.getElementById('reportGoals')?.value.trim() || '',
-
-      progress:
-        document.getElementById('reportProgress')?.value.trim() || '',
-
-      recommendations:
-        document.getElementById('reportRecommendations')?.value.trim() || ''
-    };
-
-    const hasContent = Object.values(report)
-      .some(value => value);
-
-    if (!hasContent) {
-      alert('Отчёт пустой. Сначала подготовь или заполни текст.');
-      return;
-    }
-
-    const oldText =
-      saveParentReportPdfBtn.textContent;
-
-    saveParentReportPdfBtn.disabled = true;
-    saveParentReportPdfBtn.textContent =
-      'Сохраняю отчёт...';
-    setParentReportStatus('saving', 'Сохраняем черновик…');
-
-   const reportPayload = {
-  patient_id: p.id,
-  therapist_id: user.id,
-  therapist_name: therapistName || null,
-  therapist_profession:
-  state.profile?.profession || null,
-
-therapist_organization:
-  state.profile?.organization || null,
-
-therapist_phone:
-  state.profile?.phone || null,
-
-therapist_logo_path:
-  state.profile?.logo_path || null,
-
-  complaint: report.complaint || null,
-  strengths: report.strengths || null,
-  observations: report.observations || null,
-  goals: report.goals || null,
-  progress: report.progress || null,
-  recommendations: report.recommendations || null,
-  updated_at: new Date().toISOString()
-};
-
-let saveResult;
-
-if (editingParentReportId) {
-  saveResult = await sb
-    .from('parent_reports')
-    .update(reportPayload)
-    .eq('id', editingParentReportId)
-    .eq('publication_status', state.parentReports.find(r => r.id === editingParentReportId)?.publication_status || 'draft')
-    .eq('patient_id', p.id)
-    .eq('therapist_id', user.id)
-    .select('id').single();
-    if (!editorIsCurrent()) return;
-} else {
-  saveResult = await sb
-    .from('parent_reports')
-    .insert(reportPayload)
-    .select('id')
-    .single();
-    if (!editorIsCurrent()) return;
-
-  if (!saveResult.error && saveResult.data?.id) {
-    editingParentReportId = saveResult.data.id;
-  }
-}
-
-const { error } = saveResult;
-
-    if (error) {
-      console.error(
-        'Ошибка сохранения отчёта:',
-        error
-      );
-
-      alert('Не удалось сохранить отчёт. Проверьте данные и попробуйте ещё раз.');
-      setParentReportStatus('error', 'Не удалось сохранить отчёт. Повторите попытку.');
-
-      saveParentReportPdfBtn.disabled = false;
-      saveParentReportPdfBtn.textContent =
-        oldText;
-
-      return;
-    }
-
-    await loadPatientData();
-    if (!editorIsCurrent()) return;
-    saveParentReportPdfBtn.textContent =
-      '✓ Черновик сохранён';
-    setParentReportStatus('saved', 'Черновик сохранён. Подготовьте PDF для скачивания или передачи файла. Отправка в кабинет родителя — отдельно.');
-    if (document.getElementById('parentReportPdfExport')) mountOverviewPdfExport({...report, id:editingParentReportId, therapist_name:therapistName});
-
-    setTimeout(() => {
-      if (!editorIsCurrent()) return;
-      saveParentReportPdfBtn.disabled = false;
-      saveParentReportPdfBtn.textContent =
-        oldText;
-    }, 1000);
-  };
-}
-
-document.querySelectorAll('[data-report-pdf-export]').forEach(root => {
-  mountReportPdfExport({root, sb, reportId:root.dataset.reportPdfExport, reportKind:'initial', isCurrent:accountIsCurrent});
-});
-
-document
-  .querySelectorAll('[data-open-parent-report]')
-  .forEach(openBtn => {
-    openBtn.onclick = () => {
-      if (!accountIsCurrent() || !parentReportEditor) return;
-      const report = (state.parentReports || []).find(item =>
-        String(item.id) === String(openBtn.dataset.openParentReport));
-      if (!report) return;
-      parentReportEditorRevision++;
-      editingParentReportId = report.id;
-      const editable = !report.published_at && ['draft', 'publication_error'].includes(report.publication_status || 'draft');
-      const frozen = !!report.published_at || ['published', 'archived'].includes(report.publication_status);
-      const text = frozen ? report.published_snapshot : report;
-      const fields = {therapist_name:'reportTherapistName', complaint:'reportComplaint', strengths:'reportStrengths', observations:'reportObservations', goals:'reportGoals', progress:'reportProgress', recommendations:'reportRecommendations'};
-      const displayed = {...report};
-      for (const [key, id] of Object.entries(fields)) {
-        const field = document.getElementById(id);
-        displayed[key] = typeof text?.[key] === 'string' ? text[key] : '';
-        if (field) { field.value = displayed[key]; field.readOnly = true; }
-      }
-      if (editParentReportBtn) {
-        editParentReportBtn.style.display = editable ? 'block' : 'none';
-        editParentReportBtn.onclick = () => {
-          if (!accountIsCurrent() || editingParentReportId !== report.id || !editable) return;
-          const live = state.parentReports.find(item => item.id === report.id);
-          if (!live || live.published_at || !['draft', 'publication_error'].includes(live.publication_status || 'draft')) return;
-          for (const id of Object.values(fields)) {
-            const field = document.getElementById(id);
-            if (field) field.readOnly = false;
-          }
-          editParentReportBtn.style.display = 'none';
-        };
-      }
-      if (saveParentReportPdfBtn) {
-        saveParentReportPdfBtn.style.display = editable ? 'block' : 'none';
-        saveParentReportPdfBtn.disabled = false;
-        saveParentReportPdfBtn.textContent = 'Сохранить черновик';
-      }
-      if (generateParentReportBtn) generateParentReportBtn.style.display = 'none';
-      setParentReportStatus('', frozen
-        ? (text ? 'Сохранённая версия отчёта. Её можно скачать или отправить файлом без кабинета родителя.' : 'Текст сохранённой версии недоступен. Подготовьте PDF, чтобы получить сохранённый документ.')
-        : 'Проверьте текст. PDF можно скачать или отправить без кабинета родителя.');
-      parentReportEditor.style.display = 'block';
-      document.getElementById('parentReportPdfExport')?.replaceChildren();
-      if (report.publication_status === 'publishing') {
-        setParentReportStatus('loading', 'Отчёт ещё публикуется. Откройте его повторно после завершения.');
-      } else {
-        mountOverviewPdfExport(displayed);
-      }
-      parentReportEditor.scrollIntoView({behavior:'smooth', block:'start'});
-    };
   });
-
-  document
-  .querySelectorAll('[data-pdf-parent-report]')
-  .forEach(pdfBtn => {
-    pdfBtn.onclick = () => {
-      if (!accountIsCurrent()) return;
-      const openBtn = [...document.querySelectorAll('[data-open-parent-report]')].find(button =>
-        String(button.dataset.openParentReport) === String(pdfBtn.dataset.pdfParentReport));
-      openBtn?.click();
-    };
-  });
-
-  document
-  .querySelectorAll('[data-delete-parent-report]')
-  .forEach(deleteBtn => {
-    deleteBtn.onclick = async () => {
-    if (!accountIsCurrent()) return;
-      const report = (state.parentReports || []).find(
-        item =>
-          String(item.id) ===
-          String(deleteBtn.dataset.deleteParentReport)
-      );
-
-      if (report?.published_at || !['draft','publication_error'].includes(report?.publication_status || 'draft')) { state.tab = 'parent'; renderPatient(); return; }
-      if (!report) {
-        return;
-      }
-
-      const confirmed = window.confirm(
-        'Удалить этот отчёт? Это действие нельзя отменить.'
-      );
-
-      if (!confirmed) {
-        return;
-      }
-
-      const oldText = deleteBtn.textContent;
-
-      deleteBtn.disabled = true;
-      deleteBtn.textContent = 'Удаляю...';
-
-      const { error } = await sb
-        .from('parent_reports')
-        .delete()
-        .eq('id', report.id)
-        .eq('patient_id', p.id)
-        .eq('therapist_id', user.id);
-    if (!accountIsCurrent()) return;
-
-      if (error) {
-        console.error(
-          'Ошибка удаления отчёта:',
-          error
-        );
-
-        alert('Не удалось удалить отчёт. Попробуйте ещё раз.');
-
-        deleteBtn.disabled = false;
-        deleteBtn.textContent = oldText;
-
-        return;
-      }
-
-      await loadPatientData();
-    if (!accountIsCurrent()) return;
-      renderPatient();
-    };
-  });
+}
 
  box.insertAdjacentHTML('beforeend', `
   <div class="card contacts-workspace" style="margin-top:12px">

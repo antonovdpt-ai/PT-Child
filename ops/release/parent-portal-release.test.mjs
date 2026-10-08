@@ -10,6 +10,8 @@ const assets=['parent.html','parent.js','parent.css','parent-domain.mjs','parent
 test('release packages every portal dependency and checks independent runtime evidence',async()=>{
  const manifest=await read('ops/release/frontend-assets.txt'),workflow=await read('.github/workflows/deploy-fizira-frontend.yml');
  for(const asset of assets)assert.ok(manifest.split('\n').includes(asset),asset);
+ for(const asset of ['report-pdf-export.mjs','parent-report-workspace.mjs','report-pdf-preview.mjs','pdfjs-5.6.205.min.mjs','pdfjs-worker-5.6.205.min.mjs','pdfjs-LICENSE.txt'])assert.ok(manifest.split('\n').includes(asset),asset);
+ assert.ok((await read('ops/release/edge-assets.txt')).split('\n').includes('functions/_shared/parent-pdf-brand.ts'));
  for(const gate of ['FIZIRA_BASE_SHA','FIZIRA_PR_SHA','audit-production-source.sh','release-evidence.json','verify-release-evidence.mjs','activate-frontend.sh','postactivation'])assert.ok(workflow.includes(gate),gate);
  for(const fn of ['create-parent-invitation','resend-parent-invitation','revoke-parent-access','generate-parent-report-pdf','parent-report-file'])assert.ok(workflow.includes(`${fn}/index.ts`),fn);
  assert.doesNotMatch(workflow,/supabase (?:db push|functions deploy)/);
