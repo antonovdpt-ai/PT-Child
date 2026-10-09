@@ -67,15 +67,16 @@ async function checkFlowerSurfaces(page,mode){
 
 async function checkFlowerIdentity(page){
   const identity=await page.locator('.flower-identity').evaluate(circle=>{
-    const r=circle.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+    const r=circle.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,compact=circle.closest('.patient-flower').classList.contains('is-compact');
     const elements=[...circle.children].map(el=>{
       const b=el.getBoundingClientRect(),s=getComputedStyle(el);
       return {key:el.id||el.className,visible:s.display!=='none'&&s.visibility==='visible',
-        inside:[[b.left,b.top],[b.right,b.top],[b.left,b.bottom],[b.right,b.bottom]].every(([x,y])=>Math.hypot(x-cx,y-cy)<=r.width/2-1),
-        top:b.top,bottom:b.bottom};
+        inside:compact ? b.left>=r.left+1&&b.right<=r.right-1&&b.top>=r.top+1&&b.bottom<=r.bottom-1 : [[b.left,b.top],[b.right,b.top],[b.left,b.bottom],[b.right,b.bottom]].every(([x,y])=>Math.hypot(x-cx,y-cy)<=r.width/2-1),
+        left:b.left,right:b.right,top:b.top,bottom:b.bottom};
     });
     const button=circle.querySelector('#aiAnalyzeBtn'),buttonRect=button.getBoundingClientRect(),buttonStyle=getComputedStyle(button),textRange=document.createRange();textRange.selectNodeContents(button);const textRect=textRange.getBoundingClientRect();
-    return {elements,metaFits:circle.querySelector('.patient-hero-meta').scrollWidth<=circle.clientWidth-16,
+    const meta=circle.querySelector('.patient-hero-meta');
+    return {elements,compact,metaFits:meta.scrollWidth<=meta.clientWidth+1,
       buttonTextFits:textRect.left>=buttonRect.left+parseFloat(buttonStyle.paddingLeft)-.5&&textRect.right<=buttonRect.right-parseFloat(buttonStyle.paddingRight)+.5,
       nameStyle:getComputedStyle(circle.querySelector('h1')).textOverflow,
       aiText:circle.querySelector('#aiAnalyzeBtn').textContent,
@@ -83,7 +84,12 @@ async function checkFlowerIdentity(page){
   });
   assert.equal(identity.elements.length,4,JSON.stringify(identity));
   for(const el of identity.elements){assert.ok(el.visible,`Identity element is hidden: ${JSON.stringify(identity)}`);assert.ok(el.inside,`Identity element crosses circle: ${JSON.stringify(identity)}`);}
-  for(let i=1;i<identity.elements.length;i++)assert.ok(identity.elements[i].top>=identity.elements[i-1].bottom+3,`Identity elements need space: ${JSON.stringify(identity)}`);
+  if(identity.compact){
+    for(let i=0;i<identity.elements.length;i++)for(let j=i+1;j<identity.elements.length;j++){
+      const a=identity.elements[i],b=identity.elements[j];
+      assert.ok(a.right+1<=b.left||b.right+1<=a.left||a.bottom+1<=b.top||b.bottom+1<=a.top,`Compact identity elements overlap: ${JSON.stringify(identity)}`);
+    }
+  }else for(let i=1;i<identity.elements.length;i++)assert.ok(identity.elements[i].top>=identity.elements[i-1].bottom+3,`Identity elements need space: ${JSON.stringify(identity)}`);
   assert.ok(identity.metaFits,`Age and sex must fit one line: ${JSON.stringify(identity)}`);
   assert.ok(identity.buttonTextFits,`The analysis label must fit with padding: ${JSON.stringify(identity)}`);
   assert.equal(identity.nameStyle,'ellipsis');
@@ -91,14 +97,50 @@ async function checkFlowerIdentity(page){
   assert.equal(identity.forbidden,false);
 }
 
+test('Flower UI 2.1 layout geometry: real desktop columns and compact mobile card',async t=>{
+  const server=createServer(async(req,res)=>{try{const path=new URL(req.url,'http://localhost').pathname;if(path==='/fixture'){res.setHeader('Content-Type','text/html');res.end(shell);return;}if(!/^\/[a-zA-Z0-9.-]+$/.test(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.css')?'text/css':path.endsWith('.png')?'image/png':'text/javascript');res.end(await readFile(new URL(path.slice(1),root)));}catch{res.writeHead(404);res.end();}});
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  let browser;
+  try {
+    browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+    for(const width of [1440,1280,390,320])await t.test(`${width}px`,async()=>{
+      const page=await browser.newPage({viewport:{width,height:width>=1280?900:844},isMobile:width<701,hasTouch:width<701,reducedMotion:'reduce'});
+      try {
+        await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);await install(page);
+        for(const mode of ['expanded','compact']) {
+          if(mode==='compact')await page.locator('[data-flower-toggle]').click();
+          const g=await page.evaluate(()=>{
+            const rect=selector=>{const el=document.querySelector(selector);if(!el)return null;const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+            return {flower:rect('.patient-flower'),work:rect('.patient-work-area'),heading:rect('.overview-heading h2'),panel:rect('.patient-secondary-actions'),nav:rect('.flower-navigation'),scroll:document.documentElement.scrollWidth,scrollY,grid:document.querySelector('.patient-workspace')&&getComputedStyle(document.querySelector('.patient-workspace')).display};
+          });
+          assert.ok(g.work,`${mode}: a real working column is required`);assert.equal(g.grid,'grid');assert.ok(g.scroll<=width,JSON.stringify(g));
+          if(width>=1280){
+            assert.ok(await page.locator('.patient-facts').isVisible(),'The desktop column must show the full saved patient name and facts');
+            assert.equal(await page.locator('.patient-facts h2').textContent(),'Михаил Тестовый');
+            assert.ok(g.work.left>=g.flower.right+20,JSON.stringify(g));assert.ok(Math.abs(g.work.top-g.flower.top)<=4,JSON.stringify(g));
+            assert.ok(g.heading.left>=g.work.left&&g.heading.right<=g.work.right+1,JSON.stringify(g));
+            assert.ok(g.heading.top>=g.work.top&&g.heading.bottom<900,JSON.stringify(g));assert.equal(g.scrollY,0);
+          }else if(mode==='compact'){
+            assert.ok(g.flower.height<=240,JSON.stringify(g));
+            assert.ok(g.work.top>=g.flower.bottom,JSON.stringify(g));assert.ok(g.panel.top<g.work.top+5,JSON.stringify(g));
+            assert.equal(await page.locator('.flower-identity').evaluate(el=>getComputedStyle(el).borderRadius),'18px');
+            assert.ok(await page.locator('.flower-scroll-hint').isVisible(),'Overflowing compact navigation needs a visible scroll cue');
+          }
+          if(mode==='expanded')assert.equal(await page.locator('.flower-identity').evaluate(el=>getComputedStyle(el).borderRadius),'50%');
+        }
+      } finally {await page.close();}
+    });
+  }finally{await browser?.close();await new Promise(r=>server.close(r));}
+});
+
 test('real patient renderer: responsive flower, navigation, keyboard, reports and schedule',async t=>{
   assert.ok(process.env.CHROMIUM_EXECUTABLE,'Chromium is required');
   const server=createServer(async(req,res)=>{try{const path=new URL(req.url,'http://localhost').pathname;if(path==='/fixture'){res.setHeader('Content-Type','text/html');res.end(shell);return;}if(!/^\/[a-zA-Z0-9.-]+$/.test(path)){res.writeHead(404);res.end();return;}res.setHeader('Content-Type',path.endsWith('.css')?'text/css':path.endsWith('.png')?'image/png':'text/javascript');res.end(await readFile(new URL(path.slice(1),root)));}catch{res.writeHead(404);res.end();}});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;const evidence=[];
   try{
     browser=await chromium.launch({executablePath:process.env.CHROMIUM_EXECUTABLE,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
-    for(const width of [320,350,360,375,390,430,768,1024,1440])await t.test(`${width}px`,async()=>{
-      const page=await browser.newPage({viewport:{width,height:width<701?844:1000},isMobile:width<701,hasTouch:width<701});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    for(const width of [320,350,360,375,390,430,768,1024,1280,1440])await t.test(`${width}px`,async()=>{
+      const page=await browser.newPage({viewport:{width,height:width<701?844:900},isMobile:width<701,hasTouch:width<701});const errors=[];page.on('pageerror',e=>errors.push(e.message));
       page.setDefaultTimeout(10000);
       try {
       await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);await install(page);
@@ -133,20 +175,14 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
       await page.waitForTimeout(300);
       const compact=await measure();evidence.push({width,state:'compact',...compact});
       await checkFlowerIdentity(page);
-      const baseDirections=await page.evaluate(()=>{
-        const circle=document.querySelector('.flower-identity').getBoundingClientRect(),cx=circle.left+circle.width/2,cy=circle.top+circle.height/2;
-        return [...document.querySelectorAll('.flower-petal')].map(button=>{
-          const svg=button.querySelector('.flower-petal-shape'),box=svg.viewBox.baseVal,matrix=svg.getScreenCTM();
-          const point=y=>new DOMPoint(box.x+box.width/2,box.y+box.height*y).matrixTransform(matrix);
-          const base=point(.92),outer=point(.08),distance=p=>Math.hypot(p.x-cx,p.y-cy);
-          return {key:button.dataset.tab,base:distance(base),outer:distance(outer)};
-        });
-      });
-      for(const p of baseDirections)assert.ok(p.base+20<p.outer,`The compact petal base must point toward the circle: ${JSON.stringify(p)}`);
-      assert.ok(compact.scroll<=width,JSON.stringify(compact));assert.ok(compact.stage.height<=310,JSON.stringify(compact));assert.ok(compact.stage.height<expanded.stage.height*.75);
-      for(const p of compact.petals){assert.ok(p.left>=-1&&p.right<=width+1&&p.bottom<=compact.stage.bottom+1,JSON.stringify(p));assert.ok(p.width>=44&&p.height>=44);assert.ok(p.reachable,`Compact petal occluded: ${JSON.stringify(p)}`);}
-      await checkFlowerSurfaces(page,'compact');
-      if(width===1440){await page.setViewportSize({width:390,height:844});await page.waitForTimeout(300);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.setViewportSize({width,height:1000});await page.waitForTimeout(300);}
+      assert.ok(compact.scroll<=width,JSON.stringify(compact));assert.ok(compact.flower.height<=240,JSON.stringify(compact));assert.ok(compact.stage.height<expanded.stage.height*.75);
+      assert.equal(await page.locator('.flower-identity').evaluate(el=>getComputedStyle(el).borderRadius),'18px');
+      assert.ok(await page.locator('.flower-navigation').evaluate(el=>el.scrollHeight<=el.clientHeight+1),'Compact sections must stay in one horizontal scroll row');
+      for(const p of compact.petals){
+        const button=page.locator(`[data-tab="${p.key}"]`);await button.scrollIntoViewIfNeeded();
+        assert.ok(await button.evaluate(el=>{const r=el.getBoundingClientRect(),nav=el.closest('nav').getBoundingClientRect();return r.height>=44&&r.width>=44&&r.left>=nav.left-1&&r.right<=nav.right+1&&document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest('.flower-petal')===el;}),`The compact section must be reachable after scrolling: ${p.key}`);
+      }
+      if(width===1440){await page.setViewportSize({width:390,height:844});await page.waitForTimeout(300);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.setViewportSize({width,height:900});await page.waitForTimeout(300);}
       assert.equal(await page.locator('[aria-current="page"]').getAttribute('data-tab'),'goals');
       await page.locator('#goalFormToggle').click();await page.locator('[name="title"]').fill('Несохранённая цель');
       await page.evaluate(()=>window.unsavedGoalForm=document.getElementById('goalForm'));
@@ -155,6 +191,8 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
       await page.keyboard.press('Home');assert.equal(await page.evaluate(()=>document.activeElement.dataset.tab),'overview');
       for(const [key,selector]of [['assessment','#assessmentForm'],['sessions','#sessionForm'],['progress','#aiDynamicsBtn'],['media','#mediaForm'],['parent','.parent-specialist'],['overview','.patient-overview']]){
         await page.locator(`[data-tab="${key}"]`).click();await page.locator(selector).waitFor();assert.equal(await page.locator('[aria-current="page"]').getAttribute('data-tab'),key);
+        assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${key}: no page overflow at ${width}px`);
+        if(width>=1280)assert.ok(await page.locator('#tabContent').evaluate(el=>el.getBoundingClientRect().left>=document.querySelector('.patient-flower').getBoundingClientRect().right+20),`${key}: keep the live form in the right column`);
       }
       await page.locator('[data-tab="goals"]').click();
       assert.equal(await page.locator('#goalForm [name="title"]').inputValue(),'Несохранённая цель');
@@ -185,13 +223,13 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
       const page=await browser.newPage({viewport:{width,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
       try {
         await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);await install(page);
-        for(const name of ['Миша','Александр','Тест','Анна-Мария','Александрина'.repeat(12),'']) {
+        for(const name of ['Миша','Александр','Тест','Иванов Иван Иванович','  Михаил\tАнтонов  ','Анна-Мария Петрова','Александрина'.repeat(12),'']) {
           await page.evaluate(async name=>{const env=window.flowerEnvironment;env.p.display_name=name;env.p.date_of_birth=name? '2021-04-12':null;env.p.sex=name?'male':'unspecified';await env.renderPatient();},name);
           await page.locator('[data-overview-report][aria-busy="false"]').waitFor();
           for(const compact of [false,true]) {
             await page.locator('.patient-flower').evaluate((root,compact)=>{if(root.classList.contains('is-compact')!==compact)root.querySelector('[data-flower-toggle]').click();},compact);
             await checkFlowerIdentity(page);
-            assert.equal(await page.locator('.flower-identity h1').textContent(),name||'Имя не указано');
+            assert.equal(await page.locator('.flower-identity h1').textContent(),name.trim().split(/\s+/)[0]||'Без имени');
             if(!name)assert.equal(await page.locator('.flower-identity .patient-hero-meta').textContent(),'Возраст — · Пол —');
             assert.equal(await page.evaluate(()=>window.flowerEnvironment.p.display_name),name);
             assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));

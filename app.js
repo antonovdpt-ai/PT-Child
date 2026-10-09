@@ -6,7 +6,7 @@ import { createSpecialistRoleGate } from './role-gate.mjs';
 import { mountParentReportWorkspace, leaveParentReportWorkspace } from './parent-report-workspace.mjs?v=2';
 import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=8';
 import { renderCabinet } from './cabinet.js?v=8';
-import { patientFlowerHtml, mountPatientFlower, readFlowerCompact, saveFlowerCompact, collapsePatientFlower } from './patient-flower.mjs?v=3';
+import { patientFlowerHtml, mountPatientFlower, readFlowerCompact, saveFlowerCompact, collapsePatientFlower } from './patient-flower.mjs?v=4';
 import { patientOverviewHtml, mountPatientOverview, updateOverviewReport } from './patient-overview.mjs?v=1';
 import { openScheduleEditor } from './schedule-editor.js?v=8';
 
@@ -3200,10 +3200,9 @@ function renderPatient(parentInvitationSent = false) {
   if (app.querySelector('.parent-report-workspace')?.parentReportController) return leaveParentReportWorkspace(app).then(ok => { if (ok && accountIsCurrent()) renderPatient(parentInvitationSent); });
   const p = currentPatient(); if (!p) return renderPatients();
   app.innerHTML = `
-    ${patientFlowerHtml({patient:p, tab:state.tab, age:ageFromDob(p.date_of_birth), sex:sexLabel(p.sex), dob:p.date_of_birth ? fmtDate(p.date_of_birth) : 'Дата рождения не указана', compact:readFlowerCompact(window)})}
-    <div id="flash"></div>
-    <div id="tabContent"></div>`;
+    ${patientFlowerHtml({patient:p, tab:state.tab, age:ageFromDob(p.date_of_birth), sex:sexLabel(p.sex), dob:p.date_of_birth ? fmtDate(p.date_of_birth) : 'Дата рождения не указана', compact:readFlowerCompact(window)})}`;
   document.getElementById('editPatient').onclick = renderEditPatient; document.getElementById('backPatients').onclick = renderPatients;
+  document.getElementById('editPatientMobile').onclick = renderEditPatient;
   const flowerRoot = app.querySelector('.patient-flower');
   const flowerIsCurrent = () => accountIsCurrent() && state.patientId === p.id && flowerRoot.isConnected;
   const firstPanel = document.getElementById('tabContent');
@@ -3283,7 +3282,7 @@ function renderPatient(parentInvitationSent = false) {
   };
   mountPatientFlower({root:flowerRoot, isCurrent:flowerIsCurrent, navigate:navigatePatientSection});
   renderTab(p, parentInvitationSent === true, navigatePatientSection);
-  const actions = app.querySelector(".actions");
+  const actions = app.querySelector(".patient-hero-actions");
   
   const deletePatientWrap = document.createElement("div");
 deletePatientWrap.style.textAlign = "center";
@@ -3300,7 +3299,7 @@ deletePatientBtn.style.borderColor = "#f0b4ae";
 deletePatientBtn.style.background = "#fff";
 
 deletePatientWrap.append(deletePatientBtn);
-app.append(deletePatientWrap);
+app.querySelector('.patient-work-area').append(deletePatientWrap);
 
 deletePatientBtn.onclick = async () => {
     if (!accountIsCurrent()) return;

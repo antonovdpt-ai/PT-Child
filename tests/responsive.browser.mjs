@@ -41,12 +41,14 @@ test('actual specialist renderer fits all requested widths with contact form and
    await page.locator('[data-add-parent]').waitFor();await page.locator('[data-add-parent]').click();
    await page.locator('[data-parent-contact-form]').waitFor({state:'visible'});
    await page.locator('.flower-support summary').click();
+   const editSelector=width>=1280?'#editPatient':'#editPatientMobile';
+   if(width<1280)await page.locator('[data-patient-details]').click();
    await page.evaluate(()=>window.scrollTo(0,0));
-   const metrics=await page.evaluate(()=>{
+   const metrics=await page.evaluate(editSelector=>{
     const r=el=>{const x=el.getBoundingClientRect();return {left:x.left,right:x.right,top:x.top,bottom:x.bottom,width:x.width,height:x.height}};
-    const selectors=['.patient-hero','.patient-tabs','#tabContent','#deletePatientBtn','[data-parent-contact-form]','#sidePatients','#sideCabinet','#sideProfile','#logoutBtn','#aiHistoryBtn','#editPatient','#backPatients'];
+    const selectors=['.patient-hero','.patient-tabs','#tabContent','#deletePatientBtn','[data-parent-contact-form]','#sidePatients','#sideCabinet','#sideProfile','#logoutBtn','#aiHistoryBtn',editSelector,'#backPatients'];
     return {viewport:innerWidth,scroll:document.documentElement.scrollWidth,boxes:selectors.map(s=>({selector:s,...r(document.querySelector(s))})),nav:[...document.querySelectorAll('.sidebar-nav-item,#logoutBtn')].map(r),tabs:[...document.querySelectorAll('.patient-tabs .flower-petal')].map(r)};
-   });
+   },editSelector);
    assert.ok(metrics.scroll<=width,`horizontal overflow ${JSON.stringify(metrics)}`);
    for(const box of metrics.boxes)assert.ok(box.left>=-1&&box.right<=width+1&&box.width>0,`${box.selector} outside viewport: ${JSON.stringify(box)}`);
    for(let i=0;i<metrics.nav.length;i++)for(let j=i+1;j<metrics.nav.length;j++){
@@ -54,6 +56,7 @@ test('actual specialist renderer fits all requested widths with contact form and
    }
    if(width<701)assert.ok(new Set(metrics.tabs.map(x=>Math.round(x.top))).size>1,'mobile tabs must wrap into rows');
    assert.deepEqual(errors,[]);
+   if(width<1280)await page.locator('[data-close-details]').click();
    if(process.env.RESPONSIVE_SCREENSHOT_DIR){await mkdir(process.env.RESPONSIVE_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.RESPONSIVE_SCREENSHOT_DIR}/specialist-${width}.png`,fullPage:true});}
    await page.close();
   });

@@ -20,12 +20,12 @@ test('the identity circle contains only icon, name, age/sex and the existing ana
   } finally {await h.close();}
 });
 
-test('ambiguous full names and initials are not guessed or modified for the circle', async () => {
-  for(const display_name of ['Михаил Тестовый','Тестовый Михаил Александрович','И. О. Тестовый','И.О.']) {
+test('the circle displays the first whitespace-delimited word without interpreting or changing the full name', async () => {
+  for(const [display_name,expected] of [['Михаил Тестовый','Михаил'],['Иванов Иван Иванович','Иванов'],['  Анна-Мария\tПетрова  ','Анна-Мария'],['И. О. Тестовый','И.'],['\n\t','Без имени']]) {
     const h=await flowerFixture({patient:{display_name}});
     try {
-      assert.equal(h.document.querySelector('.flower-identity h1').textContent,'Имя не уточнено');
-      assert.equal(h.document.querySelector('.flower-identity h1').title,'Имя не уточнено');
+      assert.equal(h.document.querySelector('.flower-identity h1').textContent,expected);
+      assert.equal(h.document.querySelector('.flower-identity h1').title,expected);
       assert.equal(h.document.querySelector('dialog h2').textContent,display_name);
       assert.equal(h.patient.display_name,display_name);
     } finally {await h.close();}
@@ -33,13 +33,29 @@ test('ambiguous full names and initials are not guessed or modified for the circ
 });
 
 test('single given names and hyphenated names display without changing the source value', async () => {
-  for(const [display_name,expected] of [[' Миша ','Миша'],['Тест','Тест'],['Анна-Мария','Анна-Мария'],['Александрина'.repeat(12),'Александрина'.repeat(12)],['','Имя не указано']]) {
+  for(const [display_name,expected] of [[' Миша ','Миша'],['Тест','Тест'],['Анна-Мария','Анна-Мария'],['Александрина'.repeat(12),'Александрина'.repeat(12)],['','Без имени']]) {
     const h=await flowerFixture({patient:{display_name}});
     try {
       assert.equal(h.document.querySelector('.flower-identity h1').textContent,expected);
       assert.equal(h.patient.display_name,display_name);
     } finally {await h.close();}
   }
+});
+
+test('flower and the single live section share a workspace with separate navigation and working columns',async()=>{
+  const h=await flowerFixture();
+  try {
+    const workspace=h.document.querySelector('.patient-workspace');assert.ok(workspace);
+    const flower=workspace.querySelector('.patient-flower'),work=workspace.querySelector('.patient-work-area');
+    assert.equal(flower.parentElement,workspace);assert.equal(work.parentElement,workspace);
+    assert.equal(work.querySelectorAll('#tabContent').length,1);
+    assert.equal(work.querySelector('.patient-facts h2').textContent,h.patient.display_name);
+    assert.ok(work.querySelector('[data-patient-details]'));assert.ok(work.querySelector('.flower-support'));
+    assert.ok(!flower.querySelector('.flower-support,[data-patient-details]'));
+    const first=work.querySelector('#tabContent');await flower.querySelector('[data-tab="goals"]').onclick();
+    assert.equal(work.querySelector('#tabContent').parentElement,work);
+    await flower.querySelector('[data-tab="overview"]').onclick();assert.equal(work.querySelector('#tabContent'),first);
+  } finally {await h.close();}
 });
 
 test('an existing analysis keeps the approved action label and handler', async () => {
