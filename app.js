@@ -6,7 +6,7 @@ import { createSpecialistRoleGate } from './role-gate.mjs';
 import { mountParentReportWorkspace, leaveParentReportWorkspace } from './parent-report-workspace.mjs?v=2';
 import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=8';
 import { renderCabinet } from './cabinet.js?v=8';
-import { patientFlowerHtml, mountPatientFlower, readFlowerCompact, saveFlowerCompact, collapsePatientFlower } from './patient-flower.mjs?v=5';
+import { patientFlowerHtml, mountPatientFlower, readFlowerCompact, saveFlowerCompact, collapsePatientFlower } from './patient-flower.mjs?v=6';
 import { patientOverviewHtml, mountPatientOverview, updateOverviewReport } from './patient-overview.mjs?v=1';
 import { openScheduleEditor } from './schedule-editor.js?v=8';
 

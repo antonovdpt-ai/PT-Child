@@ -76,20 +76,22 @@ async function checkMobileCap(page){
   await checkFlowerIdentity(page);
   const g=await page.evaluate(()=>{
     const root=document.querySelector('.patient-flower'),stage=root.querySelector('.flower-stage').getBoundingClientRect(),circle=root.querySelector('.flower-identity').getBoundingClientRect();
-    const buttons=[...root.querySelectorAll('.flower-petal')],paths=buttons.map(b=>b.querySelector('.flower-petal-compact:not(.flower-petal-rim)'));
-    const edges=paths.map(p=>{const length=p.getTotalLength(),matrix=p.getScreenCTM();return Array.from({length:160},(_,i)=>{const point=p.getPointAtLength(length*i/160);return new DOMPoint(point.x,point.y).matrixTransform(matrix);});});
-    const overlaps=edges.flatMap((points,i)=>paths.flatMap((p,j)=>i===j?[]:points.filter(point=>p.isPointInFill(point.matrixTransform(p.getScreenCTM().inverse()))).map(()=>[i,j])));
+    const buttons=[...root.querySelectorAll('.flower-petal')],bounds=buttons.map(b=>b.getBoundingClientRect()),labels=buttons.map(b=>b.querySelector('.flower-petal-content>span').getBoundingClientRect());
+    const overlaps=bounds.flatMap((a,i)=>bounds.flatMap((b,j)=>j<=i?[]:Math.hypot(a.left+a.width/2-b.left-b.width/2,a.top+a.height/2-b.top-b.height/2)<(a.width+b.width)/2?[[i,j]]:[]));
+    const labelOverlaps=labels.flatMap((a,i)=>labels.flatMap((b,j)=>j<=i?[]:a.left<b.right&&b.left<a.right&&a.top<b.bottom&&b.top<a.bottom?[[i,j]]:[]));
+    const coveredLabels=labels.flatMap((a,i)=>bounds.flatMap((b,j)=>i===j?[]:Math.hypot(Math.max(Math.abs(a.left+a.width/2-b.left-b.width/2)-a.width/2,0),Math.max(Math.abs(a.top+a.height/2-b.top-b.height/2)-a.height/2,0))<b.width/2?[[i,j]]:[]));
     const petals=buttons.map((b,i)=>{
-      const r=b.getBoundingClientRect(),m=paths[i].getScreenCTM(),center=new DOMPoint(100,66).matrixTransform(m),base=new DOMPoint(100,130).matrixTransform(m);
-      const dx=circle.left+circle.width/2-center.x,dy=circle.top+circle.height/2-center.y,bx=base.x-center.x,by=base.y-center.y;
+      const r=bounds[i],s=getComputedStyle(b),label=labels[i];
       const taps=['.flower-icon','.flower-petal-content>span'].map(selector=>{const rect=b.querySelector(selector).getBoundingClientRect();return document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2)?.closest('.flower-petal')===b;});
-      return {key:b.dataset.tab,width:r.width,height:r.height,taps,baseFacesCircle:(dx*bx+dy*by)/Math.hypot(dx,dy)/Math.hypot(bx,by),fits:edges[i].every(p=>p.x>=stage.left+1&&p.x<=stage.right-1&&p.y>=stage.top+1&&p.y<=stage.bottom-1),font:getComputedStyle(b.querySelector('.flower-petal-content')).fontSize};
+      const circleGap=Math.hypot(r.left+r.width/2-circle.left-circle.width/2,r.top+r.height/2-circle.top-circle.height/2)-circle.width/2-r.width/2;
+      return {key:b.dataset.tab,width:r.width,height:r.height,radius:s.borderRadius,taps,circleGap,fits:[r,label].every(p=>p.left>=stage.left-.5&&p.right<=stage.right+.5&&p.top>=stage.top&&p.bottom<=stage.bottom),font:getComputedStyle(b.querySelector('.flower-petal-content')).fontSize};
     });
     const work=document.querySelector('.patient-work-area').getBoundingClientRect();
-    return {height:root.getBoundingClientRect().height,workGap:work.top-stage.bottom,overlaps,petals,scroll:document.documentElement.scrollWidth,viewport:innerWidth};
+    return {height:root.getBoundingClientRect().height,workGap:work.top-stage.bottom,overlaps,labelOverlaps,coveredLabels,petals,scroll:document.documentElement.scrollWidth,viewport:innerWidth};
   });
-  assert.ok(g.height<=190,JSON.stringify(g));assert.ok(g.workGap>=0&&g.workGap<=9,JSON.stringify(g));assert.ok(g.scroll<=g.viewport,JSON.stringify(g));assert.deepEqual(g.overlaps,[],`Compact painted petals must not intersect: ${JSON.stringify(g)}`);
-  for(const p of g.petals){assert.ok(p.fits,JSON.stringify(p));assert.ok(p.width>=44&&p.height>=44,JSON.stringify(p));assert.ok(p.taps.every(Boolean),JSON.stringify(p));assert.ok(p.baseFacesCircle>.98,JSON.stringify(p));assert.equal(p.font,'10px');}
+  assert.ok(g.height<=140,JSON.stringify(g));assert.ok(g.workGap>=0&&g.workGap<=9,JSON.stringify(g));assert.ok(g.scroll<=g.viewport,JSON.stringify(g));assert.deepEqual(g.overlaps,[],`Round buttons must not intersect: ${JSON.stringify(g)}`);assert.deepEqual(g.labelOverlaps,[],`Compact labels must not intersect: ${JSON.stringify(g)}`);
+  assert.deepEqual(g.coveredLabels,[],`Another round button must not cover a label: ${JSON.stringify(g)}`);
+  for(const p of g.petals){assert.ok(p.fits,JSON.stringify(p));assert.ok(p.width>=44&&p.height>=44,JSON.stringify(p));assert.ok(Math.abs(p.width-p.height)<.1,JSON.stringify(p));assert.equal(p.radius,'50%');assert.ok(p.taps.every(Boolean),JSON.stringify(p));assert.ok(p.circleGap>=1&&p.circleGap<=4,JSON.stringify(p));assert.equal(p.font,'10px');}
   for(const selector of ['#aiAnalyzeBtn','.patient-secondary-actions','#deletePatientBtn','.flower-toolbar','.flower-footer'])assert.equal(await page.locator(selector).isVisible(),false,selector);
   return g;
 }
@@ -202,8 +204,8 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
           const r=await page.locator(`[data-tab="${key}"] ${target}`).boundingBox();await page.touchscreen.tap(r.x+r.width/2,r.y+r.height/2);
           await page.locator(selector).waitFor();await page.waitForFunction(key=>window.flowerEnvironment.state.tab===key&&!document.querySelector(`[data-tab="${key}"]`).disabled,key);
           assert.equal(await page.locator('[aria-current="page"]').getAttribute('data-tab'),key);
-          assert.ok(await page.locator(`[data-tab="${key}"] .flower-petal-compact`).first().evaluate(el=>{const fill=getComputedStyle(el).fill;return fill.includes('flower-active-')||fill==='rgb(160, 230, 216)';}));
-          const inactive=await page.locator('.flower-petal:not(.is-active) .flower-petal-compact:not(.flower-petal-rim)').evaluateAll(els=>els.map(el=>getComputedStyle(el).fill));assert.ok(inactive.every(fill=>fill==='rgb(255, 255, 255)'));
+          assert.equal(await page.locator(`[data-tab="${key}"]`).evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(212, 244, 235)');
+          const inactive=await page.locator('.flower-petal:not(.is-active)').evaluateAll(els=>els.map(el=>getComputedStyle(el).backgroundColor));assert.ok(inactive.every(fill=>fill==='rgb(255, 255, 255)'));
         }
         await page.locator('[data-tab="goals"]').tap();await page.locator('#goalFormToggle').click();await page.locator('#goalForm [name="title"]').fill('Несохранённая мобильная цель');
         await page.evaluate(()=>{window.retainedMobileForm=document.getElementById('goalForm');window.retainedMobileField=window.retainedMobileForm.querySelector('[name="title"]');});

@@ -22,7 +22,7 @@ const petalContours = {
   expanded:'M100 2C130 2 153 6 171 13C188 19 197 32 190 49L156 120Q150 132 136 130Q100 121 64 130Q50 132 44 120L10 49C3 32 12 19 29 13C47 6 70 2 100 2Z',
   compact:'M100 130C82 110 24 80 14 52C-2 8 50 2 100 2C150 2 202 8 186 52C176 80 118 110 100 130Z'
 };
-const mobileFan = [[-.35,12,225],[-.24,41,212],[-.12,70,196],[0,94,180],[.12,70,164],[.24,41,148],[.35,12,135]];
+const mobileArc = [-60,-40,-20,0,20,40,60].map(angle=>{const radians=angle*Math.PI/180;return [Math.sin(radians).toFixed(4),Math.cos(radians).toFixed(4)];});
 const mobileFlower = view => view.matchMedia?.('(max-width:700px)').matches === true;
 const compactPreference = view => mobileFlower(view) ? 'fizira:flower-mobile-compact' : 'fizira:flower-compact';
 
@@ -53,8 +53,8 @@ export function patientFlowerHtml({patient, tab, age, sex, dob, compact = false}
       <nav class="patient-tabs flower-navigation" aria-label="Разделы карточки пациента">
         ${patientSections.map(([key,label],i) => {
           const angle = -90 + i * 360/7, radians = angle * Math.PI/180;
-          const [fanX,fanY,fanTurn] = mobileFan[i];
-          return `<button type="button" class="flower-petal ${key === tab ? 'is-active' : ''}" data-tab="${key}" aria-controls="tabContent" ${key === tab ? 'aria-current="page"' : ''} style="--petal-x:${Math.cos(radians).toFixed(4)};--petal-y:${Math.sin(radians).toFixed(4)};--petal-turn:${(angle+90).toFixed(2)}deg;--fan-x:${fanX};--fan-y:${fanY}px;--fan-turn:${fanTurn}deg">
+          const [compactX,compactY] = mobileArc[i];
+          return `<button type="button" class="flower-petal ${key === tab ? 'is-active' : ''}" data-tab="${key}" aria-controls="tabContent" ${key === tab ? 'aria-current="page"' : ''} style="--petal-x:${Math.cos(radians).toFixed(4)};--petal-y:${Math.sin(radians).toFixed(4)};--petal-turn:${(angle+90).toFixed(2)}deg;--compact-x:${compactX};--compact-y:${compactY}">
             <svg class="flower-petal-shape" viewBox="0 0 200 132" preserveAspectRatio="none" aria-hidden="true" style="--petal-fill:url(#flower-surface-${key});--petal-active-fill:url(#flower-active-${key})">
               <defs><linearGradient id="flower-surface-${key}" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#f0f8fa"/></linearGradient><radialGradient id="flower-active-${key}" cx=".5" cy=".55" r=".7"><stop stop-color="#cdfbf1"/><stop offset="1" stop-color="#87e4d5"/></radialGradient></defs>
               ${Object.entries(petalContours).map(([mode,d])=>`<path class="flower-petal-${mode}" d="${d}"/><path class="flower-petal-${mode} flower-petal-rim" transform="translate(3 2) scale(.97 .96)" d="${d}"/>`).join('')}
