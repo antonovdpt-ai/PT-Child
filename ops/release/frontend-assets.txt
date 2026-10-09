@@ -1,6 +1,9 @@
 app.js
 cabinet.js
 styles.css
+patient-flower.css
+patient-flower.mjs
+patient-overview.mjs
 media-fallback.css
 auth-domain.mjs
 schedule-domain.mjs

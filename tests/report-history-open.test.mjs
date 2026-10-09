@@ -12,7 +12,7 @@ function setup(report) {
   window.confirm = () => true;
   document.getElementById('parentReportEditor').scrollIntoView = () => {};
   let current = true;
-  const env = { window, document, mountReportPdfExport, state:{tab:'overview',parentReports:[report],profile:{}}, user:{id:'owner',user_metadata:{}}, p:{id:'child'},
+  const env = { window, document, box:document, mountReportPdfExport, state:{tab:'overview',parentReports:[report],profile:{}}, user:{id:'owner',user_metadata:{}}, p:{id:'child'},
     parentReportEditor:document.getElementById('parentReportEditor'), editParentReportBtn:document.getElementById('editParentReportBtn'), saveParentReportPdfBtn:document.getElementById('saveParentReportPdfBtn'), generateParentReportBtn:document.getElementById('generateParentReportBtn'), editingParentReportId:null,
     parentReportEditorRevision:0, accountIsCurrent:() => current, setParentReportStatus(){}, renderPatient(){calls.push('navigation');}, openParentReportPrintView(){calls.push('print');},
     sb:{functions:{invoke:async (name,{body}) => {calls.push({name,body});return {data:new Blob(['%PDF-1.7\nfictional'],{type:'application/pdf'})};}}}
@@ -77,7 +77,7 @@ test('late consultation save cannot replace the opened report identity or PDF co
   h.env.sb.from=()=>{const q={insert(){return q;},select(){return q;},single(){return new Promise(resolve=>{finish=resolve;});}};return q;};
   const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
   const start=source.indexOf('if (saveParentReportPdfBtn) {\n  saveParentReportPdfBtn.onclick');
-  const end=source.indexOf("document.querySelectorAll('[data-report-pdf-export]')",start);
+  const end=source.indexOf("function bindParentReportHistoryActions()",start);
   new Function('env',`with(env){${reportPdfMountSource}\n${source.slice(start,end)}}`)(h.env);
   try {
     h.env.parentReportEditor.style.display='block';h.document.getElementById('reportComplaint').value='Новый черновик';

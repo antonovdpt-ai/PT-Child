@@ -188,7 +188,7 @@ export async function renderParentPortalSpecialist(o) {
   const s=scope(o); if(!s.current()) return;
   o.root.innerHTML='<p data-status role="status">Загружаем кабинет родителя…</p>';
   try {
-    const [invitations,access,initial,reports,publications,sessions]=await Promise.all([
+    let [invitations,access,initial,reports,publications,sessions]=await Promise.all([
       result(query(o,'parent_invitations','id,contact_id,patient_id,therapist_id,created_at,expires_at,accepted_at,revoked_at,email_normalized,accepted_by').order('created_at',{ascending:false})),
       result(query(o,'parent_child_access','id,contact_id,patient_id,therapist_id,status,granted_at,parent_user_id').order('granted_at',{ascending:false})),
       result(query(o,'parent_reports',reportColumns('initial')).order('created_at',{ascending:false})),
@@ -198,28 +198,13 @@ export async function renderParentPortalSpecialist(o) {
     ]);
     if(!s.current()) return;
     const safe=rows=>(rows||[]).filter(r=>owned(r,o));
-    const contacts=(o.contacts||[]).filter(r=>owned(r,o));
+    let contacts=(o.contacts||[]).filter(r=>owned(r,o));
     const published=safe(reports).filter(r=>r.publication_status==='published');
     // Count selected IDs only for published reports; no private artifacts are read.
     const selections=await result(query(o,'parent_session_report_media','parent_session_report_id,patient_media_id,patient_id,therapist_id'));
     if(!s.current()) return;
     const photoCount=safe(selections).filter(m=>published.some(r=>r.id===m.parent_session_report_id)).length;
-    o.root.innerHTML=`<section class="card parent-specialist"><h2>Кабинет родителя</h2><p>Видимость: первичный отчёт — ${safe(initial).some(r=>r.publication_status==='published')?'опубликован':'не опубликован'}; отчёт занятия — ${published.length?'опубликован':'не опубликован'}; цели — ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}; фото — ${photoCount}.</p>
-      <p data-status role="status" aria-live="polite">${o.invitationSent === true ? 'Приглашение отправлено. Проверьте получение письма родителем.' : ''}</p>
-      <section aria-label="Родители и представители"><div class="parent-contacts-heading"><h3>Родители и представители</h3><button type="button" class="btn" data-add-parent>Добавить родителя / представителя</button><button type="button" class="btn" data-refresh-parent>Обновить статус</button></div>
-      <p>Сохраните имя, родство и email представителя, затем отправьте ему приглашение.</p>
-      <form data-parent-contact-form class="parent-contact-form" hidden>
-        <h4>Новый родитель / представитель</h4>
-        <div class="parent-contact-fields">
-          <label>Имя<input name="full_name" required maxlength="200" autocomplete="name"></label>
-          <label>Родство / роль<input name="relation" required maxlength="100" placeholder="Мать, отец, законный представитель"></label>
-          <label>Email<input type="email" name="email" required maxlength="254" autocomplete="email"></label>
-          <label>Телефон (необязательно)<input type="tel" name="phone" maxlength="50" autocomplete="tel"></label>
-        </div>
-        <div class="parent-specialist-actions"><button type="submit" class="btn primary" data-save-parent>Сохранить контакт</button><button type="button" class="btn" data-cancel-parent>Отмена</button></div>
-        <p data-contact-status role="status" aria-live="polite"></p>
-      </form>
-      <div class="parent-specialist-contacts">${contacts.map(c=>{
+    const contactsHtml=()=>`${contacts.map(c=>{
         const activeAccess=safe(access).filter(x=>x.contact_id===c.id&&x.status==='active');
         const a=activeAccess[0];
         const i=safe(invitations).find(x=>x.contact_id===c.id&&!x.accepted_at&&!x.revoked_at);
@@ -236,15 +221,32 @@ export async function renderParentPortalSpecialist(o) {
         <label>Email контакта<input type="email" name="email" maxlength="254" value="${esc(c.email||'')}"></label>
         ${a?'<p class="muted">Изменение email контакта не меняет аккаунт с доступом. Для замены родителя сначала отзовите доступ.</p>':''}
         <div class="parent-specialist-actions"><button type="button" class="btn" data-save-email>Сохранить email</button>${a?'':i?`<button type="button" class="btn" data-resend="${esc(i.id)}" ${emailValid(c.email||'')?'':'disabled'}>Отправить повторно</button>`:accepted&&!revoked?'<span>Обновите статус доступа</span>':`<button type="button" class="btn primary" data-invite ${emailValid(c.email||'')?'':'disabled'}>Отправить приглашение</button>`}</div>${!emailValid(c.email||'')?'<p class="muted">Укажите и сохраните корректный email перед отправкой приглашения.</p>':''}</article>`;
-      }).join('')||'<p>Контактов пока нет. Добавьте родителя / представителя выше.</p>'}</div></section>
-      <section class="parent-active-access"><h3>Доступы без сохранённого контакта</h3><p>Удаление контакта не отключает доступ родителя.</p>${safe(access).filter(a=>a.status==='active'&&!contacts.some(c=>c.id===a.contact_id)).map((a,i)=>
+      }).join('')||'<p>Контактов пока нет. Добавьте родителя / представителя выше.</p>'}`;
+    const orphanAccessHtml=()=>`${safe(access).filter(a=>a.status==='active'&&!contacts.some(c=>c.id===a.contact_id)).map((a,i)=>
         `<article class="parent-contact"><h4>Доступ ${i+1} · Контакт удалён</h4><p>Доступ активен · Активирован ${esc(a.granted_at?new Date(a.granted_at).toLocaleString('ru-RU'):'Дата не указана')}</p><button type="button" class="btn danger" data-revoke="${esc(a.id)}">Отозвать доступ</button></article>`
-      ).join('')||'<p>Таких доступов нет.</p>'}</section></section>
-      <section class="card"><h3>Первичные отчёты</h3><button class="btn" data-create-initial>Новый черновик</button>${safe(initial).map(r=>`<p>${esc(publicationLabel(r.publication_status))} <button class="btn" data-open-initial="${esc(r.id)}">Открыть отчёт</button></p>`).join('')}<div data-initial-editor></div></section>
-      <section class="card"><h3>Отчёты занятий</h3>${safe(sessions).map((r,i)=>`<button class="btn" data-session="${esc(r.id)}">Отчёт занятия ${esc(r.session_date||String(i+1))}</button>`).join('')}<div data-session-editor></div></section>
-      <section class="card"><h3>Цели для родителя</h3><p>Опубликовано целей: ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}</p>
+      ).join('')||'<p>Таких доступов нет.</p>'}`;
+    o.root.innerHTML=`<section class="card parent-specialist"><h2>Кабинет родителя</h2><p data-parent-visibility>Видимость: первичный отчёт — ${safe(initial).some(r=>r.publication_status==='published')?'опубликован':'не опубликован'}; отчёт занятия — ${published.length?'опубликован':'не опубликован'}; цели — ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}; фото — ${photoCount}.</p>
+      <p data-status role="status" aria-live="polite">${o.invitationSent === true ? 'Приглашение отправлено. Проверьте получение письма родителем.' : ''}</p>
+      <section aria-label="Родители и представители"><div class="parent-contacts-heading"><h3>Родители и представители</h3><button type="button" class="btn" data-add-parent>Добавить родителя / представителя</button><button type="button" class="btn" data-refresh-parent>Обновить статус</button></div>
+      <p>Сохраните имя, родство и email представителя, затем отправьте ему приглашение.</p>
+      <form data-parent-contact-form class="parent-contact-form" hidden>
+        <h4>Новый родитель / представитель</h4>
+        <div class="parent-contact-fields">
+          <label>Имя<input name="full_name" required maxlength="200" autocomplete="name"></label>
+          <label>Родство / роль<input name="relation" required maxlength="100" placeholder="Мать, отец, законный представитель"></label>
+          <label>Email<input type="email" name="email" required maxlength="254" autocomplete="email"></label>
+          <label>Телефон (необязательно)<input type="tel" name="phone" maxlength="50" autocomplete="tel"></label>
+        </div>
+        <div class="parent-specialist-actions"><button type="submit" class="btn primary" data-save-parent>Сохранить контакт</button><button type="button" class="btn" data-cancel-parent>Отмена</button></div>
+        <p data-contact-status role="status" aria-live="polite"></p>
+      </form>
+      <div class="parent-specialist-contacts">${contactsHtml()}</div></section>
+      <section class="parent-active-access"><h3>Доступы без сохранённого контакта</h3><p>Удаление контакта не отключает доступ родителя.</p>${orphanAccessHtml()}</section></section>
+      <section class="card"><h3>Первичные отчёты</h3><button class="btn" data-create-initial>Новый черновик</button><div data-initial-report-list>${safe(initial).map(r=>`<p>${esc(publicationLabel(r.publication_status))} <button class="btn" data-open-initial="${esc(r.id)}">Открыть отчёт</button></p>`).join('')}</div><div data-initial-editor></div></section>
+      <section class="card"><h3>Отчёты занятий</h3><div data-parent-session-list>${safe(sessions).map((r,i)=>`<button class="btn" data-session="${esc(r.id)}">Отчёт занятия ${esc(r.session_date||String(i+1))}</button>`).join('')}</div><div data-session-editor></div></section>
+      <section class="card"><h3>Цели для родителя</h3><div data-parent-goal-list><p>Опубликовано целей: ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).length}</p>
       ${safe(publications).filter(g=>g.published_at&&!g.unpublished_at).map(g=>`<article class="goal"><h4>${esc(g.title)}</h4>${g.description?`<p>${esc(g.description)}</p>`:''}<p>${esc(({new:'Новая',in_progress:'В работе',achieved:'Достигнута',paused:'Приостановлена',cancelled:'Отменена',revised:'Пересмотрена'})[g.status]||'Статус не указан')}</p></article>`).join('')||'<p>Опубликованных целей пока нет.</p>'}
-      <button type="button" class="btn" data-manage-goals>Управлять целями</button></section>`;
+      </div><button type="button" class="btn" data-manage-goals>Управлять целями</button></section>`;
     s.action(o.root.querySelector('[data-manage-goals]'),()=>o.manageGoals?.());
     let savedContactId=null;
     const contactForm=o.root.querySelector('[data-parent-contact-form]');
@@ -281,9 +283,11 @@ export async function renderParentPortalSpecialist(o) {
       s.status('Приглашение отправлено. Проверьте получение письма родителем.');
       try{await s.refresh(true);}catch{s.status('Приглашение отправлено. Не удалось обновить список; нажмите «Обновить статус».');}
     }
-    contacts.forEach(c=>{
+    function bindContactActions(rows=contacts) {
+    rows.forEach(c=>{
       const el=[...o.root.querySelectorAll('[data-contact]')].find(x=>x.dataset.contact===c.id);
-      s.action(el.querySelector('[data-save-email]'),async()=>{
+      const contactAction=(button,fn,disabled)=>s.action(button,async()=>{el.dataset.contactBusy='true';try{return await fn();}finally{delete el.dataset.contactBusy;}},disabled);
+      contactAction(el.querySelector('[data-save-email]'),async()=>{
         const email=el.querySelector('[name=email]').value.trim().toLowerCase();
         if(email&&!emailValid(email)) {s.status('Введите корректный email');return;}
         await result(o.sb.from('patient_contacts').update({email:email||null}).eq('id',c.id).eq('patient_id',o.patient.id).eq('therapist_id',o.user.id).select('id').single());
@@ -299,10 +303,13 @@ export async function renderParentPortalSpecialist(o) {
         for(const button of [invite,resend].filter(Boolean))button.disabled=!emailUnchanged()||!emailValid(c.email||'');
         if(invite||resend)s.status(emailUnchanged()?'':'Сохраните email контакта перед отправкой приглашения.');
       };
-      if(invite)s.action(invite,async()=>{if(!savedEmailReady())return;await sendInvitation('create-parent-invitation',{patient_id:o.patient.id,contact_id:c.id});},()=>!emailUnchanged()||!emailValid(c.email||''));
-      if(resend)s.action(resend,async()=>{if(!savedEmailReady())return;await sendInvitation('resend-parent-invitation',{invitation_id:resend.dataset.resend});},()=>!emailUnchanged()||!emailValid(c.email||''));
+      if(invite)contactAction(invite,async()=>{if(!savedEmailReady())return;await sendInvitation('create-parent-invitation',{patient_id:o.patient.id,contact_id:c.id});},()=>!emailUnchanged()||!emailValid(c.email||''));
+      if(resend)contactAction(resend,async()=>{if(!savedEmailReady())return;await sendInvitation('resend-parent-invitation',{invitation_id:resend.dataset.resend});},()=>!emailUnchanged()||!emailValid(c.email||''));
 
     });
+    }
+    bindContactActions();
+    function bindRevokeActions() {
     o.root.querySelectorAll('[data-revoke]').forEach(button=>s.action(button,async()=>{
       const accessId=button.dataset.revoke;
       if(!safe(access).some(a=>a.id===accessId&&a.status==='active')) return;
@@ -312,13 +319,66 @@ export async function renderParentPortalSpecialist(o) {
       if(!s.current()) return;
       await s.refresh();
     }));
+    }
+    bindRevokeActions();
     const editorOptions=root=>({...o,root,isCurrent:()=>s.current()});
     const initialRoot=o.root.querySelector('[data-initial-editor]');
     s.action(o.root.querySelector('[data-create-initial]'),async()=>{
       const row=await result(o.sb.from('parent_reports').insert({patient_id:o.patient.id,therapist_id:o.user.id}).select('id').single());
       if(!s.current())return;await renderReportEditor({...editorOptions(initialRoot),kind:'initial',reportId:row.id});
     });
-    o.root.querySelectorAll('[data-open-initial]').forEach(b=>s.action(b,()=>renderReportEditor({...editorOptions(initialRoot),kind:'initial',reportId:b.dataset.openInitial})));
-    o.root.querySelectorAll('[data-session]').forEach(b=>s.action(b,()=>renderParentSessionReportEditor({...editorOptions(o.root.querySelector('[data-session-editor]')),session:safe(sessions).find(x=>x.id===b.dataset.session)})));
+    const bindReportLists=()=>{
+      o.root.querySelectorAll('[data-open-initial]').forEach(b=>s.action(b,()=>renderReportEditor({...editorOptions(initialRoot),kind:'initial',reportId:b.dataset.openInitial})));
+      o.root.querySelectorAll('[data-session]').forEach(b=>s.action(b,()=>renderParentSessionReportEditor({...editorOptions(o.root.querySelector('[data-session-editor]')),session:safe(sessions).find(x=>x.id===b.dataset.session)})));
+    };
+    bindReportLists();
+    let factsRevision=0;
+    let contactsVersion=JSON.stringify([contacts,invitations,access]);
+    function refreshContactLists(nextContacts) {
+      contacts=(nextContacts||[]).filter(r=>owned(r,o));
+      const nextVersion=JSON.stringify([contacts,invitations,access]);
+      if(nextVersion===contactsVersion)return;
+      const list=o.root.querySelector('.parent-specialist-contacts');
+      const oldCards=new Map([...list.querySelectorAll('[data-contact]')].map(el=>[el.dataset.contact,el]));
+      const template=o.root.ownerDocument.createElement('template');template.innerHTML=contactsHtml();
+      const retained=new Set();
+      for(const fresh of template.content.querySelectorAll('[data-contact]')) {
+        const old=oldCards.get(fresh.dataset.contact),input=old?.querySelector('[name=email]');
+        if(old&&(old.outerHTML===fresh.outerHTML||input.value!==input.defaultValue||old.dataset.contactBusy)) {
+          fresh.replaceWith(old);retained.add(old.dataset.contact);
+        }
+      }
+      // Only the list changes; the new-contact form and report editors stay mounted.
+      list.replaceChildren(...template.content.childNodes);
+      bindContactActions(contacts.filter(c=>!retained.has(c.id)));
+      o.root.querySelector('.parent-active-access').innerHTML='<h3>Доступы без сохранённого контакта</h3><p>Удаление контакта не отключает доступ родителя.</p>'+orphanAccessHtml();
+      bindRevokeActions();contactsVersion=nextVersion;
+    }
+    o.root.refreshPatientFacts=async(nextContacts=o.contacts)=>{
+      const revision=++factsRevision;
+      try {
+        const rows=await Promise.all([
+          result(query(o,'parent_reports',reportColumns('initial')).order('created_at',{ascending:false})),
+          result(query(o,'parent_session_reports',reportColumns('session')).order('created_at',{ascending:false})),
+          result(query(o,'parent_goal_publications','id,goal_id,patient_id,therapist_id,title,description,status,published_at,unpublished_at')),
+          result(query(o,'sessions','id,patient_id,therapist_id,session_date').order('session_date',{ascending:false})),
+          result(query(o,'parent_session_report_media','parent_session_report_id,patient_media_id,patient_id,therapist_id')),
+          result(query(o,'parent_invitations','id,contact_id,patient_id,therapist_id,created_at,expires_at,accepted_at,revoked_at,email_normalized,accepted_by').order('created_at',{ascending:false})),
+          result(query(o,'parent_child_access','id,contact_id,patient_id,therapist_id,status,granted_at,parent_user_id').order('granted_at',{ascending:false}))
+        ]);
+        if(!s.current()||revision!==factsRevision)return;
+        [initial,reports,publications,sessions]=rows;
+        [invitations,access]=rows.slice(5);
+        refreshContactLists(nextContacts);
+        const goals=safe(publications).filter(g=>g.published_at&&!g.unpublished_at);
+        const published=safe(reports).filter(r=>r.publication_status==='published');
+        const photos=safe(rows[4]).filter(m=>published.some(r=>r.id===m.parent_session_report_id)).length;
+        o.root.querySelector('[data-parent-visibility]').textContent=`Видимость: первичный отчёт — ${safe(initial).some(r=>r.publication_status==='published')?'опубликован':'не опубликован'}; отчёт занятия — ${published.length?'опубликован':'не опубликован'}; цели — ${goals.length}; фото — ${photos}.`;
+        o.root.querySelector('[data-parent-goal-list]').innerHTML=`<p>Опубликовано целей: ${goals.length}</p>`+goals.map(g=>`<article class="goal"><h4>${esc(g.title)}</h4>${g.description?`<p>${esc(g.description)}</p>`:''}<p>${esc(({new:'Новая',in_progress:'В работе',achieved:'Достигнута',paused:'Приостановлена',cancelled:'Отменена',revised:'Пересмотрена'})[g.status]||'Статус не указан')}</p></article>`).join('')+(goals.length?'':'<p>Опубликованных целей пока нет.</p>');
+        o.root.querySelector('[data-initial-report-list]').innerHTML=safe(initial).map(r=>`<p>${esc(publicationLabel(r.publication_status))} <button class="btn" data-open-initial="${esc(r.id)}">Открыть отчёт</button></p>`).join('');
+        o.root.querySelector('[data-parent-session-list]').innerHTML=safe(sessions).map((r,i)=>`<button class="btn" data-session="${esc(r.id)}">Отчёт занятия ${esc(r.session_date||String(i+1))}</button>`).join('');
+        bindReportLists();
+      } catch {if(s.current()&&revision===factsRevision)s.status('Не удалось обновить сводку. Повторите переход в кабинет.');}
+    };
   } catch {s.status('Не удалось загрузить кабинет родителя. Обновите вкладку.');}
 }
