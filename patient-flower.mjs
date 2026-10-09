@@ -19,15 +19,19 @@ const paths = {
 };
 export const flowerIcon = key => `<svg class="flower-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${paths[key] || paths.overview}</svg>`;
 const petalContours = {
-  expanded:'M100 2C130 2 153 6 171 13C188 19 197 32 190 49L156 120Q150 132 136 130Q100 121 64 130Q50 132 44 120L10 49C3 32 12 19 29 13C47 6 70 2 100 2Z'
+  expanded:'M100 2C130 2 153 6 171 13C188 19 197 32 190 49L156 120Q150 132 136 130Q100 121 64 130Q50 132 44 120L10 49C3 32 12 19 29 13C47 6 70 2 100 2Z',
+  compact:'M100 130C82 110 24 80 14 52C-2 8 50 2 100 2C150 2 202 8 186 52C176 80 118 110 100 130Z'
 };
+const mobileFan = [[-.35,12,225],[-.24,41,212],[-.12,70,196],[0,94,180],[.12,70,164],[.24,41,148],[.35,12,135]];
+const mobileFlower = view => view.matchMedia?.('(max-width:700px)').matches === true;
+const compactPreference = view => mobileFlower(view) ? 'fizira:flower-mobile-compact' : 'fizira:flower-compact';
 
-// The only persisted value is a global presentation preference, never a patient ID or content.
+// Presentation preferences contain no patient content; mobile defaults to the patient cap.
 export function readFlowerCompact(view) {
-  try {return view.localStorage.getItem('fizira:flower-compact') === '1';} catch {return false;}
+  try {const saved = view.localStorage.getItem(compactPreference(view));return saved === null ? mobileFlower(view) : saved === '1';} catch {return mobileFlower(view);}
 }
 export function saveFlowerCompact(view, compact) {
-  try {view.localStorage.setItem('fizira:flower-compact',compact ? '1' : '0');} catch { /* Private browsing still supports the current view. */ }
+  try {view.localStorage.setItem(compactPreference(view),compact ? '1' : '0');} catch { /* Private browsing still supports the current view. */ }
 }
 
 export async function collapsePatientFlower(root) {
@@ -49,7 +53,8 @@ export function patientFlowerHtml({patient, tab, age, sex, dob, compact = false}
       <nav class="patient-tabs flower-navigation" aria-label="Разделы карточки пациента">
         ${patientSections.map(([key,label],i) => {
           const angle = -90 + i * 360/7, radians = angle * Math.PI/180;
-          return `<button type="button" class="flower-petal ${key === tab ? 'is-active' : ''}" data-tab="${key}" aria-controls="tabContent" ${key === tab ? 'aria-current="page"' : ''} style="--petal-x:${Math.cos(radians).toFixed(4)};--petal-y:${Math.sin(radians).toFixed(4)};--petal-turn:${(angle+90).toFixed(2)}deg">
+          const [fanX,fanY,fanTurn] = mobileFan[i];
+          return `<button type="button" class="flower-petal ${key === tab ? 'is-active' : ''}" data-tab="${key}" aria-controls="tabContent" ${key === tab ? 'aria-current="page"' : ''} style="--petal-x:${Math.cos(radians).toFixed(4)};--petal-y:${Math.sin(radians).toFixed(4)};--petal-turn:${(angle+90).toFixed(2)}deg;--fan-x:${fanX};--fan-y:${fanY}px;--fan-turn:${fanTurn}deg">
             <svg class="flower-petal-shape" viewBox="0 0 200 132" preserveAspectRatio="none" aria-hidden="true" style="--petal-fill:url(#flower-surface-${key});--petal-active-fill:url(#flower-active-${key})">
               <defs><linearGradient id="flower-surface-${key}" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#f0f8fa"/></linearGradient><radialGradient id="flower-active-${key}" cx=".5" cy=".55" r=".7"><stop stop-color="#cdfbf1"/><stop offset="1" stop-color="#87e4d5"/></radialGradient></defs>
               ${Object.entries(petalContours).map(([mode,d])=>`<path class="flower-petal-${mode}" d="${d}"/><path class="flower-petal-${mode} flower-petal-rim" transform="translate(3 2) scale(.97 .96)" d="${d}"/>`).join('')}
@@ -64,6 +69,7 @@ export function patientFlowerHtml({patient, tab, age, sex, dob, compact = false}
         <div class="patient-hero-meta" aria-label="${esc(`${age} · ${sex}`)}">${esc(meta)}</div>
         <div class="flower-ai-host"></div>
       </section>
+      <button class="flower-mobile-expand" type="button" data-flower-expand aria-label="${esc(name)} — развернуть карточку пациента" aria-controls="patientFlowerStage" aria-expanded="${!compact}"></button>
     </div>
     <div class="flower-footer">
       <button class="flower-tool flower-toggle" type="button" data-flower-toggle aria-expanded="${!compact}" aria-controls="patientFlowerStage">${flowerIcon('chevron')}<span>${compact ? 'Развернуть' : 'Свернуть'}</span></button>
@@ -90,14 +96,20 @@ export function patientFlowerHtml({patient, tab, age, sex, dob, compact = false}
 }
 
 export function mountPatientFlower({root, isCurrent, navigate}) {
-  const view = root.ownerDocument.defaultView, toggle = root.querySelector('[data-flower-toggle]');
+  const view = root.ownerDocument.defaultView, toggle = root.querySelector('[data-flower-toggle]'), expand = root.querySelector('[data-flower-expand]');
   toggle.onclick = () => {
     if (!isCurrent() || !root.isConnected) return;
     const compact = root.classList.toggle('is-compact');
     saveFlowerCompact(view, compact);
     toggle.setAttribute('aria-expanded',String(!compact));
+    expand.setAttribute('aria-expanded',String(!compact));
     toggle.querySelector('span').textContent = compact ? 'Развернуть' : 'Свернуть';
     updateScrollHint();
+  };
+  expand.onclick = () => {
+    if (!mobileFlower(view) || !root.classList.contains('is-compact') || !isCurrent() || !root.isConnected) return;
+    toggle.click();
+    toggle.focus({preventScroll:true});
   };
   const nav = root.querySelector('.flower-navigation');
   const buttons = [...nav.querySelectorAll('[data-tab]')];

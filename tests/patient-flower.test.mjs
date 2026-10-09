@@ -2,6 +2,36 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {flowerFixture} from './patient-flower-fixture.mjs';
 import {updateOverviewReport} from '../patient-overview.mjs';
+import {readFlowerCompact,saveFlowerCompact} from '../patient-flower.mjs';
+
+test('mobile starts compact and uses its own presentation preference without changing desktop',()=>{
+  const saved=new Map([['fizira:flower-compact','0']]);
+  const view={matchMedia:q=>({matches:q==='(max-width:700px)'}),localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,v)}};
+  assert.equal(readFlowerCompact(view),true);
+  saveFlowerCompact(view,false);
+  assert.equal(readFlowerCompact(view),false);
+  assert.equal(saved.get('fizira:flower-compact'),'0');
+  assert.equal(saved.get('fizira:flower-mobile-compact'),'0');
+  view.matchMedia=()=>({matches:false});assert.equal(readFlowerCompact(view),false);
+});
+
+test('tapping the mobile patient cap expands the existing flower without replacing its live form',async()=>{
+  const h=await flowerFixture();
+  try {
+    h.window.matchMedia=query=>({matches:query==='(max-width:700px)'||query==='(prefers-reduced-motion: reduce)'});
+    h.render();
+    const root=h.document.querySelector('.patient-flower'),panel=h.document.getElementById('tabContent');
+    assert.ok(root.classList.contains('is-compact'));
+    panel.innerHTML='<form><textarea>Несохранённая оценка</textarea></form>';
+    const form=panel.querySelector('form'),field=form.querySelector('textarea');
+    h.document.querySelector('[data-flower-expand]').click();
+    assert.ok(!root.classList.contains('is-compact'));
+    assert.equal(h.document.querySelector('.patient-flower'),root);
+    assert.equal(h.document.getElementById('tabContent'),panel);
+    assert.equal(panel.querySelector('form'),form);assert.equal(field.value,'Несохранённая оценка');
+    assert.equal(h.window.localStorage.getItem('fizira:flower-mobile-compact'),'0');
+  } finally {await h.close();}
+});
 
 test('the identity circle contains only icon, name, age/sex and the existing analysis button', async () => {
   const h=await flowerFixture({patient:{display_name:'Александр',primary_complaint:'Причина вне круга'}});

@@ -6,7 +6,7 @@ import { createSpecialistRoleGate } from './role-gate.mjs';
 import { mountParentReportWorkspace, leaveParentReportWorkspace } from './parent-report-workspace.mjs?v=2';
 import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=8';
 import { renderCabinet } from './cabinet.js?v=8';
-import { patientFlowerHtml, mountPatientFlower, readFlowerCompact, saveFlowerCompact, collapsePatientFlower } from './patient-flower.mjs?v=4';
+import { patientFlowerHtml, mountPatientFlower, readFlowerCompact, saveFlowerCompact, collapsePatientFlower } from './patient-flower.mjs?v=5';
 import { patientOverviewHtml, mountPatientOverview, updateOverviewReport } from './patient-overview.mjs?v=1';
 import { openScheduleEditor } from './schedule-editor.js?v=8';
 
@@ -3285,6 +3285,7 @@ function renderPatient(parentInvitationSent = false) {
   const actions = app.querySelector(".patient-hero-actions");
   
   const deletePatientWrap = document.createElement("div");
+deletePatientWrap.className = "patient-delete-actions";
 deletePatientWrap.style.textAlign = "center";
 deletePatientWrap.style.margin = "28px 0 8px";
 
@@ -3766,7 +3767,7 @@ aiToggleBtn.onclick = () => {
   aiResult.parentNode.insertBefore(aiToggleBtn, aiResult);
 
   const historyPanel = document.createElement("div");
-  historyPanel.className = "card";
+  historyPanel.className = "card patient-analysis-history";
   historyPanel.style.display = "none";
   historyPanel.style.marginTop = "12px";
 

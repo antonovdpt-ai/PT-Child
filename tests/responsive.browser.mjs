@@ -40,6 +40,7 @@ test('actual specialist renderer fits all requested widths with contact form and
    },snippets);
    await page.locator('[data-add-parent]').waitFor();await page.locator('[data-add-parent]').click();
    await page.locator('[data-parent-contact-form]').waitFor({state:'visible'});
+   if(await page.locator('[data-flower-expand]').isVisible())await page.locator('[data-flower-expand]').click();
    await page.locator('.flower-support summary').click();
    const editSelector=width>=1280?'#editPatient':'#editPatientMobile';
    if(width<1280)await page.locator('[data-patient-details]').click();
