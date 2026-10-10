@@ -93,8 +93,9 @@ test('011 authoritative roles deny own-source and Storage, provision trusted sig
   await query('delete from account_deletion_jobs where user_id=$1',[parentA]);await query('insert into account_deletion_jobs values($1)',[specialist]);await query(`update parent_goal_publications set title=title||'z' where id=$1`,[publication]);assert.equal(await count(),3);await query('delete from account_deletion_jobs where user_id=$1',[specialist]);
   const notifications=await query('select * from parent_notifications where entity_id=$1',[publication]);assert.ok(notifications.every(row=>row.parent_user_id===parentA&&row.type==='goal_published'&&row.entity_type==='goal'));assert.doesNotMatch(JSON.stringify(notifications),/PRIVATE|safe2/);
  });
- await t.test('latest verifier rejects pre011, passes post011/replay and catches unsafe policies, provisioning and goal triggers',async()=>{
-  const verification=(await readFile(verifierUrl,'utf8')).replace('\\set on_error_stop on','');
+ await t.test('historical 011 verifier passes post011/replay and catches unsafe policies, provisioning and goal triggers',async()=>{
+  const {loadPre013ParentVerifier}=await import('./parent-pre013-verifier.mjs');
+  const verification=await loadPre013ParentVerifier();
   const latest=verification.split('-- Parent publication withdrawal boundary (012).')[0];
   await db.exec(latest);
   for(const mutation of ["alter table parent_notifications drop constraint parent_notifications_type_check;alter table parent_notifications add constraint parent_notifications_type_check check(type in ('report_published','appointment_created','appointment_changed','goal_published') or true)",'drop policy specialist_role_required on patients','alter policy specialist_role_required on patients using(true)','alter policy specialist_role_required on storage.objects with check(true)','alter table auth.users disable trigger provision_ordinary_specialist','alter table parent_goal_publications disable trigger notify_parent_goal_publication','grant insert on parent_signup_reservations to authenticated','create policy parent_unsafe_source on sessions for select to authenticated using(true)','create policy parent_unsafe_storage on storage.objects for select to authenticated using(true)']) {

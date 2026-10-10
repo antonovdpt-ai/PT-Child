@@ -1,5 +1,6 @@
 // Local platform stand-ins only; ALL application schema/functions/policies are
-// executed verbatim from reviewed migrations 001–012, with no tenant data.
+// executed verbatim from reviewed migrations, with no tenant data. Transition
+// tests default to 001–012; release verification explicitly requests 001–013.
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {btree_gist} from '@electric-sql/pglite/contrib/btree_gist';
@@ -11,7 +12,8 @@ export const reviewedMigrations=[
  '20261003_009_parent_portal_publications.sql','20261003_010_parent_publication_artifacts.sql',
  '20261003_011_parent_role_boundaries.sql','20261003_012_parent_publication_archive.sql'
 ];
-export async function createFullParentSchemaFixture() {
+export const currentParentMigrations=[...reviewedMigrations,'20261006_013_goal_parent_sync.sql'];
+export async function createFullParentSchemaFixture({migrations=reviewedMigrations}={}) {
  const db=new PGlite({extensions:{btree_gist}});
  try {
   await db.exec(`
@@ -27,7 +29,7 @@ export async function createFullParentSchemaFixture() {
    grant usage on schema auth,storage to authenticated,service_role;
    grant select,insert,update,delete on storage.objects to authenticated,service_role;
   `);
-  for(const file of reviewedMigrations)await db.exec((await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8')).replace(/^\\set[^\n]*\n/gm,''));
+  for(const file of migrations)await db.exec((await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8')).replace(/^\\set[^\n]*\n/gm,''));
   return {db,query:async(sql,args=[]) => (await db.query(sql,args)).rows};
  }catch(error){await db.close();throw error;}
 }

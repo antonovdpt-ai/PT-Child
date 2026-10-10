@@ -3,14 +3,14 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
-import {createFullParentSchemaFixture,reviewedMigrations} from '../../tests/parent-full-schema-fixture.mjs';
+import {createFullParentSchemaFixture,currentParentMigrations} from '../../tests/parent-full-schema-fixture.mjs';
 const root=new URL('../../',import.meta.url);
 const parentMigrations=[
  '20261003_008_parent_portal_identity.sql','20261003_009_parent_portal_publications.sql',
  '20261003_010_parent_publication_artifacts.sql','20261003_011_parent_role_boundaries.sql',
- '20261003_012_parent_publication_archive.sql'
+ '20261003_012_parent_publication_archive.sql','20261006_013_goal_parent_sync.sql'
 ];
-const sourceFiles=reviewedMigrations;
+const sourceFiles=currentParentMigrations;
 export const policyTables=['app_user_roles','legal_document_versions','parent_child_access','parent_invitations','parent_consent_audit','parent_signup_reservations','parent_reports','parent_session_reports','parent_session_report_media','parent_goal_publications','parent_notifications'];
 // pg_get_functiondef includes the COMPLETE body, signature/defaults/return type,
 // language, volatility, security, search_path/config and other function attributes.
@@ -28,7 +28,7 @@ export async function generateReference() {
  for(const file of sourceFiles)sources.set(file,await readFile(new URL('supabase/migrations/'+file,root),'utf8'));
  // Scope is discovered from approved migration declarations, never live names.
  const names=[...new Set(['account_is_active',...parentMigrations.flatMap(file=>[...sources.get(file).matchAll(/create or replace function public\.(\w+)\(/gi)].map(m=>m[1]))])].sort();
- const h=await createFullParentSchemaFixture();
+ const h=await createFullParentSchemaFixture({migrations:sourceFiles});
  try {
   await h.db.exec('set search_path=pg_catalog,public');
   const functions=await h.query(functionDefinitionQuery,[names]);

@@ -394,7 +394,9 @@ begin
  if new.published_at is null or new.unpublished_at is not null then return new; end if;
  if tg_op='UPDATE' and old.published_at is not null and old.unpublished_at is null
   and new.title is not distinct from old.title and new.description is not distinct from old.description
-  and new.status is not distinct from old.status then return new; end if;
+  and new.status is not distinct from old.status
+  and new.baseline is not distinct from old.baseline and new.criterion is not distinct from old.criterion
+  and new.deadline is not distinct from old.deadline and new.progress is not distinct from old.progress then return new; end if;
  insert into public.parent_notifications(parent_user_id,patient_id,therapist_id,type,title,body,entity_type,entity_id)
   select a.parent_user_id,new.patient_id,new.therapist_id,'goal_published','Опубликована цель','Новая или обновлённая цель доступна в кабинете родителя.','goal',new.id
   from public.parent_child_access a

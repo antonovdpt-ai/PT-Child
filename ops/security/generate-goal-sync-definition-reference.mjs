@@ -1,4 +1,5 @@
-// Offline only: preserve the 012 reference and derive a distinct 013 snapshot.
+// Offline only: derive the goal verification snapshot from the current parent
+// reference and reviewed 013 migration; never capture a live database definition.
 import {readFile,writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {createFullParentSchemaFixture} from '../../tests/parent-full-schema-fixture.mjs';

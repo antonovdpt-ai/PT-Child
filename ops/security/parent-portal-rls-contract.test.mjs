@@ -19,9 +19,9 @@ test('cleanup is bounded, checks failures, retains immutable records and attempt
  await assert.rejects(cleanupResources({paths:['source','artifact'],patients:['child'],users:['parent','specialist']},async(path,options)=>{calls.push(path);return {status:path.includes('source')?500:204,body:null};},()=>{}),/cleanup failed/);
  assert.equal(calls.length,5);assert.ok(calls.some(p=>p.includes('artifact')));assert.ok(calls.some(p=>p.includes('specialist')));
 });
-test('readonly verifier runs through012 and detects effective source/Storage authorization changes',async()=>{
+test('readonly verifier runs through013 and detects effective source/Storage authorization changes',async()=>{
  const h=await createParentDatabaseFixture();try{
- for(const file of ['20261003_011_parent_role_boundaries.sql','20261003_012_parent_publication_archive.sql'])await h.db.exec(await readFile(new URL('../../supabase/migrations/'+file,import.meta.url),'utf8'));
+ for(const file of ['20261003_011_parent_role_boundaries.sql','20261003_012_parent_publication_archive.sql','20261006_013_goal_parent_sync.sql'])await h.db.exec(await readFile(new URL('../../supabase/migrations/'+file,import.meta.url),'utf8'));
  await h.query("insert into storage.buckets(id,name,public) values('patient-media','patient-media',false)");
  const entry=await readFile(new URL('../../supabase/verification/verify_parent_portal.sql',import.meta.url),'utf8');assert.match(entry,/begin read only/i);assert.match(entry,/\\ir verify_migration.sql/);assert.match(entry,/rollback/i);
  const full=(await readFile(new URL('../../supabase/verification/verify_migration.sql',import.meta.url),'utf8')).replace(/\\set[^\n]*\n/g,'');

@@ -8,7 +8,8 @@ test('012 own active specialist withdrawal preserves immutable artifacts and par
  try {
  await db.exec(await load('20261003_011_parent_role_boundaries.sql'));
  const migration=process.env.PARENT012_BASELINE?'':await load('20261003_012_parent_publication_archive.sql');
- const verify=(await readFile(new URL('../supabase/verification/verify_migration.sql',import.meta.url),'utf8')).replace('\\set on_error_stop on','');
+ const {loadPre013ParentVerifier}=await import('./parent-pre013-verifier.mjs');
+ const verify=await loadPre013ParentVerifier();
  const block=verify.slice(verify.indexOf('-- Parent publication withdrawal boundary (012).'));
  if(!process.env.PARENT012_BASELINE) await assert.rejects(db.exec(block),/Unsafe publication withdrawal guard/);
  await db.exec(migration);

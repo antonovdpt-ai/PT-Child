@@ -13,6 +13,7 @@
 -- 20261003_010_parent_publication_artifacts.sql sha256=07274cf04835b74f7b4030fc04831773d47f294efecff23f6eb8c749d3a39ea9
 -- 20261003_011_parent_role_boundaries.sql sha256=3cada7dc0580566e4517ef8699511154cff957236a64d29ab2f65eb535593112
 -- 20261003_012_parent_publication_archive.sql sha256=35ba78b064a0281f56a238e79bb3b38ab1f949aa74a7b72a4b1c8dae5efd4ba1
+-- 20261006_013_goal_parent_sync.sql sha256=381a03d3c640e1462c1359e43271566adafdbcccbb602a39e0b9731ae4406562
 do $verify_definitions$
 declare
  expected jsonb := $reviewed_reference${
@@ -137,6 +138,13 @@ declare
       ]
     },
     {
+      "name": "normalize_goal_completion",
+      "signature": "normalize_goal_completion()",
+      "owner": "postgres",
+      "definition_sha256": "e9eb7002c22f02796bb35776a5f9e127975c42121b752772b0f17bc657b5efea",
+      "grants": []
+    },
+    {
       "name": "normalize_parent_contact_email",
       "signature": "normalize_parent_contact_email()",
       "owner": "postgres",
@@ -147,7 +155,7 @@ declare
       "name": "notify_parent_goal_publication",
       "signature": "notify_parent_goal_publication()",
       "owner": "postgres",
-      "definition_sha256": "1b956c00d259efc90e2ec675622c4498be24e95cbe5109a2636945e0fe41a309",
+      "definition_sha256": "8afa5bd243ec837ac039c41ecf1e6b0832c5efa1ceb4661b936a96ca3ac626bc",
       "grants": []
     },
     {
@@ -213,7 +221,7 @@ declare
       "name": "parent_portal_dashboard",
       "signature": "parent_portal_dashboard(uuid)",
       "owner": "postgres",
-      "definition_sha256": "71204626637af1588bdd65771182ae4544d9bb46cfcbf72f005fcb489a82594d",
+      "definition_sha256": "f94a6cce55ec544c798f51880be118185f5f3c696c49630787dbb2d4bbb768e4",
       "grants": [
         {
           "role": "authenticated",
@@ -239,7 +247,7 @@ declare
       "name": "parent_portal_goals",
       "signature": "parent_portal_goals(uuid)",
       "owner": "postgres",
-      "definition_sha256": "e2a0dcb9b46a535e00b8d61d2af8e51172c356ece059a6d073611994596fea0b",
+      "definition_sha256": "36b485f1761b7a935316c18ec14044612a432a2c4f7e106fe1703d7ff6d58368",
       "grants": [
         {
           "role": "authenticated",
@@ -414,6 +422,13 @@ declare
           "privilege": "EXECUTE"
         }
       ]
+    },
+    {
+      "name": "sync_goal_parent_projection",
+      "signature": "sync_goal_parent_projection()",
+      "owner": "postgres",
+      "definition_sha256": "64aa6a15614cb04aa3c04ce4f8d580ec579feec9592b48905cb5358939697bae",
+      "grants": []
     }
   ],
   "policies": [

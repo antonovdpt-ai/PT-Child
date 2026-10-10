@@ -11,7 +11,10 @@ const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 // This follow-up changes only these release tools to check the actual self-hosted
 // runtime instead of requiring an unused CLI packaging file. Product/backend
 // parity remains pinned; runtime fail-closed behavior has integration coverage.
-const adaptedAuditTools=new Set(['.github/workflows/deploy-fizira-frontend.yml','ops/release/audit-production-source.sh']);
+const adaptedAuditTools=new Set(['.github/workflows/deploy-fizira-frontend.yml','ops/release/audit-production-source.sh',
+ // Only read-only assertions change: current-schema integration tests verify
+ // strict 013 parity and reject stale/unknown definitions. Migrations stay pinned.
+ 'supabase/verification/verify_migration.sql','supabase/verification/verify_parent_portal_definitions.sql']);
 test('isolated Flower release leaves all backend and PDF export bytes at production baseline',async()=>{
  assert.equal(baseline.baseSha,base);
  for(const [file,expected] of Object.entries({...baseline.unchangedFiles,...baseline.approvedFlowerAssets})) {

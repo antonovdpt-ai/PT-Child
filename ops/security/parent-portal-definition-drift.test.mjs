@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {createParentDatabaseFixture} from '../../tests/parent-database-fixture.mjs';
-import {createFullParentSchemaFixture} from '../../tests/parent-full-schema-fixture.mjs';
+import {createFullParentSchemaFixture,currentParentMigrations} from '../../tests/parent-full-schema-fixture.mjs';
 const verification=new URL('../../supabase/verification/',import.meta.url);
 async function load(name='verify_parent_portal.sql') {
  let sql=await readFile(new URL(name,verification),'utf8');
@@ -13,10 +12,23 @@ async function load(name='verify_parent_portal.sql') {
  return sql.replace(/^\\set[^\n]*\n/gm,'');
 }
 async function fixture() {
- const h=await createParentDatabaseFixture();
- for(const file of ['20261003_011_parent_role_boundaries.sql','20261003_012_parent_publication_archive.sql'])await h.db.exec(await readFile(new URL('../../supabase/migrations/'+file,import.meta.url),'utf8'));
- await h.query("insert into storage.buckets(id,name,public) values('patient-media','patient-media',false)");
- return h;
+ const h=await createFullParentSchemaFixture({migrations:currentParentMigrations});
+ try {
+  const specialist='11111111-1111-4111-8111-111111111111',parentA='22222222-2222-4222-8222-222222222222',parentB='33333333-3333-4333-8333-333333333333';
+  const childA='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',childB='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  await h.query('insert into auth.users(id,email) values($1,$2),($3,$4),($5,$6)',[specialist,'specialist@example.test',parentA,'parent-a@example.test',parentB,'parent-b@example.test']);
+  await h.query('delete from app_user_roles where user_id in ($1,$2)',[parentA,parentB]);
+  await h.query("insert into app_user_roles(user_id,role) values($1,'parent'),($2,'parent')",[parentA,parentB]);
+  await h.query('insert into patients(id,therapist_id,display_name,date_of_birth) values($1,$2,$3,$4),($5,$2,$6,$7)',[childA,specialist,'Fictional A','2020-01-01',childB,'Fictional B','2021-01-01']);
+  await h.query('insert into parent_child_access(parent_user_id,patient_id,therapist_id) values($1,$2,$3),($4,$5,$3)',[parentA,childA,specialist,parentB,childB]);
+  const scalar=async(sql,args=[])=>Object.values((await h.query(sql,args))[0])[0];
+  const as=async(role,user,fn)=>{
+   await h.db.exec('reset role;set role '+role);
+   await h.query("select set_config('request.jwt.claim.sub',$1,false)",[user||'']);
+   try{return await fn();}finally{await h.db.exec('reset role');}
+  };
+  return {...h,scalar,as,specialist,parentA,parentB,childA,childB};
+ }catch(error){await h.db.close();throw error;}
 }
 async function rejectsFull(h,sql,mutation,label,verifyMutation) {
  await h.db.exec('begin');
@@ -95,7 +107,7 @@ test('reviewed repo-source reference regenerates deterministically and full sche
  const committed=await readFile(new URL('verify_parent_portal_definitions.sql',verification),'utf8');
  assert.equal(await generateReference(),committed,'checked-in assertion derives from repo sources');
  assert.equal(await generateReference(),committed,'no random fixture UUID/OID/user data in reference');
- const h=await createFullParentSchemaFixture();try {
+ const h=await createFullParentSchemaFixture({migrations:currentParentMigrations});try {
  const sql=await load();
  const before=await h.query('select * from patients order by id');
  await h.db.exec(sql.replace(/rollback;\s*$/i,()=>`do $$ begin if current_setting('transaction_read_only') <> 'on' then raise exception 'Verifier is not READ ONLY'; end if; end; $$;rollback;`));
