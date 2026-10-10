@@ -21,12 +21,12 @@ async function fixture(){
  const router='const VERIFY_JWT=Deno.env.get("VERIFY_JWT");\nconst servicePath=`/home/deno/functions/${service_name}`;\nEdgeRuntime.userWorkers.create({servicePath,envVars:Deno.env.toObject()});\n';
  await writeFile(join(paths.functions,'main/index.ts'),router);
  const runtimeFiles={};for(const name of await readdir(paths.functions,{recursive:true,withFileTypes:true})){if(name.isFile()&&name.name!=='config.toml'){const relative=join(name.parentPath,name.name).slice(paths.functions.length+1);runtimeFiles[relative]=sha(await readFile(join(paths.functions,relative)));}}
- const snapshot={containerName:'supabase-edge-functions',running:true,imageId:'sha256:'+ 'a'.repeat(64),imageTag:'supabase/edge-runtime:v1.67.0',process:{path:'edge-runtime',args:['start','--main-service','/home/deno/functions/main']},mounts:[{type:'bind',source:paths.functions,destination:'/home/deno/functions',rw:true}],environment:{VERIFY_JWT:'false',SUPABASE_URL:'http://kong:8000',FIZIRA_ALLOWED_ORIGINS:null},secretPresence:{JWT_SECRET:true,SUPABASE_ANON_KEY:true,SUPABASE_SERVICE_ROLE_KEY:true},compose:{configFiles:[]},router:{containerPath:'/home/deno/functions/main/index.ts',sha256:sha(router)},runtimeFiles};
+ const snapshot={containerName:'supabase-edge-functions',running:true,imageId:'sha256:'+ 'a'.repeat(64),imageTag:'supabase/edge-runtime:v1.67.0',process:{path:'edge-runtime',args:['start','--main-service','/home/deno/functions/main']},mounts:[{type:'bind',source:paths.functions,destination:'/home/deno/functions',rw:true}],environment:{VERIFY_JWT:'false',SUPABASE_URL:'http://kong:8000',SUPABASE_PUBLIC_URL:'https://auth.fizira.com',FIZIRA_ALLOWED_ORIGINS:null},secretPresence:{JWT_SECRET:true,SUPABASE_ANON_KEY:true,SUPABASE_SERVICE_ROLE_KEY:true},compose:{configFiles:[]},router:{containerPath:'/home/deno/functions/main/index.ts',sha256:sha(router)},runtimeFiles};
  const profile={schemaVersion:1,status:'reviewed',mode:'self-hosted-bind-mount',sourceBase:'base',cliConfigPath:join(paths.functions,'config.toml'),reviewEvidence:'synthetic-test-only',snapshot};
  await mkdir(join(paths.head,'ops/release'),{recursive:true});
  await writeFile(join(paths.head,'ops/release/edge-runtime-profile.json'),JSON.stringify(profile));
  const docker=join(paths.bin,'docker');
- const inspect={Name:'/supabase-edge-functions',State:{Running:true},Image:snapshot.imageId,Path:snapshot.process.path,Args:snapshot.process.args,Config:{Image:snapshot.imageTag,Env:['VERIFY_JWT=false','SUPABASE_URL=http://kong:8000','JWT_SECRET=DO_NOT_EMIT_SECRET','SUPABASE_ANON_KEY=DO_NOT_EMIT_ANON','SUPABASE_SERVICE_ROLE_KEY=DO_NOT_EMIT_SERVICE'],Labels:{}},Mounts:snapshot.mounts.map(m=>({Type:m.type,Source:m.source,Destination:m.destination,RW:m.rw}))};
+ const inspect={Name:'/supabase-edge-functions',State:{Running:true},Image:snapshot.imageId,Path:snapshot.process.path,Args:snapshot.process.args,Config:{Image:snapshot.imageTag,Env:['VERIFY_JWT=false','SUPABASE_URL=http://kong:8000','SUPABASE_PUBLIC_URL=https://auth.fizira.com','JWT_SECRET=DO_NOT_EMIT_SECRET','SUPABASE_ANON_KEY=DO_NOT_EMIT_ANON','SUPABASE_SERVICE_ROLE_KEY=DO_NOT_EMIT_SERVICE'],Labels:{}},Mounts:snapshot.mounts.map(m=>({Type:m.type,Source:m.source,Destination:m.destination,RW:m.rw}))};
  await writeFile(join(dir,'inspect.json'),JSON.stringify([inspect]));
  await writeFile(docker,'#!/usr/bin/env python3\nimport pathlib,sys\nprint(pathlib.Path('+JSON.stringify(join(dir,'inspect.json'))+').read_text())\n',{mode:0o755});
  const env={...process.env,PATH:paths.bin+':'+process.env.PATH,FIZIRA_BASE_SHA:'base',FIZIRA_PR_SHA:'head',FIZIRA_AUDIT_BASE_DIR:paths.base,FIZIRA_AUDIT_HEAD_DIR:paths.head,FIZIRA_PRODUCTION_APP:paths.live,FIZIRA_PRODUCTION_FUNCTIONS:paths.functions,FIZIRA_PRODUCTION_CONFIG:join(paths.functions,'config.toml'),FIZIRA_AUDIT_SKIP_PUBLIC:'1',FIZIRA_EDGE_REQUIRE_HEAD:'1'};
@@ -94,4 +94,25 @@ test('collector fails closed when escaped secret values appear in metadata',asyn
    assert.notEqual(r.status,0,'secret-bearing metadata must stop before serialization');assert.doesNotMatch(r.stdout,/password-with|пароль-с/);
   }finally{await rm(f.dir,{recursive:true,force:true});}
  }
+});
+test('runtime profile pins the public Storage origin used by saved PDF handoff',async()=>{
+ const f=await fixture();try{
+  await rm(join(f.paths.functions,'config.toml'));
+  f.inspect.Config.Env=f.inspect.Config.Env.filter(v=>!v.startsWith('SUPABASE_PUBLIC_URL='));
+  f.profile.snapshot.environment.SUPABASE_PUBLIC_URL=null;
+  await writeFile(join(f.dir,'inspect.json'),JSON.stringify([f.inspect]));
+  await writeFile(join(f.paths.head,'ops/release/edge-runtime-profile.json'),JSON.stringify(f.profile));
+  const r=f.run();assert.notEqual(r.status,0,'a missing public origin cannot attest the PDF handoff configuration');
+  assert.match(r.stdout,/PDF_PUBLIC_ORIGIN_STOP/);
+  assert.doesNotMatch(r.stdout,/SOURCE_AUDIT_OK/);
+ }finally{await rm(f.dir,{recursive:true,force:true});}
+});
+test('public PDF origin cannot contain an invalid port',async()=>{
+ const f=await fixture();try{
+  await rm(join(f.paths.functions,'config.toml'));
+  f.inspect.Config.Env=f.inspect.Config.Env.map(v=>v.startsWith('SUPABASE_PUBLIC_URL=')?'SUPABASE_PUBLIC_URL=https://auth.fizira.com:broken':v);
+  f.profile.snapshot.environment.SUPABASE_PUBLIC_URL='https://auth.fizira.com:broken';
+  await writeFile(join(f.dir,'inspect.json'),JSON.stringify([f.inspect]));await writeFile(join(f.paths.head,'ops/release/edge-runtime-profile.json'),JSON.stringify(f.profile));
+  const r=f.run();assert.notEqual(r.status,0,'invalid port must fail the equivalent runtime check');
+ }finally{await rm(f.dir,{recursive:true,force:true});}
 });

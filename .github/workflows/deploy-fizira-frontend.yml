@@ -62,7 +62,7 @@ jobs:
           for asset in "${assets[@]}"; do test -f "$asset"; test ! -L "$asset"; done
           sha256sum "${assets[@]}" > release-assets.sha256
           tar -czf fizira-frontend.tar.gz "${assets[@]}"
-          tar -czf release-tools.tar.gz ops/release/activate-frontend.sh ops/release/audit-production-source.sh ops/release/edge-runtime-audit.py ops/release/frontend-assets.txt ops/release/edge-assets.txt
+          tar -czf release-tools.tar.gz ops/release/activate-frontend.sh ops/release/audit-production-source.sh ops/release/edge-runtime-audit.py ops/release/frontend-snapshot.py ops/release/frontend-assets.txt ops/release/edge-assets.txt
       - name: Configure restricted SSH access
         env:
           SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}

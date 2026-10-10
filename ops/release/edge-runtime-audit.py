@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
 
-SAFE_ENV = ('VERIFY_JWT', 'SUPABASE_URL', 'FIZIRA_ALLOWED_ORIGINS')
+SAFE_ENV = ('VERIFY_JWT', 'SUPABASE_URL', 'SUPABASE_PUBLIC_URL', 'FIZIRA_ALLOWED_ORIGINS')
 SECRET_ENV = ('JWT_SECRET', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY')
 PACKAGING_SHA = '38f8ea2f213aaf2fdd0484484f313cd09c71ea51df073e07c69a8cbb3d7236e4'
 
@@ -68,7 +68,7 @@ def collect(functions, include_source=False):
     safe_env = {key: env.get(key) for key in SAFE_ENV}
     for key, value in safe_env.items():
         require(value is None or sanitized(value) == value, 'UNSAFE_ENV_VALUE_STOP')
-        if key == 'SUPABASE_URL' and value:
+        if key in ('SUPABASE_URL', 'SUPABASE_PUBLIC_URL') and value:
             parsed = urlsplit(value)
             require(parsed.scheme in ('http', 'https') and parsed.hostname and
                     not parsed.username and not parsed.password and not parsed.query and not parsed.fragment,
@@ -159,6 +159,12 @@ def verify(profile, evidence, functions, base, base_dir, head_dir, config):
     require('config.toml' not in source, 'ROUTER_REFERENCES_CLI_CONFIG_STOP')
     require(actual['environment']['VERIFY_JWT'] in ('true', 'false') and
             actual['environment']['SUPABASE_URL'] and all(actual['secretPresence'].values()), 'RUNTIME_ENV_INCOMPLETE_STOP')
+    public = urlsplit(actual['environment'].get('SUPABASE_PUBLIC_URL') or '')
+    # .hostname alone does not reject malformed or out-of-range ports.
+    public.port
+    require(public.scheme == 'https' and public.hostname and not public.username and
+            not public.password and public.path in ('', '/') and not public.query and
+            not public.fragment, 'PDF_PUBLIC_ORIGIN_STOP')
 
 
 def main():
