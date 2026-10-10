@@ -42,7 +42,20 @@ compare_file() {
 while IFS= read -r file; do [[ -z "$file" ]] || compare_file "frontend/$file" "$app/$file" "$file"; done < "$script_dir/frontend-assets.txt"
 while IFS= read -r file; do
  [[ -n "$file" ]] || continue
- if [[ "$file" == config.toml ]]; then live="$config"; else live="$functions/${file#functions/}"; fi
+ if [[ "$file" == config.toml ]]; then
+  live="$config"
+  # CLI static_files is not consumed by a direct self-hosted bind-mount runtime.
+  # Its alternative is enabled only by a reviewed, commit-bound exact profile.
+  if [[ ! -e "$live" && ! -L "$live" && -f "$head/ops/release/edge-runtime-profile.json" ]]; then
+   if python3 -B "$script_dir/edge-runtime-audit.py" --functions "$functions" \
+      --config "$config" --profile "$head/ops/release/edge-runtime-profile.json" \
+      --base "$FIZIRA_BASE_SHA" --base-dir "$base" --head-dir "$head"; then
+    continue
+   else
+    stop_count=$((stop_count+1)); continue
+   fi
+  fi
+ else live="$functions/${file#functions/}"; fi
  compare_file "supabase/$file" "$live" "supabase/$file"
 done < "$script_dir/edge-assets.txt"
 if [[ "${FIZIRA_AUDIT_SKIP_PUBLIC:-0}" != 1 ]]; then

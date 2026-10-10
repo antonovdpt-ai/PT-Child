@@ -44,7 +44,10 @@ test('fresh local shallow checkout fails without baseline, provisions pinned sna
   assert.equal(provision.status,0,provision.stdout+provision.stderr);
   assert.equal(run('git',['rev-parse','--verify',`${baseline}^{commit}`],clone).stdout.trim(),baseline);
   const positive=cache();assert.equal(positive.status,0,positive.stdout+positive.stderr);assert.match(positive.stdout,/tests 1/);assert.match(positive.stdout,/pass 1/);
-  await writeFile(join(clone,'app.js'),(await readFile(join(clone,'app.js'),'utf8')).replace('./cabinet.js?v=7','./cabinet.js?v=6'));
+  const currentApp=await readFile(join(clone,'app.js'),'utf8');
+  const staleApp=currentApp.replace(/(\.\/cabinet\.js\?v=)\d+/,(_match,prefix)=>prefix+'6');
+  assert.notEqual(staleApp,currentApp,'probe must actually replace the current cache URL with stale v6');
+  await writeFile(join(clone,'app.js'),staleApp);
   const stale=cache();assert.notEqual(stale.status,0);assert.match(stale.stdout,/baseline URL .*cabinet\.js\?v=6/);assert.match(stale.stdout,/tests 1/);assert.match(stale.stdout,/fail 1/);
   t.diagnostic(`pinned provisioning: current audit tests1/pass1/fail0 exit${positive.status}; stale-v6 audit tests1/pass0/fail1 exit${stale.status}`);
   // Idempotent provisioning validates the pinned object; an unavailable origin

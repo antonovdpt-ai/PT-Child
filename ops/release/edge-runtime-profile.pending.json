@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "status": "pending",
+  "mode": "self-hosted-bind-mount",
+  "sourceBase": "51e18c88377a7b20d06eef24b0db9fcb6d45fd3a",
+  "cliConfigPath": "/root/supabase-project/supabase/config.toml",
+  "reviewEvidence": "",
+  "snapshot": null,
+  "instructions": "Collect actual runtime metadata and review main router/import maps. Only then add edge-runtime-profile.json to the reviewed release head. This template cannot pass source audit or attest edgeRuntime, SQL or isolated-target gates."
+}

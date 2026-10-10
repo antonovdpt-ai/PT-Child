@@ -62,7 +62,7 @@ jobs:
           for asset in "${assets[@]}"; do test -f "$asset"; test ! -L "$asset"; done
           sha256sum "${assets[@]}" > release-assets.sha256
           tar -czf fizira-frontend.tar.gz "${assets[@]}"
-          tar -czf release-tools.tar.gz ops/release/activate-frontend.sh ops/release/audit-production-source.sh ops/release/frontend-assets.txt ops/release/edge-assets.txt
+          tar -czf release-tools.tar.gz ops/release/activate-frontend.sh ops/release/audit-production-source.sh ops/release/edge-runtime-audit.py ops/release/frontend-assets.txt ops/release/edge-assets.txt
       - name: Configure restricted SSH access
         env:
           SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
@@ -140,4 +140,5 @@ jobs:
             release-assets.sha256
 # Database migrations and actual Edge rollout remain separate operator gates.
 # Edge parity is audited from ops/release/edge-assets.txt, including helpers,
-# bundled Cyrillic font/license and supabase/config.toml static_files configuration.
+# bundled Cyrillic font/license. A missing CLI packaging config requires a reviewed
+# exact self-hosted runtime profile from the release head, never a skipped gate.
