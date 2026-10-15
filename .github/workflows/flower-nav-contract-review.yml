@@ -1,8 +1,13 @@
 name: Flower 0.188 deployment contract offline check (once)
 # NO SSH, NO Timeweb credentials, NO production writes.
-# Offline review registered, no additional automatic runs.
+# Last one-time offline review of scoped four-file backup and locked deploy.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-contract-review.yml
 permissions:
   contents: read
 jobs:
@@ -47,5 +52,5 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s ops/release -p 'test_flower_nav_release.py' -v 2>&1 | tee test-nav.log
-          grep -Fq 'Ran 6 tests' test-nav.log
+          grep -Fq 'Ran 7 tests' test-nav.log
           grep -Fqx 'OK' test-nav.log
