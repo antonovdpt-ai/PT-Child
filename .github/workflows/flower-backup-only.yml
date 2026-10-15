@@ -1,8 +1,14 @@
 name: Fizira Flower snapshot-only backup (one-time)
 
-# One-time backup run registered; no automatic runs are enabled.
+# Approved continuation of frontend backup using non-privileged TAR format.
+# One branch-only invocation. Disable this push trigger once registered.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-backup-only.yml
 
 permissions:
   contents: read
