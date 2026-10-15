@@ -31,8 +31,8 @@ jobs:
       - name: Configure existing restricted SSH identity on ephemeral runner
         shell: bash
         env:
-          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }
-          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           test -n "$SSH_KEY"
@@ -46,9 +46,9 @@ jobs:
       - name: Compare 21 allowed server files and cache-busted public files, read-only
         shell: bash
         env:
-          TIMEWEB_HOST: ${{ secrets.TIMEWEB_HOST }
-          TIMEWEB_PORT: ${{ secrets.TIMEWEB_PORT }
-          TIMEWEB_USER: ${{ secrets.TIMEWEB_USER }
+          TIMEWEB_HOST: ${{ secrets.TIMEWEB_HOST }}
+          TIMEWEB_PORT: ${{ secrets.TIMEWEB_PORT }}
+          TIMEWEB_USER: ${{ secrets.TIMEWEB_USER }}
         run: |
           set -euo pipefail
           python3 -B ops/release/flower-readonly-ci-audit.py
