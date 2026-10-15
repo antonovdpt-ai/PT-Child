@@ -1,8 +1,13 @@
 name: Fizira Flower nine-file production release (LOCKED DRAFT)
-# One-time production rollout was registered; automatic runs are disabled.
-# Further publication requires separate approval. Keep hard job lock enabled.
+# Explicit second one-shot production attempt authorized 2026-10-15.
+# Re-lock immediately upon registration; no second run is authorized.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-production-one-shot-LOCKED.yml
 permissions:
   contents: read
 concurrency:
@@ -11,7 +16,7 @@ concurrency:
 
 jobs:
   frontend-only:
-    if: ${{ false }}
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/release/flower-frontend-only-20261015' && github.event_name == 'push'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
