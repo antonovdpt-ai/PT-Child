@@ -1,0 +1,35 @@
+name: Flower exact-source frontend release and rollback rehearsal
+
+# No production access or credentials. Temporary files on GitHub runner only.
+on:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-exact-source-rehearsal.yml
+
+permissions:
+  contents: read
+
+jobs:
+  genuine-bytes:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/release/flower-frontend-only-20261015'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run 12 local safety and recovery tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s ops/release -p 'test_flower_frontend_transaction.py' -v 2>&1 | tee test-output.log
+          grep -Eq 'Ran (1[2-9]|[2-9][0-9]+) tests' test-output.log
+          grep -Fqx 'OK' test-output.log
+      - name: Rehearse exact released Git bytes and rollback with interrupted scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B ops/release/flower-real-source-rehearsal.py
