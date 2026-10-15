@@ -1,13 +1,8 @@
 name: Fizira locked production workflow offline review (once)
 # CI checks only. No Timeweb secrets, ssh/scp, production writes or deployment.
-# One permitted local-only regression after CLI bug: no Timeweb access.
+# CLI regression registered. No automatic CI retries.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - release/flower-frontend-only-20261015
-    paths:
-      - .github/workflows/flower-prod-contract-review.yml
 permissions:
   contents: read
 jobs:
