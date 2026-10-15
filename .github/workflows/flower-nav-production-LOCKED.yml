@@ -1,8 +1,13 @@
 name: Fizira 0.188 Flower navigation only (LOCKED)
-# Corrected 0.188 rollout was registered once. No automatic deployment.
-# This deployment workflow must be separately reviewed and approved for future use.
+# Continuing explicitly authorized 0.188 four-file release, after actual Timeweb backup FD compatibility verified.
+# Exactly one branch-scoped run; restore hard lock immediately.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-production-LOCKED.yml
 permissions:
   contents: read
 concurrency:
@@ -10,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish-nav:
-    if: ${{ false }}
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/fix/flower-navigation-20261015' && github.event_name == 'push'
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
