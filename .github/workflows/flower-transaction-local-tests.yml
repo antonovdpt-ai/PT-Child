@@ -22,7 +22,10 @@ jobs:
       - name: Validate Python sources
         run: |
           python3 -m py_compile ops/release/flower-frontend-transaction.py
-          python3 -m py_compile ops/release/flower-frontend-transaction.test.py
+          python3 -m py_compile ops/release/test_flower_frontend_transaction.py
       - name: Rehearse release and rollback on fictional assets only
         run: |
-          python3 -m unittest discover -s ops/release -p 'flower-frontend-transaction.test.py' -v
+          python3 -m unittest discover -s ops/release -p 'test_flower_frontend_transaction.py' -v 2>&1 | tee result.log
+          grep -Eq 'Ran ([8-9]|[1-9][0-9]+) tests' result.log
+          grep -Eq '^OK
+ result.log
