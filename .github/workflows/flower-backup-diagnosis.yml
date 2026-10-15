@@ -1,0 +1,46 @@
+name: Fizira backup path diagnosis (read-only once)
+on:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-backup-diagnosis.yml
+permissions:
+  contents: read
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+jobs:
+  permission-diagnosis:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Configure pinned SSH host
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+      - name: Diagnose backup path only, no writes
+        env:
+          TIMEWEB_HOST: ${{ secrets.TIMEWEB_HOST }}
+          TIMEWEB_PORT: ${{ secrets.TIMEWEB_PORT }}
+          TIMEWEB_USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          ssh -T -p "$TIMEWEB_PORT" -i "$HOME/.ssh/id_ed25519" \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "$TIMEWEB_USER@$TIMEWEB_HOST" 'python3 -B -' \
+            < ops/release/flower-backup-readonly-diagnostics.py
+      - name: Erase temporary SSH identity
+        if: always()
+        run: |
+          rm -f "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
