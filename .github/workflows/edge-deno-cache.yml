@@ -1,0 +1,34 @@
+name: Fizira Edge Deno public cache (staged)
+# Deliberately non-runnable on this non-default branch until a separate approval.
+# See docs/edge-deno-cache-review.md before activating.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fizira-edge-cache-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  linux-cache:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/ci/edge-deno-cache-20261015'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Read pinned repository source (no persisted credentials)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download public dependencies into Linux Deno cache; check offline
+        shell: bash
+        run: bash ops/ci/build-edge-deno-cache.sh
+      - name: Publish cache-only artifact (3-day retention)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fizira-edge-cache-ed6c103-${{ github.run_id }}
+          path: ${{ runner.temp }}/fizira-edge-cache-output/*.tar.gz
+          retention-days: 3
+          if-no-files-found: error
