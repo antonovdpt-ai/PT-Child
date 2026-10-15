@@ -1,10 +1,7 @@
 name: Fizira backup path diagnosis (read-only once)
+# One-time read-only diagnosis registered; no further auto runs.
 on:
-  push:
-    branches:
-      - release/flower-frontend-only-20261015
-    paths:
-      - .github/workflows/flower-backup-diagnosis.yml
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
