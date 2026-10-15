@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""0.188 four-file Flower-only production transaction, with NEW full v1 snapshot.
+"""0.188 four-file Flower-only production transaction, with scoped fresh v1 snapshot.
 
 Imports the existing reviewed fd/no-follow frontend-snapshot.py unmodified.
 Fail-closed; no database, backend, service or patient-record operations.
@@ -149,12 +149,28 @@ def main():
         meta=live_verify(names,base)
         permission_check(meta)
         need(not backup.exists() and not backup.is_symlink(),"BACKUP_REUSE_STOP")
-        result=snapshot.create(PRODUCTION,private/"stage",backup,list(DELTA))
+        # The live web tree also includes other-user files which the SSH
+        # identity must never chmod/chown/read with elevated permissions.
+        # Back up the EXACT four files that may be replaced, preserving their
+        # source ownership, mode, mtime and SHA. Other 17 pinned assets are
+        # verified but are never modified by either transaction.
+        originals=private/"original-four"
+        need(not originals.exists() and not originals.is_symlink(),
+             "ORIGINALS_REUSE_STOP")
+        originals.mkdir(mode=0o700)
+        for name in DELTA:
+            snapshot.copy_checked(PRODUCTION/name,originals/name,base[name])
+            need(snapshot.sha(originals/name)==base[name],
+                 "COPIED_ORIGINAL_MISMATCH_STOP")
+        live_verify(names,base)
+        result=snapshot.create(originals,private/"stage",backup,list(DELTA))
         checked=validate_backup(snapshot,backup,names,result["manifestSha256"])
-        need(checked["manifestSha256"]==result["manifestSha256"],
+        need(result["files"]==4 and checked["manifestSha256"]==result["manifestSha256"],
              "SNAPSHOT_AFTER_CREATE_STOP")
-        # No web mutation: backup contains all files, not just the four changed.
+        live_verify(names,base)
         print(json.dumps({"NAV_BACKUP":"PASS","manifestSha256":result["manifestSha256"],
+                          "scope":"EXACT_FOUR_REPLACED_FILES",
+                          "diskAssetsVerified":21,
                           "files":result["files"],"bytes":result["bytes"]},sort_keys=True))
 
 if __name__=="__main__":
