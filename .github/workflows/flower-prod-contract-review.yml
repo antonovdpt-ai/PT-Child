@@ -1,0 +1,41 @@
+name: Fizira locked production workflow offline review (once)
+# CI checks only. No Timeweb secrets, ssh/scp, production writes or deployment.
+on:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-prod-contract-review.yml
+permissions:
+  contents: read
+jobs:
+  local-review:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Compile tools and parse locked deployment YAML
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ops/release/flower-prepare-remote-stage.py ops/release/flower-public-verify.py ops/release/flower-frontend-transaction.py ops/release/test_flower_deploy_contract.py
+          ruby -e 'require "yaml"; YAML.parse_file(ARGV.fetch(0)); puts "LOCKED_WORKFLOW_YAML=PASS"' .github/workflows/flower-production-one-shot-LOCKED.yml
+      - name: Rebuild exact release TAR from pinned Git source
+        run: |
+          set -euo pipefail
+          python3 -B ops/release/build-flower-release-package.py
+          (cd "$RUNNER_TEMP" && sha256sum -c "flower-release-$GITHUB_RUN_ID.tar.gz.sha256")
+      - name: Execute stage and hard-lock contract tests
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s ops/release -p 'test_flower_deploy_contract.py' -v 2>&1 | tee production-review-tests.log
+          grep -Fq 'Ran 6 tests' production-review-tests.log
+          grep -Fqx 'OK' production-review-tests.log
+      - name: Confirm existing rollback safety tests still pass
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s ops/release -p 'test_flower_frontend_transaction.py' -v 2>&1 | tee transaction-review-tests.log
+          grep -Fq 'Ran 12 tests' transaction-review-tests.log
+          grep -Fqx 'OK' transaction-review-tests.log
