@@ -1,11 +1,8 @@
 name: Fizira Flower nine-file package preparation (no production)
 # Public source artifact only; no SSH secrets, no deploy, no backend.
+# One release bundle prepared; no further automated runs.
 on:
-  push:
-    branches:
-      - release/flower-frontend-only-20261015
-    paths:
-      - .github/workflows/flower-prepare-package.yml
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
