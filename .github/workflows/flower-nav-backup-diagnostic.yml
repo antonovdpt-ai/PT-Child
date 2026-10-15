@@ -1,8 +1,13 @@
 name: Diagnose incomplete Flower 0.188 backup (read-only once)
 # No release, no writes on Timeweb, no patient data, no remote command injection.
-# Final read-only backup audit registered. Automatic triggers disabled.
+# Read-only check of direct-versus-anchored file opens, no writes or publication.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-backup-diagnostic.yml
 permissions:
   contents: read
 jobs:
@@ -79,6 +84,15 @@ jobs:
           tool=Path.home()/".cache"/"fizira-flower-nav"/"38791116267"/"frontend-snapshot.py"
           spec=importlib.util.spec_from_file_location("snapshot_diagnostic",tool)
           snap=importlib.util.module_from_spec(spec);spec.loader.exec_module(snap)
+          for mode,label in (("direct","DIRECT_APPJS"),("descriptor","ANCHORED_APPJS")):
+              try:
+                  if mode=="direct":fd=os.open(source/"app.js",os.O_RDONLY|os.O_NOFOLLOW)
+                  else:fd=snap.open_nofollow(source/"app.js",os.O_RDONLY)
+                  os.close(fd)
+                  print(label+"=PASS")
+              except OSError as err:
+                  print(label+"_STOP="+type(err).__name__)
+                  print(label+"_ERRNO="+str(getattr(err,"errno","NONE")))
           try:
               files,dirs=snap.inventory(source)
               print("SNAPSHOT_INVENTORY=PASS")
