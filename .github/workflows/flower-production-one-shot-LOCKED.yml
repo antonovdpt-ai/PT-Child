@@ -1,0 +1,129 @@
+name: Fizira Flower nine-file production release (LOCKED DRAFT)
+# INACTIVE. Separate user authorization and a reviewed single-use activation
+# patch are mandatory. Never merge this workflow into main to bypass the lock.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+
+jobs:
+  frontend-only:
+    if: ${{ false }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Pin source, generate the nine-file bundle and verify its SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = antonovdpt-ai/PT-Child
+          test "$GITHUB_REF" = refs/heads/release/flower-frontend-only-20261015
+          git merge-base --is-ancestor ed6c103578cbfcabe19ab0077e8eeff1305d8b3d HEAD
+          test "$(git rev-parse HEAD:ops/release/flower-frontend-transaction.py)" = 0b96a3563cc0bd67a5937631514959a2316a432e
+          test "$(git rev-parse HEAD:ops/release/build-flower-release-package.py)" = cd45138cc00cdbd8f06d480569fc8f25277d77ec
+          python3 -B ops/release/build-flower-release-package.py
+          (cd "$RUNNER_TEMP" && sha256sum -c "flower-release-$GITHUB_RUN_ID.tar.gz.sha256")
+          sha256sum "$RUNNER_TEMP/flower-release-$GITHUB_RUN_ID.tar.gz" | cut -d' ' -f1 > "$RUNNER_TEMP/flower-bundle-hash"
+          sha256sum ops/release/flower-frontend-transaction.py | cut -d' ' -f1 > "$RUNNER_TEMP/flower-script-hash"
+
+      - name: Verify 18 cache-busted production public assets still match baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B ops/release/flower-public-verify.py --pins "$RUNNER_TEMP/flower-package-$GITHUB_RUN_ID/pins.json" --state base
+
+      - name: Provision ephemeral pinned SSH identity
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Stage and independently verify nine files in a private Timeweb directory
+        id: stage
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]{1,30}$ ]]
+          [[ "$PORT" =~ ^[0-9]{1,5}$ ]]
+          test -n "$HOST" && test -n "$USER"
+          remote="$USER@$HOST"
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$remote" \
+            "set -eu; umask 077; test -d .cache && test ! -L .cache; if test ! -e .cache/fizira-frontend-deploy; then mkdir -m 700 .cache/fizira-frontend-deploy; fi; test -d .cache/fizira-frontend-deploy && test ! -L .cache/fizira-frontend-deploy; test ! -e .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID.tar.gz; test ! -e .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID"
+          scp -P "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "$RUNNER_TEMP/flower-release-$GITHUB_RUN_ID.tar.gz" "$remote:.cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID.tar.gz"
+          bundle_sha="$(cat "$RUNNER_TEMP/flower-bundle-hash")"
+          script_sha="$(cat "$RUNNER_TEMP/flower-script-hash")"
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$remote" \
+            "python3 -B - --package .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID.tar.gz --expected-sha256 '$bundle_sha' --transaction-sha256 '$script_sha' --destination .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID" < ops/release/flower-prepare-remote-stage.py
+
+      - name: Recheck 21 server bytes, file ownership and pinned backup with no writes
+        id: preflight
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" \
+            "python3 -B .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID/transaction.py preflight --live /root/supabase-project/volumes/proxy/app --stage .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID/stage --backup .cache/fizira-frontend-snapshots/flower-ui-38763866489 --pins .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID/pins.json --backup-manifest-sha256 e18171381a5452860741fbe6578586aa6ceea0d33c7cac54ac3c5f56f5925346"
+
+      - name: Atomically publish nine reviewed files with index.html last
+        id: activate
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" \
+            "FIZIRA_FRONTEND_RELEASE_APPROVAL='ed6c103578cbfcabe19ab0077e8eeff1305d8b3d::activate' python3 -B .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID/transaction.py activate --live /root/supabase-project/volumes/proxy/app --stage .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID/stage --backup .cache/fizira-frontend-snapshots/flower-ui-38763866489 --pins .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID/pins.json --backup-manifest-sha256 e18171381a5452860741fbe6578586aa6ceea0d33c7cac54ac3c5f56f5925346"
+
+      - name: Independently verify all 21 production public asset hashes
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B ops/release/flower-public-verify.py --pins "$RUNNER_TEMP/flower-package-$GITHUB_RUN_ID/pins.json" --state head
+
+      - name: Guarded TAR_V2 rollback only if activation or public verification fails
+        if: ${{ failure() && (steps.activate.outcome == 'failure' || steps.verify.outcome == 'failure') }}
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" \
+            "FIZIRA_FRONTEND_RELEASE_APPROVAL='ed6c103578cbfcabe19ab0077e8eeff1305d8b3d::rollback' python3 -B .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID/transaction.py rollback --live /root/supabase-project/volumes/proxy/app --stage .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID/stage --backup .cache/fizira-frontend-snapshots/flower-ui-38763866489 --pins .cache/fizira-frontend-deploy/flower-$GITHUB_RUN_ID/pins.json --backup-manifest-sha256 e18171381a5452860741fbe6578586aa6ceea0d33c7cac54ac3c5f56f5925346"
+          python3 -B ops/release/flower-public-verify.py --pins "$RUNNER_TEMP/flower-package-$GITHUB_RUN_ID/pins.json" --state base
+
+      - name: Erase ephemeral runner credentials and hashes
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -f "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          rm -f "$RUNNER_TEMP/flower-bundle-hash" "$RUNNER_TEMP/flower-script-hash"
