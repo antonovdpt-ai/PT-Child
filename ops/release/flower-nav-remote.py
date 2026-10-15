@@ -40,6 +40,54 @@ def digest(path):
         return sha.hexdigest(),before
     finally:os.close(fd)
 
+def copy_production_file_without_parent_directory_reads(name,destination,expected):
+    """Read a known public asset safely without requiring O_RDONLY on every ancestor.
+
+    Timeweb allows traversal and direct O_NOFOLLOW reads but does not grant
+    directory READ access for every ancestor. Never weaken permissions or sudo.
+    """
+    source=PRODUCTION/name
+    need(name in DELTA and not source.is_symlink(),"COPY_SOURCE_SCOPE_STOP")
+    fd=os.open(source,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    output=None
+    try:
+        before=os.fstat(fd)
+        need(stat.S_ISREG(before.st_mode) and before.st_size<=64*1024*1024,
+             "COPY_REGULAR_SOURCE_STOP")
+        need(before.st_uid==os.geteuid(),"COPY_OWNER_STOP")
+        destination=Path(destination)
+        need(not destination.exists() and not destination.is_symlink(),
+             "COPY_DEST_ALREADY_EXISTS_STOP")
+        output=os.open(destination,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+        sha=hashlib.sha256();size=0
+        while True:
+            chunk=os.read(fd,65536)
+            if not chunk:break
+            sha.update(chunk);size+=len(chunk)
+            need(size<=64*1024*1024,"COPY_SIZE_STOP")
+            pending=memoryview(chunk)
+            while pending:
+                pending=pending[os.write(output,pending):]
+        after=os.fstat(fd)
+        need(sha.hexdigest()==expected and size==before.st_size and
+             (before.st_ino,before.st_size,before.st_mtime_ns)==
+             (after.st_ino,after.st_size,after.st_mtime_ns),
+             "COPY_SOURCE_CHANGED_STOP")
+        os.fchmod(output,stat.S_IMODE(before.st_mode))
+        if os.fstat(output).st_gid!=before.st_gid:
+            os.fchown(output,-1,before.st_gid)
+        os.utime(output,ns=(before.st_atime_ns,before.st_mtime_ns))
+        os.fsync(output)
+    finally:
+        if output is not None:os.close(output)
+        os.close(fd)
+    copied,meta=digest(destination)
+    need(copied==expected and meta.st_uid==before.st_uid and
+         meta.st_gid==before.st_gid and
+         stat.S_IMODE(meta.st_mode)==stat.S_IMODE(before.st_mode) and
+         meta.st_mtime_ns==before.st_mtime_ns,
+         "COPY_DESTINATION_VERIFY_STOP")
+
 def paths(job_id):
     need(RUN_RE.fullmatch(job_id),"RUN_ID_STOP")
     private=Path.home()/".cache"/"fizira-flower-nav"/job_id
@@ -159,9 +207,8 @@ def main():
              "ORIGINALS_REUSE_STOP")
         originals.mkdir(mode=0o700)
         for name in DELTA:
-            snapshot.copy_checked(PRODUCTION/name,originals/name,base[name])
-            need(snapshot.sha(originals/name)==base[name],
-                 "COPIED_ORIGINAL_MISMATCH_STOP")
+            copy_production_file_without_parent_directory_reads(
+                name,originals/name,base[name])
         live_verify(names,base)
         result=snapshot.create(originals,private/"stage",backup,list(DELTA))
         checked=validate_backup(snapshot,backup,names,result["manifestSha256"])
