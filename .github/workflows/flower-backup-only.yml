@@ -1,0 +1,86 @@
+name: Fizira Flower snapshot-only backup (one-time)
+
+# Approved once: create and verify one private frontend snapshot on Timeweb.
+# Remove the branch-only push trigger immediately after the run registers.
+on:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-backup-only.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+
+jobs:
+  frontend-backup:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/release/flower-frontend-only-20261015'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout reviewed code only
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build and syntax check source-pinned backup-only script
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B ops/release/build-flower-backup-payload.py
+
+      - name: Configure pinned SSH host key
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY"
+          test -n "$KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Repeat read-only source and public hash audit
+        shell: bash
+        env:
+          TIMEWEB_HOST: ${{ secrets.TIMEWEB_HOST }}
+          TIMEWEB_PORT: ${{ secrets.TIMEWEB_PORT }}
+          TIMEWEB_USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          python3 -B ops/release/flower-readonly-ci-audit.py
+
+      - name: Create and verify private complete frontend backup only
+        shell: bash
+        env:
+          TIMEWEB_HOST: ${{ secrets.TIMEWEB_HOST }}
+          TIMEWEB_PORT: ${{ secrets.TIMEWEB_PORT }}
+          TIMEWEB_USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/flower-backup-stdin.py"
+          test -n "$TIMEWEB_HOST"
+          test -n "$TIMEWEB_USER"
+          test -n "$TIMEWEB_PORT"
+          ssh -T -p "$TIMEWEB_PORT" -i "$HOME/.ssh/id_ed25519" \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes -o ConnectTimeout=12 \
+            -o ServerAliveInterval=10 -o ServerAliveCountMax=2 \
+            "$TIMEWEB_USER@$TIMEWEB_HOST" 'python3 -B -' \
+            < "$RUNNER_TEMP/flower-backup-stdin.py"
+
+      - name: Erase temporary runner files
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          rm -f "$RUNNER_TEMP/flower-backup-stdin.py"
