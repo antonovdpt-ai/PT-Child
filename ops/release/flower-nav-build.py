@@ -43,7 +43,7 @@ def build(root):
         base[name]=sha(old);head[name]=sha(new)
         if name in NAMES:
             (stage/name).write_bytes(new)
-            (stage/name).chmod(0o600)
+            (stage/name).chmod(0o644)
     stop({n for n in names if base[n]!=head[n]}==set(NAMES),
          "DELTA_NOT_FOUR_STOP")
     stop(head["index.html"]!=base["index.html"],"INDEX_NOT_REFRESHED_STOP")
