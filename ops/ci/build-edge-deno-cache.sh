@@ -65,8 +65,8 @@ before=$(sha256sum "$work/evidence/deno.lock" | cut -d' ' -f1)
 
 echo 'OFFLINE_RESOLUTION=START'
 timeout --signal=TERM --kill-after=10s 180s "${base[@]}" \
-  --cidfile "$cidfile" --network none "$IMAGE" \
-  cache --cached-only --no-config --no-check --node-modules-dir=none \
+  --cidfile "$cidfile" --network none --env DENO_NO_REMOTE=1 "$IMAGE" \
+  cache --no-config --no-check --node-modules-dir=none \
   --lock=/out/deno.lock "${args[@]}"
 rm -f "$cidfile"
 after=$(sha256sum "$work/evidence/deno.lock" | cut -d' ' -f1)
