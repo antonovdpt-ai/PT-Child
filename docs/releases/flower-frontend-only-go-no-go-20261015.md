@@ -58,11 +58,21 @@
 - **Compatibility warning:** this TAR_V2 backup is not the `frontend-snapshot.py` file-tree v1 format; existing `activate-frontend.sh rollback` does **not** accept it. Before release, review/test a dedicated guarded TAR_V2 restore into a private temporary directory and a publish/rollback workflow; do not claim rollback readiness yet.
 - One-time branch-only `push` triggers were disabled after registration; no scheduled retries.
 
+## Isolated restore rehearsal — 2026-10-15
+
+- **PASS** [GitHub Actions 38776158045](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38776158045), immutable test source commit `671195061f0ca2657b7199bd2cdbba0943f2e8ac`.
+- Restored from existing backup `flower-ui-38763866489` with pinned manifest digest `e18171381a5452860741fbe6578586aa6ceea0d33c7cac54ac3c5f56f5925346`, verified manifest members, validated TAR_V2 structure, source owners/modes/timestamps as recorded metadata, and file content digests before any extraction.
+- Used private **separate** directory `~/.cache/fizira-frontend-restore-tests/flower-ui-38776158045`, never the served `/root/supabase-project/volumes/proxy/app`. Fresh directories 0700 and files 0600, created as SSH user without sudo or `chown`. Test directory retained for independent inspection.
+- Recovered **92 files, 27 directories, 5,823,129 uncompressed file bytes**, and independently rehashed all restored bytes against the saved manifest: `ISOLATED_RESTORE=PASS`, `RESTORED_HASHES=PASS`, `FRONTEND_BASE_ALLOWLIST=PASS`.
+- Result also reports `LIVE_PRODUCTION_WRITES=NONE`, `DATA_AND_SERVICES_UNTOUCHED=YES`, `OWNERSHIP_REPLAY_TESTED=NO`, `PRODUCTION_ROLLBACK_TESTED=NO`.
+- Automatic workflow `push` trigger removed immediately after approved run registered. No production publication, no rollback or owner/group change was authorized.
+- **Remaining release blocker:** design and rehearse a narrowly scoped, hash-guarded publish and TAR_V2 rollback workflow (including UID/GID handling under SSH UID 1001), plus a final dry-run and explicit deploy approval. This isolated rehearsal is **not** an activation/rollback readiness assertion.
+
 ## Current state
 
 - Frontend source selection / allowlist: REVIEWED FROM GITHUB.
 - Today's production frontend source parity (21 disk entries, 18 public GETs): **PASS via run 38757356071**.
-- Server backup for this release: **TAR_V2 CREATED/VERIFIED** via Actions [38763866489](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38763866489); restoration rehearsal **NOT TESTED**. The historical owner-preserving file-tree snapshot format is not used.
+- Server backup for this release: **TAR_V2 CREATED/VERIFIED** via Actions [38763866489](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38763866489); isolated restoration rehearsal **PASS via run 38776158045**; production rollback **NOT TESTED**. The historical owner-preserving file-tree snapshot format is not used.
 - Separate safe frontend-only deploy method: **NOT IMPLEMENTED OR REVIEWED**.
 - Permission to publish: **NOT GRANTED**.
 - **GO/NO-GO: NO-GO until the concrete frontend-only gates pass and separate release approval is granted.**
