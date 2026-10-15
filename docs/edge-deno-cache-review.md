@@ -2,19 +2,19 @@
 
 This branch is based on pinned release `ed6c103578cbfcabe19ab0077e8eeff1305d8b3d` and does **not** merge into `main`.
 
-## Status: first CI run failed; fixed offline command is not yet run
+## Status: second approved run succeeded; offline source-graph cache ready for review
 
 ## Initial one-time CI result (2026-10-15)
 
 Run [38748772005](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38748772005) failed at its **offline command-line check**, after successfully downloading the JSR `@supabase/supabase-js@2.118.0` graph and 32 npm packages on the Linux runner. Exact error: `unexpected argument '--cached-only' found`. No archive was published; no PDF or Edge handler executed. The one-time branch-only `push` trigger was removed immediately afterward.
 
-The script was corrected to use Docker `--network none` plus `DENO_NO_REMOTE=1` for offline resolution, without the unsupported CLI flag. **This correction has not been CI-executed.** A second run requires a new, explicit approval and a fresh one-time trigger, followed by removal of that trigger.
+The corrected script used Docker `--network none` and `DENO_NO_REMOTE=1` for offline resolution, without the unsupported CLI flag.
 
+## Second approved CI run (2026-10-15)
 
+Run [38749695300](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38749695300) completed **successfully**. The logs show `PUBLIC_LINUX_CACHE_OFFLINE_PASS` and `EDGE_RUNTIME_REVIEWED=NO`. Both the online fetch and offline resolution steps passed. GitHub published artifact [11979084991](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38749695300/artifacts/11979084991), `fizira-edge-cache-ed6c103-38749695300`, a ZIP of 11,016,458 bytes containing a tar.gz and SHA-256 sidecar. GitHub reports ZIP SHA-256 `9386bae4b60628f33e69aed1aaa584f14fea08ffb560ea5a4f81a7119faf4c47`. Artifact expires 2026-10-18 at approximately 14:15 UTC. Re-validate the SHA-256 after download and separately compare the inner tarball with its checksum before extraction.
 
-The workflow is `workflow_dispatch`-only and is **not** on the default branch. GitHub does not accept manual dispatch for this branch-only workflow. Consequently no CI job has been requested or executed by preparing these files. Do not merge to `main` just to make it runnable.
-
-**Activation plan (requires a separate explicit approval):** on this exact branch, add a temporary `push` trigger limited to the branch and changes to `.github/workflows/edge-deno-cache.yml`. Committing that trigger will launch the cache job once. After inspecting the run, remove the `push` trigger with another commit. Never enable `pull_request`, repository-wide triggers, deployment or production secrets. A GitHub Actions run may use CI minutes.
+The branch-only automatic `push` trigger was removed immediately after this run was registered. No CI rerun is authorized or scheduled. GitHub's `workflow_dispatch` requires the workflow file to exist on the default branch; do **not** merge this workflow to `main` solely to dispatch it.
 
 ## After approval: what is collected
 
@@ -22,7 +22,7 @@ The workflow is `workflow_dispatch`-only and is **not** on the default branch. G
 - A transient, limited Linux Docker container using `denoland/deno:2.5.6`, with no privileged mode, Docker socket, local project credentials, or production secrets.
 - The seven Edge function entrypoints, shared parent PDF renderer, and explicit public npm PDF dependencies.
 - A generated Deno dependency lock file, a Linux `DENO_DIR` cache, the image ID and basic evidence.
-- A second resolution of the identical graph using `--cached-only` and `--network none`.
+- A second resolution of the identical graph using Docker `--network none` and `DENO_NO_REMOTE=1`.
 - A short-lived artifact with a tar archive and its SHA-256; inspect archive entries before extraction in WSL. Only move it into the local test environment after verification.
 
 ## Strict limitations
