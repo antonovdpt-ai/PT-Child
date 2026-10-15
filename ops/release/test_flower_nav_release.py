@@ -77,7 +77,9 @@ class TestFlowerNavRelease(unittest.TestCase):
     def test_full_new_snapshot_four_file_activation_and_rollback(self):
         self.assertEqual(self.action("preflight")["NAV_PREFLIGHT"],"PASS")
         result=self.action("backup");self.assertEqual(result["NAV_BACKUP"],"PASS")
-        self.assertGreaterEqual(result["files"],22)
+        self.assertEqual(result["files"],4)
+        self.assertEqual(result["scope"],"EXACT_FOUR_REPLACED_FILES")
+        self.assertEqual(result["diskAssetsVerified"],21)
         manifest=result["manifestSha256"]
         with patch.dict(os.environ,{"FIZIRA_NAV_RELEASE_APPROVAL":"0.188-flower-nav::activate"}):
             changed=self.action("activate",manifest)
@@ -87,6 +89,20 @@ class TestFlowerNavRelease(unittest.TestCase):
             result=self.action("rollback",manifest)
         self.assertEqual(result["changedFiles"],4)
         self.check_files(self.base)
+
+    def test_unreadable_unrelated_frontend_file_is_never_copied_or_modified(self):
+        unrelated=self.live/"private-nonrelease-file"
+        unrelated.write_text("synthetic never-deployed unrelated bytes")
+        unrelated.chmod(0o000)
+        try:
+            result=self.action("backup")
+            self.assertEqual(result["files"],4)
+            self.assertEqual(result["NAV_BACKUP"],"PASS")
+            self.assertEqual(unrelated.stat().st_mode & 0o777,0)
+            self.assertEqual(len(list((self.backup/"files").iterdir())),4)
+        finally:
+            unrelated.chmod(0o600)
+        self.assertEqual(unrelated.read_text(),"synthetic never-deployed unrelated bytes")
 
     def test_fail_closed_stage_tamper_before_snapshot(self):
         (self.private/"stage"/"app.js").write_text("wrong source bytes")
