@@ -1,8 +1,13 @@
 name: Fizira 0.188 Flower navigation only (LOCKED)
-# One corrected 0.188 production attempt registered; no automatic subsequent release.
-# Separate review and approval required for any future production change.
+# User-authorized guarded retry after isolated anchored-permission fix.
+# Branch-only one-time run. Re-lock immediately after run registration.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-production-LOCKED.yml
 permissions:
   contents: read
 concurrency:
@@ -10,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish-nav:
-    if: ${{ false }}
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/fix/flower-navigation-20261015' && github.event_name == 'push'
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -31,6 +36,8 @@ jobs:
           test "$(git rev-parse HEAD:index.html)" = "81b3b62fa34b28b1c80e6052f6dd4affce741170"
           test "$(git rev-parse HEAD:patient-flower.css)" = "28371d13895e1e5f2c1f6e751859ed6fab3a899d"
           test "$(git rev-parse HEAD:patient-flower.mjs)" = "5fd023baa415541890be27c583a9ada8cfb41ea0"
+          test "$(git rev-parse HEAD:ops/release/flower-nav-remote.py)" = "a9305053d8ac15144a2a78a7d7f9204ccee4fa8f"
+          test "$(git rev-parse HEAD:ops/release/frontend-snapshot.py)" = "c6cf10b7efa2b7fbccbaaf636bcc36105bccd6de"
           python3 -m py_compile ops/release/flower-nav-build.py ops/release/flower-nav-remote.py ops/release/flower-nav-public.py ops/release/frontend-snapshot.py
           python3 -B ops/release/flower-nav-build.py "$RUNNER_TEMP/nav-$GITHUB_RUN_ID"
           test "$(find "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/stage" -maxdepth 1 -type f | wc -l)" -eq 4
