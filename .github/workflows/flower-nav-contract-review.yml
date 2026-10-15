@@ -1,11 +1,8 @@
 name: Flower 0.188 deployment contract offline check (once)
 # NO SSH, NO Timeweb credentials, NO production writes.
+# One offline contract review registered. No automatic repeats.
 on:
-  push:
-    branches:
-      - fix/flower-navigation-20261015
-    paths:
-      - .github/workflows/flower-nav-contract-review.yml
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
