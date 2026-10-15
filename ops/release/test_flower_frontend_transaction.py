@@ -172,9 +172,40 @@ class TestFlowerTransaction(unittest.TestCase):
         self.assert_baseline()
 
     def test_production_path_requires_separate_approval(self):
-        source=Path(mod.PRODUCTION)
-        txt=Path(__file__).read_text()
-        self.assertIn("FIZIRA_FRONTEND_RELEASE_APPROVAL",txt.replace("TestFlowerTransaction","FIZIRA_FRONTEND_RELEASE_APPROVAL"))
-        self.assertIn("FIZIRA_FRONTEND_RELEASE_APPROVAL",module_path.read_text())
+        with patch.object(mod,"PRODUCTION",str(self.live)):
+            with self.assertRaisesRegex(ValueError,"PRODUCTION_APPROVAL_REQUIRED_STOP"):
+                self.action("activate")
+        self.assert_baseline()
+
+    def test_preflight_is_read_only_and_detects_bad_stage(self):
+        before={n:(self.live/n).stat().st_ino for n in NAMES if self.baseline[n]}
+        result=mod.transact("preflight",self.live,self.stage,self.backup,self.pins,self.digest)
+        self.assertEqual(result,{"status":"PREFLIGHT_PASS","changed":0})
+        self.assert_baseline()
+        for n,ino in before.items():
+            self.assertEqual((self.live/n).stat().st_ino,ino)
+        (self.stage/"app.js").write_text("unexpected stage data")
+        with self.assertRaisesRegex(ValueError,"STAGED_HASH_STOP"):
+            mod.transact("preflight",self.live,self.stage,self.backup,self.pins,self.digest)
+        self.assert_baseline()
+
+    def test_rollback_preserves_original_file_owners_groups_permissions_and_mtime(self):
+        before={name:(self.live/name).stat() for name in mod.CHANGED}
+        self.action("activate")
+        self.action("rollback")
+        for name,meta in before.items():
+            restored=(self.live/name).stat()
+            self.assertEqual(restored.st_uid,meta.st_uid)
+            self.assertEqual(restored.st_gid,meta.st_gid)
+            self.assertEqual(stat.S_IMODE(restored.st_mode),stat.S_IMODE(meta.st_mode))
+            self.assertEqual(restored.st_mtime_ns,meta.st_mtime_ns)
+        self.assert_baseline()
+
+    def test_rollback_resumes_after_interruption(self):
+        self.action("activate")
+        with self.assertRaisesRegex(RuntimeError,"INJECTED_TEST_INTERRUPTION"):
+            self.action("rollback",inject_after=3)
+        self.assertEqual(self.action("rollback")["status"],"ROLLBACK_PASS")
+        self.assert_baseline()
 
 if __name__=="__main__":unittest.main(verbosity=2)
