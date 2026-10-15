@@ -1,8 +1,13 @@
 name: Fizira 0.188 Flower navigation only (LOCKED)
-# One user-approved 0.188 production run was registered.
-# Automatic push runs are disabled. Future releases need new approval.
+# Approved continuation after first attempt stopped before writes.
+# Repeat exact four-asset Flower publication with scoped backup; re-lock once registered.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-production-LOCKED.yml
 permissions:
   contents: read
 concurrency:
@@ -10,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish-nav:
-    if: ${{ false }}
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/fix/flower-navigation-20261015' && github.event_name == 'push'
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
