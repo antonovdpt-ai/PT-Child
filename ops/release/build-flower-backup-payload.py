@@ -9,7 +9,7 @@ import sys
 BASE="51e18c88377a7b20d06eef24b0db9fcb6d45fd3a"
 HEAD="ed6c103578cbfcabe19ab0077e8eeff1305d8b3d"
 SOURCE=Path("ops/release/frontend-snapshot.py")
-DRIVER=Path("ops/release/flower-backup-only-driver.py")
+DRIVER=Path("ops/release/flower-backup-tar-driver.py")
 
 def run(*args):
     p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -41,14 +41,9 @@ if sum(x is None for x in expected_base.values())!=3:
     raise SystemExit("STOP: not three new assets")
 if sum(expected_base[x]!=expected_head[x] for x in names)!=9:
     raise SystemExit("STOP: not nine changed assets")
-s=SOURCE.read_text()
-marker='\nif __name__ == \'__main__\':'
-if s.count(marker)!=1:
-    raise SystemExit("STOP: unexpected module structure")
-s=s.split(marker)[0]
 pins="\nPIN_BASE="+repr(expected_base)+"\nPIN_HEAD="+repr(expected_head)+"\nRUN_NUMBER="+repr(run_id)+"\n"
 p=Path(os.environ["RUNNER_TEMP"])/"flower-backup-stdin.py"
-p.write_text(s+pins+"\n"+DRIVER.read_text())
+p.write_text(pins+"\n"+DRIVER.read_text())
 p.chmod(0o600)
 compile(p.read_bytes(),str(p),"exec")
 print("SNAPSHOT_PAYLOAD_VERIFIED=YES")
