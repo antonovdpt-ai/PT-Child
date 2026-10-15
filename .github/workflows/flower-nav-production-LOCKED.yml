@@ -30,7 +30,7 @@ jobs:
           test "$(git rev-parse HEAD:app.js)" = "2250649b39cef060b7cf84b190cc864f094419d7"
           test "$(git rev-parse HEAD:index.html)" = "81b3b62fa34b28b1c80e6052f6dd4affce741170"
           test "$(git rev-parse HEAD:patient-flower.css)" = "28371d13895e1e5f2c1f6e751859ed6fab3a899d"
-          test "$(git rev-parse HEAD:patient-flower.mjs)" = "4ece311551e4b8d8d2f68c86d9ea6267a1fb5aaa"
+          test "$(git rev-parse HEAD:patient-flower.mjs)" = "5fd023baa415541890be27c583a9ada8cfb41ea0"
           python3 -m py_compile ops/release/flower-nav-build.py ops/release/flower-nav-remote.py ops/release/flower-nav-public.py ops/release/frontend-snapshot.py
           python3 -B ops/release/flower-nav-build.py "$RUNNER_TEMP/nav-$GITHUB_RUN_ID"
           test "$(find "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/stage" -maxdepth 1 -type f | wc -l)" -eq 4
