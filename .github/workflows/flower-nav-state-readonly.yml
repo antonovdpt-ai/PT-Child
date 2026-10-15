@@ -1,8 +1,7 @@
 name: Flower current production state READ ONLY
+# Registered single read-only audit; automatic reruns disabled.
 on:
-  push:
-    branches: [fix/flower-navigation-20261015]
-    paths: [.github/workflows/flower-nav-state-readonly.yml]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
