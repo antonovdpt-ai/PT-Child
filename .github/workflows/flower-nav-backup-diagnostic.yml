@@ -1,0 +1,77 @@
+name: Diagnose incomplete Flower 0.188 backup (read-only once)
+# No release, no writes on Timeweb, no patient data, no remote command injection.
+on:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-backup-diagnostic.yml
+permissions:
+  contents: read
+jobs:
+  read-only:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 4
+    steps:
+      - name: Provision known SSH identity
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+      - name: Inspect backup completion and permissions without reading contents
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" "python3 -B -" <<'PY'
+          from pathlib import Path
+          import os,stat
+          source=Path("/root/supabase-project/volumes/proxy/app")
+          backup=Path.home()/".cache"/"fizira-frontend-snapshots"/"flower-nav-38789920773"
+          copies=backup/"files"
+          print("BACKUP_EXISTS="+str(backup.is_dir()))
+          print("BACKUP_COMPLETE="+str((backup/"complete").is_file()))
+          if backup.is_dir() and not backup.is_symlink():
+              print("BACKUP_FILE_COPY_DIR="+str(copies.is_dir()))
+              print("BACKUP_ITEMS="+",".join(sorted(p.name for p in backup.iterdir()) if len(list(backup.iterdir()))<15 else ["MORE_THAN_14"]))
+              if copies.is_dir():
+                  count=0;foreign=0
+                  for root,dirs,files in os.walk(copies,followlinks=False):
+                      for name in files:
+                          info=os.lstat(os.path.join(root,name));count+=1;foreign+=int(info.st_uid!=os.geteuid())
+                  print("BACKUP_COPIED_FILES="+str(count))
+                  print("BACKUP_FOREIGN_UID="+str(foreign))
+          print("SOURCE_READABLE="+str(source.is_dir() and os.access(source,os.R_OK|os.X_OK)))
+          count=0;nonowned=0;nonregular=0;symlinks=0;directories=0;foreign_dirs=0
+          for root,dirs,files in os.walk(source,followlinks=False):
+              directories+=1
+              for name in dirs:
+                  p=os.path.join(root,name);info=os.lstat(p)
+                  foreign_dirs+=int(info.st_uid!=os.geteuid())
+                  symlinks+=int(stat.S_ISLNK(info.st_mode))
+              for name in files:
+                  info=os.lstat(os.path.join(root,name));count+=1
+                  nonowned+=int(info.st_uid!=os.geteuid())
+                  nonregular+=int(not stat.S_ISREG(info.st_mode))
+          print("SOURCE_FILES="+str(count))
+          print("SOURCE_NONOWNED_FILES="+str(nonowned))
+          print("SOURCE_DIRS="+str(directories))
+          print("SOURCE_FOREIGN_DIRS="+str(foreign_dirs))
+          print("SOURCE_NONREGULAR="+str(nonregular))
+          print("SOURCE_SYMLINKS="+str(symlinks))
+          PY
+      - name: Forget runner SSH identity
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -f "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
