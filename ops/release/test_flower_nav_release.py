@@ -90,6 +90,20 @@ class TestFlowerNavRelease(unittest.TestCase):
         self.assertEqual(result["changedFiles"],4)
         self.check_files(self.base)
 
+    def test_exact_four_backup_works_with_execute_only_ancestor_directory(self):
+        # Timeweb: SSH identity can traverse and open named static files,
+        # but cannot open the web root itself O_RDONLY|O_DIRECTORY.
+        self.live.chmod(0o311)
+        try:
+            self.assertTrue(os.access(self.live,os.W_OK|os.X_OK))
+            result=self.action("backup")
+            self.assertEqual(result["NAV_BACKUP"],"PASS")
+            self.assertEqual(result["files"],4)
+            self.assertTrue((self.backup/"complete").is_file())
+        finally:
+            self.live.chmod(0o755)
+        self.check_files(self.base)
+
     def test_unreadable_unrelated_frontend_file_is_never_copied_or_modified(self):
         unrelated=self.live/"private-nonrelease-file"
         unrelated.write_text("synthetic never-deployed unrelated bytes")
