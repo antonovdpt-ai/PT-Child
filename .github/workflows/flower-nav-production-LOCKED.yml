@@ -1,8 +1,13 @@
 name: Fizira 0.188 Flower navigation only (LOCKED)
-# Explicit user approval for ONE 4-file production publish, with fresh full backup.
-# This workflow remains HARD-LOCKED until the offline workflow review passes.
+# User-approved one-time 0.188 four-asset publication, 2026-10-15.
+# Re-lock immediately after the new run is registered.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-production-LOCKED.yml
 permissions:
   contents: read
 concurrency:
@@ -10,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish-nav:
-    if: ${{ false }}
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/fix/flower-navigation-20261015' && github.event_name == 'push'
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
