@@ -1,12 +1,8 @@
 name: Flower exact-source frontend release and rollback rehearsal
 
-# No production access or credentials. Temporary files on GitHub runner only.
+# One-time exact-source rehearsal registered. No automated reruns.
 on:
-  push:
-    branches:
-      - release/flower-frontend-only-20261015
-    paths:
-      - .github/workflows/flower-exact-source-rehearsal.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
