@@ -29,6 +29,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: fizira-edge-cache-ed6c103-${{ github.run_id }}
-          path: ${{ runner.temp }}/fizira-edge-cache-output/*.tar.gz
+          path: ${{ runner.temp }}/fizira-edge-cache-output/*
           retention-days: 3
           if-no-files-found: error
