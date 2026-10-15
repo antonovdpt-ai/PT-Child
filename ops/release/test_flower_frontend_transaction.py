@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import shutil
 import stat
+import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -206,6 +208,38 @@ class TestFlowerTransaction(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,"INJECTED_TEST_INTERRUPTION"):
             self.action("rollback",inject_after=3)
         self.assertEqual(self.action("rollback")["status"],"ROLLBACK_PASS")
+        self.assert_baseline()
+
+
+    def test_actual_command_line_entrypoint_string_paths(self):
+        options=[
+            "--live",str(self.live),"--stage",str(self.stage),
+            "--backup",str(self.backup),"--pins",str(self.pins),
+            "--backup-manifest-sha256",self.digest
+        ]
+        for mode,wanted in [
+            ("preflight","PREFLIGHT_PASS"),
+            ("activate","ACTIVATE_PASS"),
+            ("rollback","ROLLBACK_PASS")
+        ]:
+            with self.subTest(mode=mode):
+                result=subprocess.run([sys.executable,"-B",str(module_path),
+                                       mode,*options],capture_output=True,text=True)
+                self.assertEqual(result.returncode,0,result.stderr+" "+result.stdout)
+                self.assertIn(wanted,result.stdout)
+        self.assert_baseline()
+
+    def test_cli_tampered_stage_blocks_without_changes(self):
+        (self.stage/"index.html").write_bytes(b"NOT_THE_PINNED_RELEASE")
+        options=[
+            "--live",str(self.live),"--stage",str(self.stage),
+            "--backup",str(self.backup),"--pins",str(self.pins),
+            "--backup-manifest-sha256",self.digest
+        ]
+        result=subprocess.run([sys.executable,"-B",str(module_path),
+                               "preflight",*options],capture_output=True,text=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn("STAGED_HASH_STOP",result.stdout)
         self.assert_baseline()
 
 if __name__=="__main__":unittest.main(verbosity=2)
