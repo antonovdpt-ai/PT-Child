@@ -88,6 +88,83 @@ def copy_production_file_without_parent_directory_reads(name,destination,expecte
          meta.st_mtime_ns==before.st_mtime_ns,
          "COPY_DESTINATION_VERIFY_STOP")
 
+def anchored_replace(name,wanted,source,expected,metadata):
+    """Use reviewed 0.187 root-descriptor pattern, never traverse unreadable /root."""
+    need(name in DELTA,"MUTATION_ALLOWLIST_STOP")
+    rootfd=os.open(PRODUCTION,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    temp=None
+    try:
+        def current():
+            fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=rootfd)
+            try:
+                first=os.fstat(fd)
+                need(stat.S_ISREG(first.st_mode) and first.st_size<=64*1024*1024,
+                     "LIVE_NONREGULAR_STOP")
+                h=hashlib.sha256()
+                for chunk in iter(lambda:os.read(fd,65536),b""):h.update(chunk)
+                last=os.fstat(fd)
+                need((first.st_ino,first.st_size,first.st_mtime_ns)==
+                     (last.st_ino,last.st_size,last.st_mtime_ns),"LIVE_RACE_STOP")
+                return h.hexdigest()
+            finally:os.close(fd)
+        need(current()==expected,"LIVE_CHANGED_BEFORE_REPLACE_STOP")
+        if wanted==expected:return False
+        content,source_info=None,None
+        if source is not None:
+            actual,source_info=digest(source)
+            need(actual==wanted,"SOURCE_HASH_STOP")
+            with open(source,"rb") as f:
+                content=f.read(64*1024*1024+1)
+            need(len(content)<=64*1024*1024 and hashlib.sha256(content).hexdigest()==wanted,
+                 "SOURCE_CHANGED_STOP")
+        need(content is not None,"MISSING_RESTORE_BYTES_STOP")
+        temp=".fizira-nav-"+os.urandom(16).hex()
+        fd=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=rootfd)
+        try:
+            with os.fdopen(os.dup(fd),"wb") as out:
+                out.write(content);out.flush()
+            os.fchmod(fd,metadata["mode"])
+            if os.fstat(fd).st_gid!=metadata["gid"]:
+                os.fchown(fd,-1,metadata["gid"])
+            os.utime(fd,ns=(metadata["mtimeNs"],metadata["mtimeNs"]))
+            os.fsync(fd)
+        finally:os.close(fd)
+        need(current()==expected,"LIVE_CHANGED_DURING_STAGE_STOP")
+        os.replace(temp,name,src_dir_fd=rootfd,dst_dir_fd=rootfd)
+        temp=None
+        os.fsync(rootfd)
+        need(current()==wanted,"POST_REPLACE_HASH_STOP")
+        return True
+    finally:
+        if temp is not None:
+            try:os.unlink(temp,dir_fd=rootfd)
+            except FileNotFoundError:pass
+        os.close(rootfd)
+
+def anchored_transaction(mode,snapshot,private,backup,base,head,names):
+    """Guard full known state before any mutation; only four root-anchored writes."""
+    need(mode in ("activate","rollback"),"BAD_MUTATION_MODE_STOP")
+    snapshot.verify(backup,list(DELTA))
+    manifest=json.loads((backup/"snapshot.json").read_text())
+    backup_files=manifest["files"]
+    for name in names:
+        actual,_=digest(PRODUCTION/name)
+        allowed=({base[name]} if mode=="activate" else
+                 {base[name],head[name]} if name in DELTA else {base[name]})
+        need(actual in allowed,"UNKNOWN_LIVE_STATE_STOP:"+name)
+    sequence=DELTA if mode=="activate" else ("index.html","patient-flower.mjs","patient-flower.css","app.js")
+    changed=0
+    for name in sequence:
+        wanted=head[name] if mode=="activate" else base[name]
+        current,_=digest(PRODUCTION/name)
+        if current==wanted:continue
+        source=(private/"stage"/name if mode=="activate" else backup/"files"/name)
+        info=backup_files[name]
+        need(info["sha256"]==base[name],"BACKUP_SOURCE_HASH_STOP")
+        if anchored_replace(name,wanted,source,current,info):changed+=1
+    live_verify(names,head if mode=="activate" else base)
+    return {"frontend":mode.upper()+"_VERIFIED","changedFiles":changed}
+
 def paths(job_id):
     need(RUN_RE.fullmatch(job_id),"RUN_ID_STOP")
     private=Path.home()/".cache"/"fizira-flower-nav"/job_id
@@ -172,7 +249,7 @@ def main():
         if args.action=="activate":
             meta=live_verify(names,base)
             permission_check(meta)
-            result=snapshot.mutate("activate",PRODUCTION,private/"stage",backup,list(DELTA))
+            result=anchored_transaction("activate",snapshot,private,backup,base,head,names)
             live_verify(names,head)
             print(json.dumps({"NAV_ACTIVATE":"PASS","changedFiles":result["changedFiles"],
                               "postDiskAssets":21},sort_keys=True))
@@ -183,7 +260,7 @@ def main():
                 value,_=digest(PRODUCTION/name)
                 expected={base[name],head[name]} if name in DELTA else {base[name]}
                 need(value in expected,"UNKNOWN_ROLLBACK_STATE_STOP:"+name)
-            result=snapshot.mutate("rollback",PRODUCTION,private/"stage",backup,list(DELTA))
+            result=anchored_transaction("rollback",snapshot,private,backup,base,head,names)
             live_verify(names,base)
             print(json.dumps({"NAV_ROLLBACK":"PASS","changedFiles":result["changedFiles"],
                               "postDiskAssets":21},sort_keys=True))
