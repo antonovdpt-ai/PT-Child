@@ -1,13 +1,8 @@
 name: Fizira Edge Deno public cache (staged)
-# Approved second one-time push; remove trigger after the run.
+# Completed one-time push; no further automatic runs.
 # Runtime source bytes remain pinned to ed6c103.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - ci/edge-deno-cache-20261015
-    paths:
-      - .github/workflows/edge-deno-cache.yml
 
 permissions:
   contents: read
