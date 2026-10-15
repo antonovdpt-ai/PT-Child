@@ -1,13 +1,8 @@
 name: Flower navigation mobile and desktop regression (one-shot)
 # Temporary test-only runner. No production secrets, Timeweb or deployment.
-# Focused browser verification after correcting Playwright Core CLI invocation.
+# Browser CI run registered. Automatic reruns disabled.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - fix/flower-navigation-20261015
-    paths:
-      - .github/workflows/flower-navigation-tests.yml
 permissions:
   contents: read
 jobs:
