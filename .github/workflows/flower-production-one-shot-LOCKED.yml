@@ -28,7 +28,7 @@ jobs:
           test "$GITHUB_REPOSITORY" = antonovdpt-ai/PT-Child
           test "$GITHUB_REF" = refs/heads/release/flower-frontend-only-20261015
           git merge-base --is-ancestor ed6c103578cbfcabe19ab0077e8eeff1305d8b3d HEAD
-          test "$(git rev-parse HEAD:ops/release/flower-frontend-transaction.py)" = 0b96a3563cc0bd67a5937631514959a2316a432e
+          test "$(git rev-parse HEAD:ops/release/flower-frontend-transaction.py)" = 5b20126e846e5caf32218e45f15451dd751b22aa
           test "$(git rev-parse HEAD:ops/release/build-flower-release-package.py)" = cd45138cc00cdbd8f06d480569fc8f25277d77ec
           test "$(git rev-parse HEAD:ops/release/flower-prepare-remote-stage.py)" = 6384ffd7b7b6b47e747648fb7c2bdab1f8e49975
           test "$(git rev-parse HEAD:ops/release/flower-public-verify.py)" = 076e6c56f1bdc36fdc6e2c4d44c0b171912dc5ad
