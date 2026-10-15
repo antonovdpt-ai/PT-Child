@@ -150,14 +150,14 @@ def preflight(live,stage,names,base,head,files,mode):
             value=None
         else:
             value=checksum(read_regular(path)[0])
-        allowed=(before,) if mode=="activate" else (before,after)
+        allowed=(before,) if mode in ("activate","preflight") else (before,after)
         need(value in allowed,"UNEXPECTED_LIVE_STATE_STOP")
         states[name]=value
-        if mode=="activate":
+        if mode in ("activate","preflight"):
             # Empty new paths are not part of the backup.
             if name in NEW: need(value is None,"NEW_ASSET_ALREADY_PRESENT_STOP")
     for name in DEPLOY:
-        if mode=="activate":
+        if mode in ("activate","preflight"):
             need(checksum(read_regular(stage/name)[0])==head[name],"STAGED_HASH_STOP")
         if base[name] is not None:
             original=files[name]
@@ -219,11 +219,16 @@ def change(live,name,wanted,content,metadata,expected_state):
 def transact(mode,live,stage,backup,pins,manifest,inject_after=None):
     names,base,head=parse_pins(pins)
     live=checked_directory(live)
-    stage=checked_directory(stage) if mode=="activate" else Path(stage)
-    need(checked_directory(backup)!=live,"BACKUP_OVERLAP_STOP")
+    stage=checked_directory(stage) if mode in ("activate","preflight") else Path(stage)
+    backup_dir=checked_directory(backup)
+    need(backup_dir!=live and backup_dir not in live.parents and
+         live not in backup_dir.parents and backup_dir!=stage and
+         backup_dir not in stage.parents and stage not in backup_dir.parents,
+         "BACKUP_OR_STAGE_OVERLAP_STOP")
     if str(live)==PRODUCTION:
-        need(os.environ.get("FIZIRA_FRONTEND_RELEASE_APPROVAL")==
-             RELEASE_COMMIT+"::"+mode,"PRODUCTION_APPROVAL_REQUIRED_STOP")
+        if mode!="preflight":
+            need(os.environ.get("FIZIRA_FRONTEND_RELEASE_APPROVAL")==
+                 RELEASE_COMMIT+"::"+mode,"PRODUCTION_APPROVAL_REQUIRED_STOP")
         need(manifest==BACKUP_MANIFEST,"UNAPPROVED_BACKUP_PIN_STOP")
     files,original=validate_backup(backup,names,base,head,manifest)
     preflight(live,stage,names,base,head,files,mode)
@@ -252,7 +257,7 @@ def transact(mode,live,stage,backup,pins,manifest,inject_after=None):
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument("mode",choices=("activate","rollback"))
+    parser.add_argument("mode",choices=("preflight","activate","rollback"))
     parser.add_argument("--live",required=True)
     parser.add_argument("--stage",default=".")
     parser.add_argument("--backup",required=True)
