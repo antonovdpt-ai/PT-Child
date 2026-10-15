@@ -1,13 +1,8 @@
 name: Diagnose incomplete Flower 0.188 backup (read-only once)
 # No release, no writes on Timeweb, no patient data, no remote command injection.
-# Read-only investigation of last staged 0.188 scoped backup failure.
+# Final read-only backup audit registered. Automatic triggers disabled.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - fix/flower-navigation-20261015
-    paths:
-      - .github/workflows/flower-nav-backup-diagnostic.yml
 permissions:
   contents: read
 jobs:
