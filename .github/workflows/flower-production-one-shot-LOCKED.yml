@@ -1,8 +1,13 @@
 name: Fizira Flower nine-file production release (LOCKED DRAFT)
-# INACTIVE. Separate user authorization and a reviewed single-use activation
-# patch are mandatory. Never merge this workflow into main to bypass the lock.
+# One-shot operator-approved 2026-10-15: deploy exact pinned Flower UI only.
+# This branch-scoped push is the sole intended activation. Remove immediately.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-production-one-shot-LOCKED.yml
 permissions:
   contents: read
 concurrency:
@@ -11,7 +16,7 @@ concurrency:
 
 jobs:
   frontend-only:
-    if: ${{ false }}
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/release/flower-frontend-only-20261015' && github.event_name == 'push'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
