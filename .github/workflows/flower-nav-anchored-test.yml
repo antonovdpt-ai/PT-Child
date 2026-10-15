@@ -1,0 +1,21 @@
+name: Flower anchored atomic replacement isolated final test
+on:
+  push:
+    branches: [fix/flower-navigation-20261015]
+    paths: [.github/workflows/flower-nav-anchored-test.yml]
+permissions:
+  contents: read
+jobs:
+  four-file:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test atomic commit/rollback through traverse-only parent with pinned Git bytes
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ops/release/flower-nav-remote.py ops/release/test_flower_nav_anchored.py
+          python3 -m unittest discover -s ops/release -p 'test_flower_nav_anchored.py' -v
