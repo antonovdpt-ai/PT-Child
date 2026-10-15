@@ -230,7 +230,7 @@ test('folding keeps the current form DOM and stores only a layout preference', a
     assert.equal(content.querySelector('input').value,'Несохранённая запись');
     assert.equal(h.state.tab,'overview');
     const stored=Object.fromEntries(Array.from({length:h.window.localStorage.length},(_,i)=>{const key=h.window.localStorage.key(i);return [key,h.window.localStorage.getItem(key)];}));
-    assert.deepEqual(stored,{'fizira:flower-compact':'1'});
+    assert.deepEqual(stored,{'fizira:flower-compact-v2':'1'});
     h.render();
     assert.equal(h.document.querySelector('[data-flower-toggle]').getAttribute('aria-expanded'),'false');
     h.document.querySelector('[data-flower-toggle]').click();
