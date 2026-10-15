@@ -27,7 +27,7 @@ def check(ok,code):
 
 def sha(data):return hashlib.sha256(data).hexdigest()
 
-def stage_package(package,expected_digest,destination):
+def stage_package(package,expected_digest,destination,transaction_digest):
     os.umask(0o077)
     package=Path(package).absolute()
     dest=Path(destination).absolute()
@@ -92,11 +92,12 @@ def stage_package(package,expected_digest,destination):
           "HEAD_HASH_FORMAT_STOP")
     for n in DELTA:
         check(sha(items["stage/"+n])==head[n],"PINNED_STAGE_HASH_STOP")
+    check(re.fullmatch("[a-f0-9]{64}",transaction_digest) is not None and
+          sha(items["transaction.py"])==transaction_digest,
+          "TRANSACTION_PIN_MISMATCH_STOP")
     check(b"PRODUCTION_APPROVAL_REQUIRED_STOP" in items["transaction.py"]
           and RELEASE.encode() in items["transaction.py"]
           and BASE.encode() in items["transaction.py"],"TRANSACTION_SOURCE_STOP")
-    # Caller can optionally pin exact SHA-256 of the helper against Git.
-    # An unpinned transaction script must NEVER be trusted as production code.
     check(not dest.exists() and not dest.is_symlink(),
           "STAGE_EXISTS_STOP")
     dest.mkdir(mode=0o700)
@@ -122,9 +123,10 @@ def main():
     p.add_argument("--package",required=True)
     p.add_argument("--expected-sha256",required=True)
     p.add_argument("--destination",required=True)
+    p.add_argument("--transaction-sha256",required=True)
     a=p.parse_args()
     try:
-        stage_package(a.package,a.expected_sha256,a.destination)
+        stage_package(a.package,a.expected_sha256,a.destination,a.transaction_sha256)
     except (ValueError,KeyError,TypeError,OSError,tarfile.TarError):
         print("FLOWER_STAGE=STOP")
         raise SystemExit(1)
