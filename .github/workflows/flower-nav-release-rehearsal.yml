@@ -1,11 +1,8 @@
 name: Flower navigation four-file release rehearsal (OFFLINE one-time)
 # No remote credentials, Timeweb connection or production mutation.
+# Offline rehearsal registered; no further automatic runs.
 on:
-  push:
-    branches:
-      - fix/flower-navigation-20261015
-    paths:
-      - .github/workflows/flower-nav-release-rehearsal.yml
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
