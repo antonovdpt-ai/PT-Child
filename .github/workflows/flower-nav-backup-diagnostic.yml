@@ -1,8 +1,13 @@
 name: Diagnose incomplete Flower 0.188 backup (read-only once)
 # No release, no writes on Timeweb, no patient data, no remote command injection.
-# Diagnostic completed. Automatic triggers disabled.
+# Read-only investigation of last staged 0.188 scoped backup failure.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-backup-diagnostic.yml
 permissions:
   contents: read
 jobs:
@@ -34,7 +39,7 @@ jobs:
           from pathlib import Path
           import os,stat
           source=Path("/root/supabase-project/volumes/proxy/app")
-          backup=Path.home()/".cache"/"fizira-frontend-snapshots"/"flower-nav-38789920773"
+          backup=Path.home()/".cache"/"fizira-frontend-snapshots"/"flower-nav-38791116267"
           copies=backup/"files"
           print("BACKUP_EXISTS="+str(backup.is_dir()))
           print("BACKUP_COMPLETE="+str((backup/"complete").is_file()))
@@ -70,8 +75,13 @@ jobs:
           print("BACKUP_ROOT_EXISTS="+str(backups.is_dir()))
           print("BACKUP_ROOT_OWNED_BY_SSH="+str(backups.stat().st_uid==os.geteuid()))
           print("BACKUP_ROOT_WRITABLE="+str(os.access(backups,os.W_OK|os.X_OK)))
+          original=Path.home()/".cache"/"fizira-flower-nav"/"38791116267"/"original-four"
+          print("ORIGINAL_COPY_FOLDER_EXISTS="+str(original.is_dir()))
+          if original.is_dir():
+              print("ORIGINAL_COPY_FILES="+str(len([p for p in original.iterdir() if p.is_file()])))
+              print("ORIGINAL_FOLDER_WRITABLE="+str(os.access(original,os.W_OK|os.X_OK)))
           import importlib.util
-          tool=Path.home()/".cache"/"fizira-flower-nav"/"38789920773"/"frontend-snapshot.py"
+          tool=Path.home()/".cache"/"fizira-flower-nav"/"38791116267"/"frontend-snapshot.py"
           spec=importlib.util.spec_from_file_location("snapshot_diagnostic",tool)
           snap=importlib.util.module_from_spec(spec);spec.loader.exec_module(snap)
           try:
