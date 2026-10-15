@@ -1,0 +1,35 @@
+name: Flower navigation four-file release rehearsal (OFFLINE one-time)
+# No remote credentials, Timeweb connection or production mutation.
+on:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-release-rehearsal.yml
+permissions:
+  contents: read
+jobs:
+  safety-rehearsal:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify syntax and exact four-asset release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ops/release/flower-nav-build.py ops/release/flower-nav-remote.py ops/release/flower-nav-public.py ops/release/frontend-snapshot.py
+          export GITHUB_REPOSITORY=antonovdpt-ai/PT-Child
+          tmp="$(mktemp -d)"
+          python3 -B ops/release/flower-nav-build.py "$tmp/stage-package"
+          test "$(find "$tmp/stage-package/stage" -maxdepth 1 -type f | wc -l)" -eq 4
+      - name: Exercise complete snapshot and guarded 0.188 activation/rollback on fictional directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s ops/release -p 'test_flower_nav_release.py' -v 2>&1 | tee nav-tests.log
+          grep -Fq 'Ran 6 tests' nav-tests.log
+          grep -Fqx 'OK' nav-tests.log
