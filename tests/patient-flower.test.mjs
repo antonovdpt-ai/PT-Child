@@ -17,14 +17,16 @@ test('returning from another section retains the production report handler and u
 });
 
 
-test('mobile starts compact and uses its own presentation preference without changing desktop',()=>{
-  const saved=new Map([['fizira:flower-compact','0']]);
+test('mobile starts expanded, ignores the legacy forced compact preference, and persists only explicit folding',()=>{
+  const saved=new Map([['fizira:flower-compact','0'],['fizira:flower-mobile-compact','1']]);
   const view={matchMedia:q=>({matches:q==='(max-width:700px)'}),localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,v)}};
+  assert.equal(readFlowerCompact(view),false);
+  saveFlowerCompact(view,true);
   assert.equal(readFlowerCompact(view),true);
+  assert.equal(saved.get('fizira:flower-mobile-compact-v2'),'1');
   saveFlowerCompact(view,false);
   assert.equal(readFlowerCompact(view),false);
   assert.equal(saved.get('fizira:flower-compact'),'0');
-  assert.equal(saved.get('fizira:flower-mobile-compact'),'0');
   view.matchMedia=()=>({matches:false});assert.equal(readFlowerCompact(view),false);
 });
 
@@ -34,6 +36,8 @@ test('tapping the mobile patient cap expands the existing flower without replaci
     h.window.matchMedia=query=>({matches:query==='(max-width:700px)'||query==='(prefers-reduced-motion: reduce)'});
     h.render();
     const root=h.document.querySelector('.patient-flower'),panel=h.document.getElementById('tabContent');
+    assert.ok(!root.classList.contains('is-compact'),'Mobile flower should open expanded by default');
+    root.querySelector('[data-flower-toggle]').click();
     assert.ok(root.classList.contains('is-compact'));
     panel.innerHTML='<form><textarea>Несохранённая оценка</textarea></form>';
     const form=panel.querySelector('form'),field=form.querySelector('textarea');
@@ -42,7 +46,7 @@ test('tapping the mobile patient cap expands the existing flower without replaci
     assert.equal(h.document.querySelector('.patient-flower'),root);
     assert.equal(h.document.getElementById('tabContent'),panel);
     assert.equal(panel.querySelector('form'),form);assert.equal(field.value,'Несохранённая оценка');
-    assert.equal(h.window.localStorage.getItem('fizira:flower-mobile-compact'),'0');
+    assert.equal(h.window.localStorage.getItem('fizira:flower-mobile-compact-v2'),'0');
   } finally {await h.close();}
 });
 
@@ -177,7 +181,8 @@ test('patient navigation exposes seven petals linked to existing sections', asyn
       assert.equal(h.state.tab,key);
       assert.equal(h.document.querySelector('#tabContent').dataset.patientSection,key);
       assert.equal(h.document.querySelector('[aria-current="page"]').dataset.tab,key);
-      assert.equal(h.document.querySelector('[data-flower-toggle]').getAttribute('aria-expanded'),'false');
+      assert.equal(h.document.querySelector('[data-flower-toggle]').getAttribute('aria-expanded'),'true',
+        'Navigation must not collapse an expanded flower');
     }
   } finally {await h.close();}
 });
@@ -196,6 +201,23 @@ test('returning to overview updates saved facts while keeping the report editor 
     assert.match(overview.textContent,/Новая сохранённая цель/);
     assert.ok(h.document.querySelector('#parentReportEditor') === reportFields);
     assert.equal(h.document.querySelector('#parentReportEditor'),reportFields);
+  } finally {await h.close();}
+});
+
+test('explicit compact state is preserved across every section instead of being forced by navigation',async()=>{
+  const h=await flowerFixture();
+  try {
+    const root=h.document.querySelector('.patient-flower'),toggle=h.document.querySelector('[data-flower-toggle]');
+    toggle.click();
+    assert.ok(root.classList.contains('is-compact'));
+    for(const key of ['goals','assessment','sessions','progress','media','parent','overview']){
+      await h.document.querySelector(`[data-tab="${key}"]`).onclick();
+      assert.ok(root.classList.contains('is-compact'),`Manual compact choice lost at ${key}`);
+    }
+    toggle.click();
+    assert.ok(!root.classList.contains('is-compact'));
+    await h.document.querySelector('[data-tab="goals"]').onclick();
+    assert.ok(!root.classList.contains('is-compact'),'Switching tabs should not fold the flower');
   } finally {await h.close();}
 });
 
