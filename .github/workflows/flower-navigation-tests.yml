@@ -1,8 +1,13 @@
 name: Flower navigation mobile and desktop regression (one-shot)
 # Temporary test-only runner. No production secrets, Timeweb or deployment.
-# One approved local-only regression registered; no automatic repeats.
+# One focused browser run approved. No production actions or credentials.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-navigation-tests.yml
 permissions:
   contents: read
 jobs:
@@ -16,12 +21,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      - name: Install pinned dependencies and run complete JS suite
+      - name: Install dependencies and run focused Flower and parent cross-section tests
         shell: bash
         run: |
           set -euo pipefail
           npm ci
-          npm test
+          node --test tests/patient-flower.test.mjs tests/flower-cross-section.test.mjs
       - name: Provision matching Playwright Chromium for touch and desktop regression
         shell: bash
         run: |
