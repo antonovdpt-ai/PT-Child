@@ -1,8 +1,13 @@
 name: Flower frontend-only transaction local dry-run (one-time)
 # Fictional temporary directories only. No remote SSH and no production secrets.
-# Approved local test run registered; no automatic follow-up runs.
+# One additional approved local-only run for the strengthened gates.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-transaction-local-tests.yml
 
 permissions:
   contents: read
