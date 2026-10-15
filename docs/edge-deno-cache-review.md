@@ -2,7 +2,15 @@
 
 This branch is based on pinned release `ed6c103578cbfcabe19ab0077e8eeff1305d8b3d` and does **not** merge into `main`.
 
-## Status: prepared, not launched
+## Status: first CI run failed; fixed offline command is not yet run
+
+## Initial one-time CI result (2026-10-15)
+
+Run [38748772005](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38748772005) failed at its **offline command-line check**, after successfully downloading the JSR `@supabase/supabase-js@2.118.0` graph and 32 npm packages on the Linux runner. Exact error: `unexpected argument '--cached-only' found`. No archive was published; no PDF or Edge handler executed. The one-time branch-only `push` trigger was removed immediately afterward.
+
+The script was corrected to use Docker `--network none` plus `DENO_NO_REMOTE=1` for offline resolution, without the unsupported CLI flag. **This correction has not been CI-executed.** A second run requires a new, explicit approval and a fresh one-time trigger, followed by removal of that trigger.
+
+
 
 The workflow is `workflow_dispatch`-only and is **not** on the default branch. GitHub does not accept manual dispatch for this branch-only workflow. Consequently no CI job has been requested or executed by preparing these files. Do not merge to `main` just to make it runnable.
 
