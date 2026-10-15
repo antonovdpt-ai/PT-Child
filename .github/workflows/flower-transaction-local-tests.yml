@@ -27,5 +27,4 @@ jobs:
         run: |
           python3 -m unittest discover -s ops/release -p 'test_flower_frontend_transaction.py' -v 2>&1 | tee result.log
           grep -Eq 'Ran ([8-9]|[1-9][0-9]+) tests' result.log
-          grep -Eq '^OK
- result.log
+          grep -Fqx 'OK' result.log
