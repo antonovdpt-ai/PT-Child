@@ -1,8 +1,13 @@
 name: Flower navigation mobile and desktop regression (one-shot)
 # Temporary test-only runner. No production secrets, Timeweb or deployment.
-# The focused browser run is registered. Automatic reruns are disabled.
+# Focused browser verification after correcting Playwright Core CLI invocation.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-navigation-tests.yml
 permissions:
   contents: read
 jobs:
@@ -26,13 +31,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx --no-install playwright install --with-deps chromium
-          bin="$(find "$HOME/.cache/ms-playwright" -type f -name chrome -path '*/chrome-linux64/chrome' | head -n 1)"
+          node node_modules/playwright-core/cli.js install --with-deps chromium
+          bin="$(find "$HOME/.cache/ms-playwright" -type f -name chrome -path '*/chrome-linux64/chrome' -print -quit)"
           if [[ -z "$bin" ]]; then
             bin="$(find "$HOME/.cache/ms-playwright" -type f -name chrome-headless-shell | head -n 1)"
           fi
           test -n "$bin"
-          printf 'CHROMIUM_EXECUTABLE=%s\n' "$bin" }} "$GITHUB_ENV"
+          printf 'CHROMIUM_EXECUTABLE=%s\n' "$bin" >> "$GITHUB_ENV"
       - name: Full browser flower mobile touchscreen and desktop scenarios
         shell: bash
         run: |
