@@ -90,10 +90,11 @@ async function checkMobileCap(page){
     const work=document.querySelector('.patient-work-area').getBoundingClientRect();
     return {height:root.getBoundingClientRect().height,workGap:work.top-stage.bottom,overlaps,labelOverlaps,coveredLabels,petals,scroll:document.documentElement.scrollWidth,viewport:innerWidth};
   });
-  assert.ok(g.height<=140,JSON.stringify(g));assert.ok(g.workGap>=0&&g.workGap<=9,JSON.stringify(g));assert.ok(g.scroll<=g.viewport,JSON.stringify(g));assert.deepEqual(g.overlaps,[],`Round buttons must not intersect: ${JSON.stringify(g)}`);assert.deepEqual(g.labelOverlaps,[],`Compact labels must not intersect: ${JSON.stringify(g)}`);
+  assert.ok(g.height<=205,JSON.stringify(g));assert.ok(g.workGap>=44&&g.workGap<=80,JSON.stringify(g));assert.ok(g.scroll<=g.viewport,JSON.stringify(g));assert.deepEqual(g.overlaps,[],`Round buttons must not intersect: ${JSON.stringify(g)}`);assert.deepEqual(g.labelOverlaps,[],`Compact labels must not intersect: ${JSON.stringify(g)}`);
   assert.deepEqual(g.coveredLabels,[],`Another round button must not cover a label: ${JSON.stringify(g)}`);
   for(const p of g.petals){assert.ok(p.fits,JSON.stringify(p));assert.ok(p.width>=44&&p.height>=44,JSON.stringify(p));assert.ok(Math.abs(p.width-p.height)<.1,JSON.stringify(p));assert.equal(p.radius,'50%');assert.ok(p.taps.every(Boolean),JSON.stringify(p));assert.ok(p.circleGap>=1&&p.circleGap<=4,JSON.stringify(p));assert.equal(p.font,'10px');}
-  for(const selector of ['#aiAnalyzeBtn','.patient-secondary-actions','#deletePatientBtn','.flower-toolbar','.flower-footer'])assert.equal(await page.locator(selector).isVisible(),false,selector);
+  for(const selector of ['#aiAnalyzeBtn','.patient-secondary-actions','#deletePatientBtn','.flower-toolbar'])assert.equal(await page.locator(selector).isVisible(),false,selector);
+  assert.equal(await page.locator('.flower-footer [data-flower-toggle]').isVisible(),true,'Compact mobile view needs a visible expand control');
   return g;
 }
 
@@ -187,7 +188,9 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
       const page=await browser.newPage({viewport:{width,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'}),errors=[];page.on('pageerror',error=>errors.push(error.message));
       try{
         await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);await install(page,'normal',false);
-        assert.ok(await page.locator('.patient-flower').evaluate(el=>el.classList.contains('is-compact')),'Mobile must start compact');
+        assert.ok(await page.locator('.patient-flower').evaluate(el=>!el.classList.contains('is-compact')),'Mobile must open with the full flower');
+        assert.equal(await page.locator('[data-flower-toggle]').isVisible(),true);
+        await page.locator('[data-flower-toggle]').tap();
         const g=await checkMobileCap(page);evidence.push({width,state:'mobile-cap',...g});
         const folder=process.env.FLOWER_SCREENSHOT_DIR;if(folder)await mkdir(folder,{recursive:true});
         if(folder&&[375,390].includes(width))await page.screenshot({path:`${folder}/flower-mobile-compact-${width===390?'new-390':'375'}.png`});
@@ -251,6 +254,8 @@ test('real patient renderer: responsive flower, navigation, keyboard, reports an
         await toggleFlower(page);await page.waitForTimeout(300);
       }
       await page.locator('[data-tab="goals"]').click();await page.locator('#goalFormToggle').waitFor();
+      assert.equal(await page.locator('[data-flower-toggle]').getAttribute('aria-expanded'),'true','Changing a petal must not collapse the flower');
+      await toggleFlower(page);
       await page.locator('[data-flower-toggle][aria-expanded="false"]').waitFor({state:'attached'});
       // CSS transitions finish before layout assertions; this is a bounded browser wait.
       await page.waitForTimeout(300);
