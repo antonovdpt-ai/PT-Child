@@ -1,0 +1,54 @@
+name: Flower 0.188 deployment contract offline check (once)
+# NO SSH, NO Timeweb credentials, NO production writes.
+on:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-contract-review.yml
+permissions:
+  contents: read
+jobs:
+  offline-review:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Validate production YAML and every shell step without executing them
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruby -r yaml -r open3 -e '
+            d=YAML.load_file(ARGV.fetch(0))
+            raise "JOB_MISSING" unless d.fetch("jobs").key?("publish-nav")
+            steps=d.fetch("jobs").fetch("publish-nav").fetch("steps")
+            raise "JOB_NOT_HARD_LOCKED" unless d.fetch("jobs").fetch("publish-nav").fetch("if") == "${{ false }}"
+            runs=steps.filter_map {|step| step["run"]}
+            raise "TOO_FEW_STEPS" if runs.length < 8
+            runs.each_with_index do |script,i|
+              _out,err,status=Open3.capture3("bash","-n",stdin_data:script)
+              raise "SHELL_SYNTAX_#{i}: #{err}" unless status.success?
+            end
+            puts "LOCKED_YAML=PASS"
+            puts "SHELL_BLOCKS=#{runs.length}"
+          ' .github/workflows/flower-nav-production-LOCKED.yml
+      - name: Verify exact approved bytes, source pins and four-file-only delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          python3 -B ops/release/flower-nav-build.py "$tmp/package"
+          test "$(find "$tmp/package/stage" -type f | wc -l)" -eq 4
+          for file in app.js patient-flower.css patient-flower.mjs index.html; do
+            test -f "$tmp/package/stage/$file"
+          done
+      - name: Rehearse backup and rollback on fake exact Git file bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s ops/release -p 'test_flower_nav_release.py' -v 2>&1 | tee test-nav.log
+          grep -Fq 'Ran 6 tests' test-nav.log
+          grep -Fqx 'OK' test-nav.log
