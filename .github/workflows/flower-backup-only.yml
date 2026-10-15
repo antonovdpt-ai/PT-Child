@@ -1,13 +1,8 @@
 name: Fizira Flower snapshot-only backup (one-time)
 
-# Approved once: create and verify one private frontend snapshot on Timeweb.
-# Remove the branch-only push trigger immediately after the run registers.
+# One-time backup run registered; no automatic runs are enabled.
 on:
-  push:
-    branches:
-      - release/flower-frontend-only-20261015
-    paths:
-      - .github/workflows/flower-backup-only.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
