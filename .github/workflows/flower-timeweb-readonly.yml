@@ -1,0 +1,60 @@
+name: Fizira Flower read-only Timeweb audit (one-time)
+
+# Operator-approved one-time branch-only audit.
+# Remove this push trigger immediately after the run is registered.
+on:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-timeweb-readonly.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+
+jobs:
+  source-audit:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/release/flower-frontend-only-20261015'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout pinned release branch without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure existing restricted SSH identity on ephemeral runner
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY"
+          test -n "$KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Compare 21 allowed server files and cache-busted public files, read-only
+        shell: bash
+        env:
+          TIMEWEB_HOST: ${{ secrets.TIMEWEB_HOST }
+          TIMEWEB_PORT: ${{ secrets.TIMEWEB_PORT }
+          TIMEWEB_USER: ${{ secrets.TIMEWEB_USER }
+        run: |
+          set -euo pipefail
+          python3 -B ops/release/flower-readonly-ci-audit.py
+
+      - name: Remove temporary SSH identity
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
