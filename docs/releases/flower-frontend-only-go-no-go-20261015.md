@@ -91,11 +91,20 @@
 - **Unproved production-specific details:** Timeweb private-stage upload and transaction execution, web server/cache propagation, atomic rename on the actual Timeweb filesystem, and live guarded rollback. Reconfirm exact base on Timeweb immediately before any activation; STOP on a hash mismatch. A manual mobile/desktop interactive smoke test remains necessary after the release.
 - Activation must be deliberately separate: pin the current reviewed release branch commit and secrets, replace the hard lock only after user permission, enable an exact one-time branch-only trigger, observe/record its run, immediately disable future triggering and reconcile the final public/rollback evidence.
 
+## First user-approved production attempt — stopped safely (2026-10-15)
+
+- Real deployment run [38783386976](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38783386976) failed **before activation**: pinned 9-file source package `PASS`; cache-busted public 18-file baseline SHA `PASS`; private Timeweb bundle staging and package validation `FLOWER_STAGE=PASS`.
+- Read-only server preflight crashed with `AttributeError: 'str' object has no attribute 'lstat'`. The CLI entrypoint provided the `--pins` filename as a string, whereas `read_regular` expected `Path`. The activation step, public head verification and rollback steps were all **skipped**. Consequently the **served production files were not changed** by this run. The private staged bundle associated with the failed run remains outside the web root.
+- The one-shot deployment push trigger and job enablement were removed immediately after the run was registered; the workflow is hard-locked again and `main` unchanged.
+- Fix: `read_regular` now normalizes its input with `Path(path)`. The locked production workflow's immutable Git blob pin for the helper was updated to `5b20126e846e5caf32218e45f15451dd751b22aa`; the nine Flower asset source blob hashes, baseline and backup pin **did not change**.
+- Two regression tests invoke the actual Python CLI with STRING file arguments, covering preflight/activate/rollback and tampered stage refusal, rather than calling the Python function directly. Offline CI [38783788930](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38783788930) completed `LOCKED_WORKFLOW_YAML=PASS`, source package re-hash `PASS`, stage hard-lock/manifest tests **6/6 PASS**, frontend tests **14/14 PASS**.
+- **No second production deploy was triggered.** The locally corrected helper has NOT yet run on Timeweb, and the known-state guarded rollback on real Timeweb remains untested. Before another production attempt, obtain a **new explicit approval** for another one-shot deployment run and revalidate current public/disk base. Do not label release `0.187` as live before 21/21 post-deploy public hashes pass.
+
 ## Current state
 
 - Frontend source selection / allowlist: REVIEWED FROM GITHUB.
 - Today's production frontend source parity (21 disk entries, 18 public GETs): **PASS via run 38757356071**.
 - Server backup for this release: **TAR_V2 CREATED/VERIFIED** via Actions [38763866489](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38763866489); isolated restoration rehearsal **PASS via run 38776158045**; production rollback **NOT TESTED**. The historical owner-preserving file-tree snapshot format is not used.
 - Frontend transaction/package and **HARD-LOCKED** one-shot workflow: **PREPARED + 18/18 OFFLINE CHECKS PASS**, still **NOT PRODUCTION-EXECUTED**.
-- Permission to publish: **NOT GRANTED**.
-- **GO/NO-GO: NO-GO until the concrete frontend-only gates pass and separate release approval is granted.**
+- Production publication permission was granted for one attempt; first attempt is **CLOSED FAILED BEFORE ACTIVATION**. A **new** single-run authorization is needed.
+- **GO/NO-GO: NO-GO. First approved attempt stopped in preflight before any frontend mutation; offline CLI fix now passes 14 tests, but another explicit release attempt approval is pending.**
