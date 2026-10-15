@@ -24,7 +24,7 @@ const petalContours = {
 };
 const mobileArc = [-60,-40,-20,0,20,40,60].map(angle=>{const radians=angle*Math.PI/180;return [Math.sin(radians).toFixed(4),Math.cos(radians).toFixed(4)];});
 const mobileFlower = view => view.matchMedia?.('(max-width:700px)').matches === true;
-const compactPreference = view => mobileFlower(view) ? 'fizira:flower-mobile-compact-v2' : 'fizira:flower-compact';
+const compactPreference = view => mobileFlower(view) ? 'fizira:flower-mobile-compact-v2' : 'fizira:flower-compact-v2';
 
 // Layout preference only. Mobile now opens expanded by default; explicit folding persists per device.
 export function readFlowerCompact(view) {
