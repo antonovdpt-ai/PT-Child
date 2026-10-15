@@ -37,10 +37,20 @@
 - New VPS/staging server or paid infrastructure.
 - `main` merge, SQL migration replay, backend or service restarts.
 
+## Fresh production audit — 2026-10-15
+
+- **PASS**: [read-only GitHub Actions run 38757356071](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38757356071) on commit `75cc202d144b4c5eada6fcd7707fe891fa3fee51`.
+- SSH compared only the allowlisted **21 static frontend files** on the actual Timeweb app directory: six existing files matched the reviewed base, 12 were identical in base/head, and three new Flower assets were absent as expected.
+- Cache-busted public GET SHA-256 matched the Timeweb filesystem SHA-256 for **18/18 existing assets**, including `index.html`.
+- Reported free space exceeded 512 MiB (threshold only, not a complete backup capacity guarantee).
+- Exact runner report: `RESULT=BASELINE_READY_FOR_BACKUP`. No production modifications, no Auth/SQL/Edge queries. GitHub Secrets used solely to authenticate the read-only SSH session.
+- The temporary branch-only automatic `push` trigger has been removed. No further audit runs are scheduled.
+- This audit establishes current frontend byte parity only, **not** a server rollback snapshot, dynamic browser function or backend/PDF behavior.
+
 ## Current state
 
 - Frontend source selection / allowlist: REVIEWED FROM GITHUB.
-- Today's actual production source parity and disk snapshot: **NOT VERIFIED**.
+- Today's production frontend source parity (21 disk entries, 18 public GETs): **PASS via run 38757356071**.
 - Server backup for this release: **NOT CREATED/VERIFIED**.
 - Separate safe frontend-only deploy method: **NOT IMPLEMENTED OR REVIEWED**.
 - Permission to publish: **NOT GRANTED**.
