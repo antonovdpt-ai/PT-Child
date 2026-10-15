@@ -1,8 +1,13 @@
 name: Diagnose incomplete Flower 0.188 backup (read-only once)
 # No release, no writes on Timeweb, no patient data, no remote command injection.
-# Read-only audit registered, no subsequent automatic checks.
+# Second read-only audit checks backup root write access and safe inventory only.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/flower-navigation-20261015
+    paths:
+      - .github/workflows/flower-nav-backup-diagnostic.yml
 permissions:
   contents: read
 jobs:
@@ -66,6 +71,26 @@ jobs:
           print("SOURCE_FOREIGN_DIRS="+str(foreign_dirs))
           print("SOURCE_NONREGULAR="+str(nonregular))
           print("SOURCE_SYMLINKS="+str(symlinks))
+          backups=Path.home()/".cache"/"fizira-frontend-snapshots"
+          print("BACKUP_ROOT_EXISTS="+str(backups.is_dir()))
+          print("BACKUP_ROOT_OWNED_BY_SSH="+str(backups.stat().st_uid==os.geteuid()))
+          print("BACKUP_ROOT_WRITABLE="+str(os.access(backups,os.W_OK|os.X_OK)))
+          import importlib.util
+          tool=Path.home()/".cache"/"fizira-flower-nav"/"38789920773"/"frontend-snapshot.py"
+          spec=importlib.util.spec_from_file_location("snapshot_diagnostic",tool)
+          snap=importlib.util.module_from_spec(spec);spec.loader.exec_module(snap)
+          try:
+              files,dirs=snap.inventory(source)
+              print("SNAPSHOT_INVENTORY=PASS")
+              print("INVENTORY_FILES="+str(len(files)))
+              try:
+                  meta=snap.directory_metadata(source,dirs)
+                  print("SNAPSHOT_DIR_METADATA=PASS")
+              except Exception as err:
+                  print("SNAPSHOT_DIR_METADATA_STOP="+type(err).__name__)
+          except Exception as err:
+              print("SNAPSHOT_INVENTORY_STOP="+type(err).__name__)
+              print("SNAPSHOT_INVENTORY_ERRNO="+str(getattr(err,"errno","NONE")))
           PY
       - name: Forget runner SSH identity
         if: ${{ always() }}
