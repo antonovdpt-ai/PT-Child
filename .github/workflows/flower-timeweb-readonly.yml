@@ -1,13 +1,9 @@
 name: Fizira Flower read-only Timeweb audit (one-time)
 
-# Operator-approved one-time branch-only audit.
-# Remove this push trigger immediately after the run is registered.
+# One-time audit dispatched; automatic push trigger disabled.
+# Any further execution requires separate authorization.
 on:
-  push:
-    branches:
-      - release/flower-frontend-only-20261015
-    paths:
-      - .github/workflows/flower-timeweb-readonly.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
