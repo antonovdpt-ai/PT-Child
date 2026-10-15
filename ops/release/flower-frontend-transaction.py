@@ -40,6 +40,7 @@ def checked_directory(path):
     return p
 
 def read_regular(path,max_size=64*1024*1024):
+    path=Path(path)
     info=path.lstat()
     need(stat.S_ISREG(info.st_mode) and info.st_size<=max_size,"REGULAR_FILE_STOP")
     fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
