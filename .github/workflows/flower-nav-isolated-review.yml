@@ -1,0 +1,59 @@
+name: Flower 0.188 isolated backup and rollback rehearsal
+on:
+  push:
+    branches: [fix/flower-navigation-20261015]
+    paths: [.github/workflows/flower-nav-isolated-review.yml]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run full snapshot, four-file activation, rollback on fictional filesystem
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ops/release/flower-nav-update.py ops/release/flower-nav-public-audit.py
+          python3 - <<'PY'
+          import pathlib,tempfile,subprocess,hashlib,importlib.util,json,os
+          src=pathlib.Path("ops/release/frontend-snapshot.py")
+          spec=importlib.util.spec_from_file_location("snap",src)
+          snap=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(snap)
+          repo=pathlib.Path.cwd()
+          base="ed6c103578cbfcabe19ab0077e8eeff1305d8b3d"
+          ui="842d262a75cbcfc62b6e4857cef2e0ce6a5d3f81"
+          changed=("app.js","patient-flower.mjs","patient-flower.css","index.html")
+          def git(c,n):return subprocess.check_output(["git","show",c+":"+n])
+          def sha(b):return hashlib.sha256(b).hexdigest()
+          names=git(base,"ops/release/frontend-assets.txt").decode().splitlines()
+          old={n:sha(git(base,n)) for n in names}
+          new={n:sha(git(ui,n)) for n in names}
+          assert set(changed)=={n for n in names if old[n]!=new[n]}
+          with tempfile.TemporaryDirectory() as t:
+            root=pathlib.Path(t);live=root/"live";stage=root/"stage";backup=root/"backup"
+            live.mkdir();stage.mkdir()
+            for name in names:
+              (live/name).write_bytes(git(base,name))
+              (live/name).chmod(0o644)
+            for name in changed:
+              (stage/name).write_bytes(git(ui,name))
+              (stage/name).chmod(0o644)
+            (live/"unrelated.txt").write_text("MUST REMAIN")
+            saved=snap.create(live,stage,backup,list(changed))
+            assert saved["snapshot"]=="FRONTEND_SNAPSHOT_VERIFIED"
+            assert saved["files"]==22
+            assert snap.verify(backup,list(changed),saved["manifestSha256"])["snapshot"]=="FRONTEND_SNAPSHOT_VERIFIED"
+            assert snap.mutate("activate",live,stage,backup,list(changed))["changedFiles"]==4
+            assert all(sha((live/n).read_bytes())==new[n] for n in names)
+            assert snap.mutate("rollback",live,stage,backup,list(changed))["changedFiles"]==4
+            assert all(sha((live/n).read_bytes())==old[n] for n in names)
+            assert (live/"unrelated.txt").read_text()=="MUST REMAIN"
+            print("FOUR_FILE_SNAPSHOT_ACTIVATE_ROLLBACK=PASS")
+            print("UNRELATED_FRONTEND_BYTES=UNCHANGED")
+          PY
