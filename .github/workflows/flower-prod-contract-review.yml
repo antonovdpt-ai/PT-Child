@@ -1,8 +1,13 @@
 name: Fizira locked production workflow offline review (once)
 # CI checks only. No Timeweb secrets, ssh/scp, production writes or deployment.
-# Offline review completed. No automatic runs remain enabled.
+# One permitted local-only regression after CLI bug: no Timeweb access.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-prod-contract-review.yml
 permissions:
   contents: read
 jobs:
@@ -34,5 +39,5 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s ops/release -p 'test_flower_frontend_transaction.py' -v 2>&1 | tee transaction-review-tests.log
-          grep -Fq 'Ran 12 tests' transaction-review-tests.log
+          grep -Fq 'Ran 14 tests' transaction-review-tests.log
           grep -Fqx 'OK' transaction-review-tests.log
