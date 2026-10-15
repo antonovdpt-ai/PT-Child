@@ -1,0 +1,37 @@
+name: Fizira Flower nine-file package preparation (no production)
+# Public source artifact only; no SSH secrets, no deploy, no backend.
+on:
+  push:
+    branches:
+      - release/flower-frontend-only-20261015
+    paths:
+      - .github/workflows/flower-prepare-package.yml
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare immutable 9-file release bundle
+        run: |
+          set -euo pipefail
+          python3 -B ops/release/build-flower-release-package.py
+      - name: Check expected artifact layout
+        run: |
+          set -euo pipefail
+          test "$(find "$RUNNER_TEMP" -maxdepth 1 -name 'flower-release-*.tar.gz' -type f | wc -l)" -eq 1
+          test "$(find "$RUNNER_TEMP" -maxdepth 1 -name 'flower-release-*.tar.gz.sha256' -type f | wc -l)" -eq 1
+      - name: Retain reviewable public-source-only package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: flower-ui-pinned-package-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/flower-release-*.tar.gz
+            ${{ runner.temp }}/flower-release-*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
