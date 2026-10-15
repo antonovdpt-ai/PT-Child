@@ -1,0 +1,138 @@
+name: Fizira 0.188 Flower navigation only (LOCKED)
+# Explicit user approval for ONE 4-file production publish, with fresh full backup.
+# This workflow remains HARD-LOCKED until the offline workflow review passes.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+jobs:
+  publish-nav:
+    if: ${{ false }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate, without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check fixed Git source blobs and prepare only four assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "antonovdpt-ai/PT-Child"
+          test "$GITHUB_REF" = "refs/heads/fix/flower-navigation-20261015"
+          git merge-base --is-ancestor ed6c103578cbfcabe19ab0077e8eeff1305d8b3d HEAD
+          test "$(git rev-parse HEAD:app.js)" = "2250649b39cef060b7cf84b190cc864f094419d7"
+          test "$(git rev-parse HEAD:index.html)" = "81b3b62fa34b28b1c80e6052f6dd4affce741170"
+          test "$(git rev-parse HEAD:patient-flower.css)" = "28371d13895e1e5f2c1f6e751859ed6fab3a899d"
+          test "$(git rev-parse HEAD:patient-flower.mjs)" = "4ece311551e4b8d8d2f68c86d9ea6267a1fb5aaa"
+          python3 -m py_compile ops/release/flower-nav-build.py ops/release/flower-nav-remote.py ops/release/flower-nav-public.py ops/release/frontend-snapshot.py
+          python3 -B ops/release/flower-nav-build.py "$RUNNER_TEMP/nav-$GITHUB_RUN_ID"
+          test "$(find "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/stage" -maxdepth 1 -type f | wc -l)" -eq 4
+
+      - name: Independently verify 21 existing public assets are exactly 0.187
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B ops/release/flower-nav-public.py --pins "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/pins.json" --state base
+
+      - name: Configure private strictly pinned SSH
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Create PRIVATE Timeweb staging and transfer four files only
+        id: stage
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]{1,30}$ ]]
+          [[ "$PORT" =~ ^[0-9]{1,5}$ ]]
+          test -n "$HOST" && test -n "$USER"
+          remote="$USER@$HOST"
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$remote" \
+            "set -eu; umask 077; test -d .cache && test ! -L .cache; if test ! -e .cache/fizira-flower-nav; then mkdir -m 700 .cache/fizira-flower-nav; fi; test -d .cache/fizira-flower-nav && test ! -L .cache/fizira-flower-nav; if test ! -e .cache/fizira-frontend-snapshots; then mkdir -m 700 .cache/fizira-frontend-snapshots; fi; test -d .cache/fizira-frontend-snapshots && test ! -L .cache/fizira-frontend-snapshots; test ! -e .cache/fizira-flower-nav/$GITHUB_RUN_ID; test ! -e .cache/fizira-frontend-snapshots/flower-nav-$GITHUB_RUN_ID; mkdir -m 700 .cache/fizira-flower-nav/$GITHUB_RUN_ID; mkdir -m 700 .cache/fizira-flower-nav/$GITHUB_RUN_ID/stage"
+          scp -P "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            ops/release/flower-nav-remote.py ops/release/frontend-snapshot.py "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/pins.json" \
+            "$remote:.cache/fizira-flower-nav/$GITHUB_RUN_ID/"
+          scp -P "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/stage/app.js" "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/stage/patient-flower.css" \
+            "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/stage/patient-flower.mjs" "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/stage/index.html" \
+            "$remote:.cache/fizira-flower-nav/$GITHUB_RUN_ID/stage/"
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$remote" \
+            "set -eu; chmod 644 .cache/fizira-flower-nav/$GITHUB_RUN_ID/stage/app.js .cache/fizira-flower-nav/$GITHUB_RUN_ID/stage/patient-flower.css .cache/fizira-flower-nav/$GITHUB_RUN_ID/stage/patient-flower.mjs .cache/fizira-flower-nav/$GITHUB_RUN_ID/stage/index.html; python3 -B .cache/fizira-flower-nav/$GITHUB_RUN_ID/flower-nav-remote.py preflight --job-id $GITHUB_RUN_ID"
+
+      - name: Create and independently verify a fresh FULL frontend backup, before mutation
+        id: backup
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          result="$(ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" \
+            "python3 -B .cache/fizira-flower-nav/$GITHUB_RUN_ID/flower-nav-remote.py backup --job-id $GITHUB_RUN_ID")"
+          printf '%s\n' "$result"
+          manifest="$(printf '%s\n' "$result" | python3 -c 'import json,sys,re; data=json.load(sys.stdin); assert data["NAV_BACKUP"]=="PASS" and data["files"]>=21; assert re.fullmatch("[a-f0-9]{64}",data["manifestSha256"]); print(data["manifestSha256"])')"
+          printf 'manifest=%s\n' "$manifest" >> "$GITHUB_OUTPUT"
+
+      - name: Atomically publish only four reviewed UI files, index.html last
+        id: activate
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+          MANIFEST: ${{ steps.backup.outputs.manifest }}
+        run: |
+          set -euo pipefail
+          test -n "$MANIFEST"
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" \
+            "FIZIRA_NAV_RELEASE_APPROVAL='0.188-flower-nav::activate' python3 -B .cache/fizira-flower-nav/$GITHUB_RUN_ID/flower-nav-remote.py activate --job-id $GITHUB_RUN_ID --manifest-sha256 '$MANIFEST'"
+
+      - name: Verify 21 public HTTPS asset hashes match the new 0.188 release
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B ops/release/flower-nav-public.py --pins "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/pins.json" --state head
+
+      - name: Attempt guarded full-snapshot rollback only after failed activation or public verification
+        if: ${{ failure() && (steps.activate.outcome == 'failure' || steps.verify.outcome == 'failure') }}
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+          MANIFEST: ${{ steps.backup.outputs.manifest }}
+        run: |
+          set -euo pipefail
+          test -n "$MANIFEST"
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" \
+            "FIZIRA_NAV_RELEASE_APPROVAL='0.188-flower-nav::rollback' python3 -B .cache/fizira-flower-nav/$GITHUB_RUN_ID/flower-nav-remote.py rollback --job-id $GITHUB_RUN_ID --manifest-sha256 '$MANIFEST'"
+          python3 -B ops/release/flower-nav-public.py --pins "$RUNNER_TEMP/nav-$GITHUB_RUN_ID/pins.json" --state base
+
+      - name: Remove temporary runner credentials
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -f "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
