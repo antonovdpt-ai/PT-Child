@@ -1,10 +1,7 @@
 name: Flower owner metadata preflight (one-time)
+# One-time metadata audit registered; no further push triggers.
 on:
-  push:
-    branches:
-      - release/flower-frontend-only-20261015
-    paths:
-      - .github/workflows/flower-owner-preflight.yml
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
