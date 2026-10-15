@@ -1,0 +1,74 @@
+name: Flower current production state READ ONLY
+on:
+  push:
+    branches: [fix/flower-navigation-20261015]
+    paths: [.github/workflows/flower-nav-state-readonly.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify all 21 public assets without mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,subprocess,urllib.request,time
+          base="ed6c103578cbfcabe19ab0077e8eeff1305d8b3d"; head="842d262a75cbcfc62b6e4857cef2e0ce6a5d3f81"
+          names=subprocess.check_output(["git","show",base+":ops/release/frontend-assets.txt"]).decode().splitlines()
+          expected=lambda ref,n:hashlib.sha256(subprocess.check_output(["git","show",ref+":"+n])).hexdigest()
+          for n in names:
+              try:
+                  url="https://app.fizira.com"+("/" if n=="index.html" else "/"+n)+"?nav-audit="+str(time.time_ns())
+                  with urllib.request.urlopen(url,timeout=15) as r:
+                      assert r.status==200 and r.geturl()==url
+                      digest=hashlib.sha256(r.read(64*1024*1024+1)).hexdigest()
+                  state="BASE" if digest==expected(base,n) else "HEAD" if digest==expected(head,n) else "UNKNOWN"
+              except Exception:state="UNAVAILABLE"
+              print("PUBLIC",n,state,flush=True)
+          PY
+      - name: Setup pinned SSH known host
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+      - name: Inspect only four current disk hashes, metadata and backup completion
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" "python3 -B -" <<'PY'
+          import hashlib,os,pathlib,stat
+          live=pathlib.Path("/root/supabase-project/volumes/proxy/app")
+          print("DISK_ROOT_WRITABLE",os.access(live,os.W_OK|os.X_OK))
+          print("SSH_UID",os.geteuid())
+          for name in ("app.js","patient-flower.mjs","patient-flower.css","index.html"):
+              p=live/name
+              try:
+                  m=p.lstat()
+                  print("DISK",name,"SHA256",hashlib.sha256(p.read_bytes()).hexdigest(),"OWNED",m.st_uid==os.geteuid(),"MODE",oct(stat.S_IMODE(m.st_mode)))
+              except Exception as e:print("DISK",name,type(e).__name__)
+          for job in ("38789920773","38791116267","38792024482"):
+              p=pathlib.Path.home()/".cache"/"fizira-frontend-snapshots"/("flower-nav-"+job)
+              print("BACKUP",job,"EXISTS",p.is_dir(),"COMPLETE",(p/"complete").is_file())
+          PY
+      - name: Forget runner SSH material
+        if: ${{ always() }}
+        run: rm -f "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
