@@ -80,7 +80,7 @@ jobs:
           ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$remote" \
             "set -eu; chmod 644 .cache/fizira-flower-nav/$GITHUB_RUN_ID/stage/app.js .cache/fizira-flower-nav/$GITHUB_RUN_ID/stage/patient-flower.css .cache/fizira-flower-nav/$GITHUB_RUN_ID/stage/patient-flower.mjs .cache/fizira-flower-nav/$GITHUB_RUN_ID/stage/index.html; python3 -B .cache/fizira-flower-nav/$GITHUB_RUN_ID/flower-nav-remote.py preflight --job-id $GITHUB_RUN_ID"
 
-      - name: Create and independently verify a fresh FULL frontend backup, before mutation
+      - name: Create and verify a fresh backup of exactly four replaceable files
         id: backup
         shell: bash
         env:
@@ -92,7 +92,7 @@ jobs:
           result="$(ssh -T -p "$PORT" -i "$HOME/.ssh/id_ed25519" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes "$USER@$HOST" \
             "python3 -B .cache/fizira-flower-nav/$GITHUB_RUN_ID/flower-nav-remote.py backup --job-id $GITHUB_RUN_ID")"
           printf '%s\n' "$result"
-          manifest="$(printf '%s\n' "$result" | python3 -c 'import json,sys,re; data=json.load(sys.stdin); assert data["NAV_BACKUP"]=="PASS" and data["files"]>=21; assert re.fullmatch("[a-f0-9]{64}",data["manifestSha256"]); print(data["manifestSha256"])')"
+          manifest="$(printf '%s\n' "$result" | python3 -c 'import json,sys,re; data=json.load(sys.stdin); assert data["NAV_BACKUP"]=="PASS" and data["files"]==4 and data["scope"]=="EXACT_FOUR_REPLACED_FILES" and data["diskAssetsVerified"]==21; assert re.fullmatch("[a-f0-9]{64}",data["manifestSha256"]); print(data["manifestSha256"])')"
           printf 'manifest=%s\n' "$manifest" >> "$GITHUB_OUTPUT"
 
       - name: Atomically publish only four reviewed UI files, index.html last
