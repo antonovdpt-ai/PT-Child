@@ -1,8 +1,13 @@
 name: Fizira Edge Deno public cache (staged)
-# Staged for a future separately approved run; no push/PR/scheduled triggers.
-# Runtime source bytes stay pinned to ed6c103.
+# Approved second one-time push; remove trigger after the run.
+# Runtime source bytes remain pinned to ed6c103.
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - ci/edge-deno-cache-20261015
+    paths:
+      - .github/workflows/edge-deno-cache.yml
 
 permissions:
   contents: read
