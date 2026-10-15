@@ -1,8 +1,7 @@
 name: Flower anchored atomic replacement isolated final test
+# One rehearsal registered, no automatic reruns.
 on:
-  push:
-    branches: [fix/flower-navigation-20261015]
-    paths: [.github/workflows/flower-nav-anchored-test.yml]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
