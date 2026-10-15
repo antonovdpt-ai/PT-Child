@@ -1,11 +1,8 @@
 name: Flower navigation mobile and desktop regression (one-shot)
 # Temporary test-only runner. No production secrets, Timeweb or deployment.
+# One approved local-only regression registered; no automatic repeats.
 on:
-  push:
-    branches:
-      - fix/flower-navigation-20261015
-    paths:
-      - .github/workflows/flower-navigation-tests.yml
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
