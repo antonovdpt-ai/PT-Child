@@ -47,11 +47,22 @@
 - The temporary branch-only automatic `push` trigger has been removed. No further audit runs are scheduled.
 - This audit establishes current frontend byte parity only, **not** a server rollback snapshot, dynamic browser function or backend/PDF behavior.
 
+## Backup-only on Timeweb — 2026-10-15
+
+- First attempt [38762549644](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38762549644) failed with `PermissionError` before the backup root existed. Read-only diagnostics: SSH UID 1001; frontend 92 readable regular files and 27 directories, zero unreadable entries or links; 42 files owned by another UID/GID. No incomplete directory was left by that attempt.
+- Approved retry [38763866489](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38763866489) **PASS**. The source audit repeated immediately before copy: `PUBLIC_BYTES_MATCH_DISK 18`, `RESULT=BASELINE_READY_FOR_BACKUP`.
+- Private on-server directory: `~/.cache/fizira-frontend-snapshots/flower-ui-38763866489`. Contains `frontend.tar.gz`, `snapshot.json`, `before.tsv`, `release.tsv`, `manifest.sha256`, `complete`. Directory mode 0700, archive created with mode-limiting umask. No archive contents copied to GitHub Actions.
+- TAR_V2 stores **all 92 files and 27 directories**, source total **5,823,129 bytes**, plus original numeric owners, modes and mtimes in headers and manifest. The archive was re-read and its file bytes + metadata checked against the live inventory; the live tree was re-inspected unchanged before marking the backup complete. This avoids privileged `chown` on the Timeweb SSH user.
+- **Off-server manifest SHA-256:** `e18171381a5452860741fbe6578586aa6ceea0d33c7cac54ac3c5f56f5925346`. Preserve this value during any later restore review.
+- Runner confirms `FRONTEND_BACKUP=PASS`, `PRODUCTION_SOURCE_UNCHANGED=YES`, `DATABASE_EDGE_STORAGE_UNTOUCHED=YES`, `RESTORE_NOT_TESTED=YES`.
+- **Compatibility warning:** this TAR_V2 backup is not the `frontend-snapshot.py` file-tree v1 format; existing `activate-frontend.sh rollback` does **not** accept it. Before release, review/test a dedicated guarded TAR_V2 restore into a private temporary directory and a publish/rollback workflow; do not claim rollback readiness yet.
+- One-time branch-only `push` triggers were disabled after registration; no scheduled retries.
+
 ## Current state
 
 - Frontend source selection / allowlist: REVIEWED FROM GITHUB.
 - Today's production frontend source parity (21 disk entries, 18 public GETs): **PASS via run 38757356071**.
-- Server backup for this release: **NOT CREATED/VERIFIED**.
+- Server backup for this release: **TAR_V2 CREATED/VERIFIED** via Actions [38763866489](https://github.com/antonovdpt-ai/PT-Child/actions/runs/38763866489); restoration rehearsal **NOT TESTED**. The historical owner-preserving file-tree snapshot format is not used.
 - Separate safe frontend-only deploy method: **NOT IMPLEMENTED OR REVIEWED**.
 - Permission to publish: **NOT GRANTED**.
 - **GO/NO-GO: NO-GO until the concrete frontend-only gates pass and separate release approval is granted.**
