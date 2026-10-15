@@ -1,14 +1,8 @@
 name: Fizira Flower TAR isolated restore rehearsal (one-time)
 
-# Operator authorized one restore into a fresh private Timeweb directory.
-# No live frontend writes, changes to permissions, Edge/SQL, or service restart.
-# Remove the push trigger as soon as the run is registered.
+# One approved rehearsal registered. No automatic restore tests remain enabled.
 on:
-  push:
-    branches:
-      - release/flower-frontend-only-20261015
-    paths:
-      - .github/workflows/flower-restore-test.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
