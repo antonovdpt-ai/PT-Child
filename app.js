@@ -7,7 +7,7 @@ import { mountReportPdfExport } from './report-pdf-export.mjs?v=1';
 import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=8';
 import { publicationLabel } from './parent-domain.mjs';
 import { renderCabinet } from './cabinet.js?v=8';
-import { patientFlowerHtml, mountPatientFlower, readFlowerCompact, saveFlowerCompact, collapsePatientFlower } from './patient-flower.mjs?v=6';
+import { patientFlowerHtml, mountPatientFlower, readFlowerCompact } from './patient-flower.mjs?v=7';
 import { patientOverviewHtml, mountPatientOverview, updateOverviewReport } from './patient-overview.mjs?v=1';
 import { openScheduleEditor } from './schedule-editor.js?v=8';
 
@@ -3211,10 +3211,7 @@ function renderPatient(parentInvitationSent = false) {
     try {
       const activePanel = document.getElementById('tabContent');
       if (!flowerIsCurrent()) return false;
-      await collapsePatientFlower(flowerRoot);
-      if (!flowerIsCurrent()) return false;
       let panel = panels.get(tab);
-      saveFlowerCompact(window,true);
       activePanel.hidden = true;
       activePanel.removeAttribute('id');
       state.tab = tab;
@@ -5673,7 +5670,7 @@ if (overviewRoot) {
       if (navigateSection) {
         if (!await navigateSection(tab)) return false;
       } else {
-        saveFlowerCompact(window,true); state.tab = tab; renderPatient();
+        state.tab = tab; renderPatient();
       }
       if (addGoal && document.getElementById('goalForm')?.hidden) document.getElementById('goalFormToggle')?.click();
       const destination = addGoal ? document.querySelector('#goalForm [name="title"]') : app.querySelector(`[data-tab="${tab}"]`);

@@ -158,7 +158,10 @@
 
   /* A clipped circle and the original seven buttons; desktop and expanded keep their layout. */
   .patient-workspace:has(>.patient-flower.is-compact){gap:8px}
-  .patient-flower.is-compact .flower-toolbar,.patient-flower.is-compact .flower-footer{display:none}
+  .patient-flower.is-compact .flower-toolbar{display:none}
+  /* Never hide the only visible expand affordance on touch devices. */
+  .patient-flower.is-compact .flower-footer{display:flex;position:relative;z-index:4;justify-content:center;margin-top:6px;padding-bottom:4px}
+  .patient-flower.is-compact .flower-toggle{min-height:44px;min-width:144px;box-shadow:var(--flower-shadow)}
   .patient-flower.is-compact .flower-stage{--cap-circle:204px;--cap-height:calc(var(--cap-circle)*.32);--compact-orbit:calc(var(--cap-circle)*.5 + 25px);left:50%;width:100vw;height:132px;transform:translateX(-50%)}
   .patient-flower.is-compact .flower-identity{display:block;left:50%;top:calc(var(--cap-height) - var(--cap-circle));width:var(--cap-circle);height:var(--cap-circle);padding:0;border-radius:50%;transform:translateX(-50%);box-shadow:0 0 0 4px #fff,0 4px 14px rgb(17 101 108 / 8%);text-align:center}
   .patient-flower.is-compact .flower-avatar,.patient-flower.is-compact .patient-hero-meta,.patient-flower.is-compact .flower-ai-host{display:none}

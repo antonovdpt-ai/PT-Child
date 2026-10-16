@@ -24,11 +24,11 @@ const petalContours = {
 };
 const mobileArc = [-60,-40,-20,0,20,40,60].map(angle=>{const radians=angle*Math.PI/180;return [Math.sin(radians).toFixed(4),Math.cos(radians).toFixed(4)];});
 const mobileFlower = view => view.matchMedia?.('(max-width:700px)').matches === true;
-const compactPreference = view => mobileFlower(view) ? 'fizira:flower-mobile-compact' : 'fizira:flower-compact';
+const compactPreference = view => mobileFlower(view) ? 'fizira:flower-mobile-compact-v2' : 'fizira:flower-compact-v2';
 
-// Presentation preferences contain no patient content; mobile defaults to the patient cap.
+// Layout preference only. Mobile now opens expanded by default; explicit folding persists per device.
 export function readFlowerCompact(view) {
-  try {const saved = view.localStorage.getItem(compactPreference(view));return saved === null ? mobileFlower(view) : saved === '1';} catch {return mobileFlower(view);}
+  try {const saved = view.localStorage.getItem(compactPreference(view));return saved === '1';} catch {return false;}
 }
 export function saveFlowerCompact(view, compact) {
   try {view.localStorage.setItem(compactPreference(view),compact ? '1' : '0');} catch { /* Private browsing still supports the current view. */ }
@@ -106,10 +106,18 @@ export function mountPatientFlower({root, isCurrent, navigate}) {
     toggle.querySelector('span').textContent = compact ? 'Развернуть' : 'Свернуть';
     updateScrollHint();
   };
+  // The mobile cap is also accessible through a visible footer button.
   expand.onclick = () => {
     if (!mobileFlower(view) || !root.classList.contains('is-compact') || !isCurrent() || !root.isConnected) return;
     toggle.click();
     toggle.focus({preventScroll:true});
+  };
+  // Mobile fallback: tapping the visible patient name expands the same DOM,
+  // even if a browser does not hit-test the transparent overlay correctly.
+  root.querySelector('.flower-identity').onclick = event => {
+    if (!mobileFlower(view) || !root.classList.contains('is-compact') ||
+        event.target.closest('button') || !isCurrent() || !root.isConnected) return;
+    expand.click();
   };
   const nav = root.querySelector('.flower-navigation');
   const buttons = [...nav.querySelectorAll('[data-tab]')];
