@@ -32,6 +32,7 @@ test('minute-level calendar works in Chromium at mobile and desktop widths', asy
         const dateKey = await page.evaluate(async () => {
           const {renderCabinet} = await import('/cabinet.js');
           const {escapeHtml} = await import('/security-utils.mjs');
+          window.confirm = () => true; // Accept discard confirmation only in this synthetic fixture.
           document.body.dataset.specialistReady='true';
           document.body.classList.add('is-authenticated');
           const start = new Date();
