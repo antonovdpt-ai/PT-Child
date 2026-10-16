@@ -166,6 +166,23 @@ jobs:
           import json, os, subprocess, pathlib, hashlib, re
           def check(ok,label):
               if not ok: raise SystemExit(label+'_STOP')
+          # Backup feasibility only; this does not create or certify a backup.
+          app=pathlib.Path('/root/supabase-project/volumes/proxy/app')
+          check(app.is_dir() and not app.is_symlink(),'FRONTEND_TARGET_INVALID')
+          count=0; size=0
+          for path, dirs, files in os.walk(app,followlinks=False):
+              count+=len(dirs)+len(files)
+              check(count<=4096,'FRONTEND_TREE_UNBOUNDED')
+              for name in dirs+files: check(not (pathlib.Path(path)/name).is_symlink(),'FRONTEND_SYMLINK')
+              for name in files:
+                  file=pathlib.Path(path)/name
+                  check(file.is_file(),'FRONTEND_FILE_TYPE')
+                  size+=file.stat().st_size
+              check(size<=1024**3,'FRONTEND_TREE_SIZE')
+          home=pathlib.Path.home()
+          free=os.statvfs(home).f_bavail*os.statvfs(home).f_frsize
+          check(free>=2*size+128*1024*1024,'INSUFFICIENT_BACKUP_HEADROOM')
+          print('BACKUP_CAPACITY_METADATA_OK files_or_dirs='+str(count)+' app_bytes='+str(size)+' free_bytes='+str(free)+' actual_backup_created=False')
           def inspectfmt(fmt):
               for argv in (
                 ['docker','inspect','--format',fmt,'supabase-edge-functions'],
@@ -200,21 +217,5 @@ jobs:
           routerbytes=router.read_bytes()
           check(b'config.toml' not in routerbytes,'ROUTER_REFERENCES_CLI_CONFIG')
           print('EDGE_RUNTIME_METADATA_OK no_cli_config=True direct_runtime=True fixed_bind_mount=True router_sha256='+hashlib.sha256(routerbytes).hexdigest())
-          # Backup feasibility only; this does not create or certify a backup.
-          app=pathlib.Path('/root/supabase-project/volumes/proxy/app')
-          check(app.is_dir() and not app.is_symlink(),'FRONTEND_TARGET_INVALID')
-          count=0; size=0
-          for path, dirs, files in os.walk(app,followlinks=False):
-              count+=len(dirs)+len(files)
-              check(count<=4096,'FRONTEND_TREE_UNBOUNDED')
-              for name in dirs+files: check(not (pathlib.Path(path)/name).is_symlink(),'FRONTEND_SYMLINK')
-              for name in files:
-                  file=pathlib.Path(path)/name
-                  check(file.is_file(),'FRONTEND_FILE_TYPE')
-                  size+=file.stat().st_size
-              check(size<=1024**3,'FRONTEND_TREE_SIZE')
-          home=pathlib.Path.home()
-          free=os.statvfs(home).f_bavail*os.statvfs(home).f_frsize
-          check(free>=2*size+128*1024*1024,'INSUFFICIENT_BACKUP_HEADROOM')
-          print('BACKUP_CAPACITY_METADATA_OK files_or_dirs='+str(count)+' app_bytes='+str(size)+' free_bytes='+str(free)+' actual_backup_created=False')
+
           PY
