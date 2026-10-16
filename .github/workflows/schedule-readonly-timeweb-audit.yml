@@ -126,6 +126,19 @@ jobs:
             seen.add(key);
             const state=digest===pair.head?'MATCH_HEAD':digest===pair.base?'MATCH_BASE':/^[a-f0-9]{64}$/.test(digest)?'UNKNOWN_LIVE_STOP':digest+'_STOP';
             console.log(category+' '+file+' '+state);
+            if(state==='UNKNOWN_LIVE_STOP' && category==='FRONTEND'){
+              const history=execFileSync('git',['log','--all','--format=%H','--',file],{encoding:'utf8'})
+                .trim().split('\n').filter(Boolean);
+              let match=null,checked=0;
+              for(const commit of history){
+                try{
+                  const bytes=execFileSync('git',['show',commit+':'+file],{maxBuffer:8*1024*1024,stdio:['ignore','pipe','ignore']});
+                  checked++;
+                  if(sha(bytes)===digest){match=commit;break}
+                }catch{}
+              }
+              console.log('PROVENANCE '+file+' '+(match?'MATCH_HISTORY_SHA='+match:'UNMATCHED_IN_HISTORY')+' examined='+checked);
+            }
             if(state==='MATCH_HEAD')headCount++;
             else if(state==='MATCH_BASE')baseCount++;
             else stop++;
