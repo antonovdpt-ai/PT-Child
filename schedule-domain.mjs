@@ -39,6 +39,15 @@ export function debt(rows, patientId, excludeId = null) {
     .reduce((s, r) => s + Math.max(0, r.price_kopecks - r.paid_kopecks), 0);
 }
 export function hourSlot(date, hour) { const d = new Date(`${dayKey(date)}T00:00:00`); d.setHours(Number(hour), 0, 0, 0); return d; }
+export function timeSlot(date, time) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      typeof time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time))
+    throw new Error('Проверь дату и время начала.');
+  const d = new Date(`${date}T${time}:00`);
+  if (!Number.isFinite(d.getTime()) || dayKey(d) !== date)
+    throw new Error('Проверь дату и время начала.');
+  return d;
+}
 export function repeatDates(start, weekdays, weeks) {
   if (!Number.isInteger(weeks) || weeks < 1 || weeks > 12) throw new Error('Выбери от 1 до 12 недель.');
   const result = [new Date(start)];
@@ -49,12 +58,12 @@ export function repeatDates(start, weekdays, weeks) {
   return result;
 }
 export function appointmentPayload(values, therapistId) {
-  const start = hourSlot(values.date, values.hour);
+  const start = values.time === undefined ? hourSlot(values.date, values.hour) : timeSlot(values.date, values.time);
   const price = Math.round(Number(values.price) * 100);
-  if (!Number.isFinite(start.getTime()) || !Number.isInteger(Number(values.hour)) || Number(values.hour) < 0 || Number(values.hour) > 23) throw new Error('Проверь дату и час.');
+  if (!Number.isFinite(start.getTime()) || (values.time === undefined && (!Number.isInteger(Number(values.hour)) || Number(values.hour) < 0 || Number(values.hour) > 23))) throw new Error('Проверь дату и время начала.');
   if (!Number.isSafeInteger(price) || price < 0 || price > 100000000) throw new Error('Проверь стоимость занятия.');
   const kind = values.kind || 'appointment';
-  const end = new Date(start); end.setHours(end.getHours() + 1);
+  const end = new Date(start.getTime() + 3600000);
   const priorPaid = Number(values.previous_paid || 0);
   if (!Number.isSafeInteger(priorPaid) || priorPaid < 0 || priorPaid > price) throw new Error('Проверь ранее внесённую оплату.');
   return { therapist_id: therapistId, patient_id: kind === 'appointment' ? values.patient_id || null : null,

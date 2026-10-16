@@ -6,10 +6,10 @@ import { createSpecialistRoleGate } from './role-gate.mjs';
 import { mountReportPdfExport } from './report-pdf-export.mjs?v=1';
 import { renderParentPortalSpecialist, renderParentSessionReportEditor } from './parent-specialist.js?v=8';
 import { publicationLabel } from './parent-domain.mjs';
-import { renderCabinet } from './cabinet.js?v=8';
+import { renderCabinet } from './cabinet.js?v=9';
 import { patientFlowerHtml, mountPatientFlower, readFlowerCompact } from './patient-flower.mjs?v=7';
 import { patientOverviewHtml, mountPatientOverview, updateOverviewReport } from './patient-overview.mjs?v=1';
-import { openScheduleEditor } from './schedule-editor.js?v=8';
+import { openScheduleEditor } from './schedule-editor.js?v=9';
 
 const SUPABASE_URL = "https://auth.fizira.com";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5NjU2NzI5LCJleHAiOjE5NDczMzY3Mjl9.gWkGsKODazY419TdwTGoSL9InQK3Yzt5YYC7UGVFllo";
