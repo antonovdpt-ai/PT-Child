@@ -1,0 +1,136 @@
+name: Fizira schedule read-only Timeweb source audit
+on:
+  push:
+    branches: [codex/schedule-flexible-start-times-20261016]
+    paths:
+      - ".github/workflows/schedule-readonly-timeweb-audit.yml"
+permissions:
+  contents: read
+concurrency:
+  group: fizira-schedule-readonly-timeweb-audit
+  cancel-in-progress: false
+jobs:
+  hash-inventory:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/codex/schedule-flexible-start-times-20261016'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify reviewed baseline ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='ed6c103578cbfcabe19ab0077e8eeff1305d8b3d'
+          git cat-file -e "${base}^{commit}"
+          git merge-base --is-ancestor "$base" HEAD
+          printf 'READONLY_AUDIT_BASE_VERIFIED base=%s head=%s\n' "$base" "$GITHUB_SHA"
+      - name: Configure SSH identity without printing credentials
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY"
+          test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Read only known frontend and Edge file SHA-256 hashes
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST"
+          test -n "$USER"
+          # No patient data, writes, service restarts, or backups on Timeweb.
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "${PORT:-22}" "$USER@$HOST" 'bash -s' > "$RUNNER_TEMP/fizira-live-hashes.tsv" <<'REMOTE_READ_ONLY'
+          set -euo pipefail
+          frontend_root='/root/supabase-project/volumes/proxy/app'
+          edge_root='/root/supabase-project/volumes/functions'
+          config_path='/root/supabase-project/supabase/config.toml'
+          hash_known_file() {
+            local category="$1" relative="$2" absolute="$3" value
+            if [[ -L "$absolute" ]]; then
+              printf '%s\t%s\tSYMLINK\n' "$category" "$relative"
+            elif [[ ! -f "$absolute" ]]; then
+              printf '%s\t%s\tMISSING\n' "$category" "$relative"
+            elif value="$(sha256sum -- "$absolute" 2>/dev/null)"; then
+              value="${value%% *}"
+              printf '%s\t%s\t%s\n' "$category" "$relative" "$value"
+            else
+              printf '%s\t%s\tUNREADABLE\n' "$category" "$relative"
+            fi
+          }
+          for file in \
+            app.js cabinet.js styles.css patient-flower.css patient-flower.mjs \
+            patient-overview.mjs media-fallback.css auth-domain.mjs \
+            schedule-domain.mjs schedule-editor.js security-utils.mjs role-gate.mjs \
+            parent.html parent.js parent.css parent-domain.mjs parent-specialist.js \
+            report-pdf-export.mjs favicon.ico fizira-symbol.png index.html; do
+            hash_known_file FRONTEND "$file" "$frontend_root/$file"
+          done
+          for file in \
+            functions/_shared/ai-helpers.ts functions/ptchild-ai/index.ts \
+            functions/create-parent-invitation/index.ts \
+            functions/resend-parent-invitation/index.ts \
+            functions/revoke-parent-access/index.ts \
+            functions/generate-parent-report-pdf/index.ts \
+            functions/parent-report-file/index.ts \
+            functions/_shared/parent-portal.ts \
+            functions/_shared/parent-publication.ts \
+            functions/_shared/parent-pdf.ts \
+            functions/_shared/font-data.ts \
+            functions/_shared/fonts/NotoSans-Regular.ttf \
+            functions/_shared/fonts/OFL.txt; do
+            hash_known_file EDGE "$file" "$edge_root/${file#functions/}"
+          done
+          hash_known_file EDGE config.toml "$config_path"
+          REMOTE_READ_ONLY
+      - name: Compare exact bytes to reviewed baseline and current PR head
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {execFileSync} from 'node:child_process';
+          import {join} from 'node:path';
+          const baseline='ed6c103578cbfcabe19ab0077e8eeff1305d8b3d';
+          const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+          const files={
+            FRONTEND:readFileSync('ops/release/frontend-assets.txt','utf8').trim().split('\n'),
+            EDGE:readFileSync('ops/release/edge-assets.txt','utf8').trim().split('\n')
+          };
+          const expected=new Map();
+          for(const [category,names] of Object.entries(files))for(const file of names){
+            const path=category==='EDGE'?'supabase/'+file:file;
+            const base=sha(execFileSync('git',['show',baseline+':'+path],{maxBuffer:8*1024*1024}));
+            const head=sha(readFileSync(path));
+            expected.set(category+'\t'+file,{base,head});
+          }
+          const lines=readFileSync(join(process.env.RUNNER_TEMP,'fizira-live-hashes.tsv'),'utf8').trim().split('\n');
+          const seen=new Set();
+          let stop=0,baseCount=0,headCount=0;
+          for(const line of lines){
+            const [category,file,digest,...extra]=line.split('\t');
+            const key=category+'\t'+file, pair=expected.get(key);
+            if(!pair || seen.has(key) || extra.length || !digest){console.log('AUDIT_PROTOCOL_STOP');process.exitCode=1;stop++;continue}
+            seen.add(key);
+            const state=digest===pair.head?'MATCH_HEAD':digest===pair.base?'MATCH_BASE':/^[a-f0-9]{64}$/.test(digest)?'UNKNOWN_LIVE_STOP':digest+'_STOP';
+            console.log(category+' '+file+' '+state);
+            if(state==='MATCH_HEAD')headCount++;
+            else if(state==='MATCH_BASE')baseCount++;
+            else stop++;
+          }
+          for(const [key] of expected)if(!seen.has(key)){console.log(key.replace('\t',' ')+' NOT_REPORTED_STOP');stop++}
+          console.log('READONLY_AUDIT_SUMMARY files='+expected.size+' matches_base='+baseCount+' matches_head='+headCount+' stop='+stop);
+          if(stop)process.exitCode=1;
+          NODE
