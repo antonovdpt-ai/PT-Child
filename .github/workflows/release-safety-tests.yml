@@ -47,11 +47,21 @@ jobs:
         shell: bash
         run: bash ops/release/ensure-parent-portal-baseline.sh
 
+      - name: Provision pinned historical parent UX test fixtures
+        run: bash ops/release/ensure-parent-ux-test-fixtures.sh
       - name: Use supported Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install PDF verification tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
+          command -v pdftotext
+          command -v pdfinfo
       - name: Run security, AI, deletion and schedule checks
         shell: bash
         run: |
