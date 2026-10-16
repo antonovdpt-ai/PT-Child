@@ -1,4 +1,4 @@
-import { rub, dayKey, hourSlot, debt, appointmentPayload, repeatDates, scheduleError } from './schedule-domain.mjs?v=2';
+import { rub, dayKey, hourSlot, timeSlot, debt, appointmentPayload, repeatDates, scheduleError } from './schedule-domain.mjs?v=3';
 
 export function openScheduleEditor({ app, sb, user, patients, appointments, row, patientId = '', date = dayKey(new Date()), hour = new Date().getHours(), esc, onSaved, isCurrent = () => true }) {
   const dialog = document.createElement('dialog'); dialog.className = 'schedule-dialog';
@@ -9,7 +9,7 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
   const selectedPatient = () => patients.find(p => p.id === selected);
   const hasTariff = () => Number(selectedPatient()?.schedule_price_kopecks || 0) > 0;
   dialog.innerHTML = `<form class="schedule-editor"><header class="schedule-editor-heading"><div><div class="workspace-eyebrow">Расписание</div><h2>${row ? 'Редактировать запись' : 'Новая запись'}</h2><p>${row ? 'Измени дату, стоимость, оплату или статус визита.' : 'Выбери время и пациента для нового занятия.'}</p></div><button type="button" class="schedule-dialog-close" data-close aria-label="Закрыть"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button></header>
-    <section class="schedule-editor-section schedule-time-section"><div class="row"><label>Дата<input name="date" type="date" required value="${dayKey(start)}"></label><label>Начало<select name="hour">${Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${h === start.getHours() ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('')}</select></label></div>
+    <section class="schedule-editor-section schedule-time-section"><div class="row"><label>Дата<input name="date" type="date" required value="${dayKey(start)}"></label><label>Начало<input name="time" type="time" step="60" required value="${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}"></label></div>
     <label>Тип записи<select name="kind"><option value="appointment">Занятие</option><option value="break">Перерыв</option><option value="personal">Личное время</option></select></label></section>
     <section class="schedule-editor-section schedule-visit-section" data-visit><label>Найти пациента<input type="search" data-search placeholder="Имя пациента" autocomplete="off" value="${selected ? esc(selectedName()) : ''}"></label><div class="patient-picker" data-results role="group" aria-label="Выбор пациента"></div>
       <p class="calendar-selection" data-selection></p><label data-initial ${initial ? '' : 'hidden'}>Имя на первичном приёме<input name="initial_name" maxlength="120" value="${esc(row?.initial_name || '')}" placeholder="Можно заполнить позже"></label>
@@ -97,9 +97,9 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
     };
   }
   function repeats() {
-    if (row) return [hourSlot(field('date').value, field('hour').value)];
+    if (row) return [timeSlot(field('date').value, field('time').value)];
     const weekdays = [...form.querySelectorAll('[name="weekday"]:checked')].map(c => Number(c.value));
-    const start = hourSlot(field('date').value, field('hour').value);
+    const start = timeSlot(field('date').value, field('time').value);
     return weekdays.length ? repeatDates(start, weekdays, Number(field('weeks').value)) : [start];
   }
   function updateRepeat() { const node = dialog.querySelector('[data-repeat-preview]'); if (node) node.textContent = `Всего записей: ${repeats().length}. Повторы создаются без отметки оплаты.`; }
@@ -115,20 +115,20 @@ export function openScheduleEditor({ app, sb, user, patients, appointments, row,
     renderPicker();
   };
   search.onfocus = () => { if (selected && search.value === selectedName()) search.select(); };
-  if (!row) form.querySelectorAll('[name="weekday"],[name="weeks"],[name="date"],[name="hour"]').forEach(c => c.addEventListener('change', updateRepeat));
+  if (!row) form.querySelectorAll('[name="weekday"],[name="weeks"],[name="date"],[name="time"]').forEach(c => c.addEventListener('change', updateRepeat));
   form.onsubmit = event => {
     event.preventDefault();
     if (field('kind').value === 'appointment' && !selected && !initial) return showError(new Error('Выбери пациента или «Первичный приём».'));
     let entries;
     try {
-      const values = { date: field('date').value, hour: field('hour').value, kind: field('kind').value, status: field('status').value,
+      const values = { date: field('date').value, time: field('time').value, kind: field('kind').value, status: field('status').value,
         patient_id: selected, initial_name: field('initial_name').value, price: field('price').value, paid: field('paid').checked, previous_paid: originalPartial, note: field('note').value };
       const payload = appointmentPayload(values, user.id);
       if (payload.paid_kopecks > payload.price_kopecks) throw new Error('Стоимость меньше ранее внесённой оплаты. Проверь сумму.');
       entries = repeats().map((d, i) => ({ ...payload, starts_at: d.toISOString(), ends_at: new Date(d.getTime() + 3600000).toISOString(), ...(i ? { paid_kopecks: 0, status: 'planned' } : {}) }));
       if (row) {
         entries[0].id = row.id; entries[0].expected_updated_at = row.updated_at;
-        if (dayKey(start) === values.date && start.getHours() === Number(values.hour)) {
+        if (dayKey(start) === values.date && `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}` === values.time) {
           entries[0].starts_at = row.starts_at; entries[0].ends_at = row.ends_at;
         }
       }
