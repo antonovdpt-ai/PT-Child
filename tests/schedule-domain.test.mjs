@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dayKey, localDate, periodBounds, periodRows, totals, debt, hourSlot, repeatDates, appointmentPayload, scheduleError } from '../schedule-domain.mjs';
+import { dayKey, localDate, periodBounds, periodRows, totals, debt, hourSlot, timeSlot, repeatDates, appointmentPayload, scheduleError } from '../schedule-domain.mjs';
 
 test('day and period calculations stay in local calendar time', () => {
   const date = localDate('2026-09-23');
@@ -48,6 +48,21 @@ test('payload rounds to the hour, omits end-time input and preserves partial pay
   assert.equal(payload.paid_kopecks, 50000);
   assert.equal(payload.note, 'test');
   assert.throws(() => appointmentPayload({ date: '2026-09-23', hour: 15, kind: 'appointment', price: 10, previous_paid: 2000 }, 'u1'), /оплату/);
+});
+
+test('minute-accurate starts, 60-minute duration and repeats work without rounding', () => {
+  const start = timeSlot('2026-10-30', '08:30');
+  assert.equal(start.getHours(), 8);
+  assert.equal(start.getMinutes(), 30);
+  const entries = repeatDates(timeSlot('2026-10-30', '09:45'), [5], 2);
+  assert.equal(entries.length, 2);
+  assert.ok(entries.every(d => d.getHours() === 9 && d.getMinutes() === 45));
+  const payload = appointmentPayload({date:'2026-10-30',time:'09:45',kind:'appointment',patient_id:'p1',price:3000},'u1');
+  assert.equal(new Date(payload.starts_at).getMinutes(), 45);
+  assert.equal(new Date(payload.ends_at).getTime() - new Date(payload.starts_at).getTime(), 3600000);
+  for (const bad of ['24:00','09:60','9:45','09:45:00','wrong','']) {
+    assert.throws(() => timeSlot('2026-10-30', bad), /время/);
+  }
 });
 
 test('database errors are converted to actionable messages', () => {

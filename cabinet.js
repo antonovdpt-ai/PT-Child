@@ -1,5 +1,5 @@
-import { rub, dayKey, localDate, addDays, periodBounds, periodRows, totals, scheduleError } from './schedule-domain.mjs?v=2';
-import { openScheduleEditor } from './schedule-editor.js?v=8';
+import { rub, dayKey, localDate, addDays, periodBounds, periodRows, totals, scheduleError } from './schedule-domain.mjs?v=3';
+import { openScheduleEditor } from './schedule-editor.js?v=9';
 
 const dateLabel = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
 const monthLabel = new Intl.DateTimeFormat('ru-RU', { month: 'long' });
@@ -96,19 +96,20 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     const first = Math.min(range[0], ...activeHours), last = Math.max(range[1], ...activeHours);
     const options = chosen => Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${h === chosen ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('');
     const body = details.querySelector('[data-body]');
-    body.innerHTML = `<div class="calendar-hours"><span>Часы рабочего дня</span><label>С <select data-hour-from aria-label="Первый час рабочего дня">${options(range[0])}</select></label><label>По <select data-hour-to aria-label="Последний час рабочего дня">${options(range[1])}</select></label></div>
+    body.innerHTML = `<div class="calendar-hours"><span>Часы рабочего дня</span><button class="link calendar-custom-time" type="button" data-custom-time>+ Указать время</button><label>С <select data-hour-from aria-label="Первый час рабочего дня">${options(range[0])}</select></label><label>По <select data-hour-to aria-label="Последний час рабочего дня">${options(range[1])}</select></label></div>
       <div class="calendar-slots">${Array.from({ length: last - first + 1 }, (_, i) => {
         const h = i + first, at = new Date(`${key}T${String(h).padStart(2, '0')}:00:00`);
         const items = rows.filter(r => new Date(r.starts_at).getHours() === h);
-        const blocked = appointments.some(r => ['planned', 'completed'].includes(r.status) && new Date(r.starts_at) <= at && new Date(r.ends_at) > at);
+        const blocked = appointments.some(r => ['planned', 'completed'].includes(r.status) && new Date(r.starts_at).getTime() < at.getTime() + 3600000 && new Date(r.ends_at) > at);
         return `<div class="calendar-slot"><span class="calendar-time">${String(h).padStart(2, '0')}:00</span><div>${items.map(r => {
           const paid = r.price_kopecks > 0 && r.paid_kopecks >= r.price_kopecks;
-          const details = `${r.kind === 'appointment' ? rub(r.price_kopecks) : statuses[r.status]}${new Date(r.starts_at).getMinutes() ? ` · начало ${new Date(r.starts_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}` : ''}`;
+          const details = `${new Date(r.starts_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} · ${r.kind === 'appointment' ? rub(r.price_kopecks) : statuses[r.status]}`;
           const statusOptions = Object.entries(statuses).map(([value, label]) => `<option value="${value}" ${r.status === value ? 'selected' : ''}>${label}</option>`).join('');
           return `<article class="calendar-entry ${safe(r.status)}"><button type="button" class="calendar-entry-open" data-edit="${r.id}"><span class="calendar-entry-copy"><strong>${safe(name(r))}</strong>${!r.patient_id && r.kind === 'appointment' ? '<small>Первичный приём</small>' : ''}<small>${details}</small></span></button>${r.kind === 'appointment' ? `<div class="calendar-entry-actions"><select class="calendar-status ${safe(r.status)}" data-status="${r.id}" aria-label="Статус занятия ${safe(name(r))}">${statusOptions}</select><button type="button" class="calendar-paid ${paid ? 'paid' : 'unpaid'}" data-payment="${r.id}" aria-pressed="${paid}" ${r.price_kopecks <= 0 ? 'disabled title="Сначала укажите стоимость занятия"' : ''}>${paid ? 'Оплачено' : 'Не оплачено'}</button></div>` : ''}</article>`;
         }).join('')}
           ${!blocked ? `<button class="calendar-empty" data-slot="${h}">+ Записать пациента <span>или первичный приём</span></button>` : !items.length ? '<span class="help">Занято предыдущей записью</span>' : ''}</div></div>`;
       }).join('')}</div><div class="calendar-total">${summary(rows)}</div>`;
+    body.querySelector('[data-custom-time]').onclick = () => edit(null, key, range[0]);
     body.querySelectorAll('[data-slot]').forEach(b => b.onclick = () => edit(null, key, Number(b.dataset.slot)));
     body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => edit(appointments.find(r => r.id === b.dataset.edit)));
     body.querySelectorAll('[data-payment]').forEach(b => b.onclick = () => togglePayment(appointments.find(r => r.id === b.dataset.payment), b));
@@ -177,7 +178,7 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     const title = mode === 'year' ? String(from.getFullYear()) : mode === 'month' ? `${monthLabel.format(from)} ${from.getFullYear()}` : mode === 'day' ? dateLabel.format(from) : `${dateLabel.format(from)} — ${dateLabel.format(addDays(to, -1))}`;
     page.innerHTML = `${navigation('schedule')}<section class="calendar-toolbar calendar-period-toolbar"><div class="cabinet-tabs" aria-label="Период расписания">${Object.entries(modes).map(([k, v]) => `<button data-mode="${k}" class="${mode === k ? 'active' : ''}" aria-pressed="${mode === k}">${v}</button>`).join('')}</div>
       <div class="calendar-controls"><button class="link" data-step="-1" aria-label="Предыдущий период">←</button><input type="date" data-date value="${dayKey(date)}" aria-label="Дата расписания"><button class="link" data-step="1" aria-label="Следующий период">→</button><button class="link" data-today>Сегодня</button><button class="link" data-refresh ${loading ? 'disabled' : ''}>Обновить</button></div></section>
-      <div class="calendar-title calendar-period-heading"><div><h2>${safe(title)}</h2><p class="help">Открой день и нажми на свободный час или существующую запись. Время — по часовому поясу устройства.</p></div>${mode === 'week' && loaded ? '<button class="btn secondary" data-copy>Скопировать на следующую неделю</button>' : ''}</div>
+      <div class="calendar-title calendar-period-heading"><div><h2>${safe(title)}</h2><p class="help">Открой день и укажи любое время начала либо выбери свободный час или существующую запись. Время — по часовому поясу устройства.</p></div>${mode === 'week' && loaded ? '<button class="btn secondary" data-copy>Скопировать на следующую неделю</button>' : ''}</div>
       <div class="error" role="alert">${safe(notice)}</div>
       ${loaded ? (mode === 'year' ? Array.from({ length: 12 }, (_, i) => {
         const month = new Date(from.getFullYear(), i, 1, 12), monthRows = periodRows(appointments, month, 'month');
