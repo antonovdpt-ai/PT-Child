@@ -95,65 +95,6 @@ jobs:
           done
           hash_known_file EDGE config.toml "$config_path"
           REMOTE_READ_ONLY
-      - name: Read-only runtime and backup-capacity diagnostic (metadata only)
-        shell: bash
-        env:
-          HOST: ${{ secrets.TIMEWEB_HOST }}
-          PORT: ${{ secrets.TIMEWEB_PORT }}
-          USER: ${{ secrets.TIMEWEB_USER }}
-        run: |
-          set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "${PORT:-22}" "$USER@$HOST" python3 - <<'PY'
-          # No source mutations, no production credentials or env values in output.
-          import json, os, subprocess, pathlib, hashlib, re
-          def check(ok,label):
-              if not ok: raise SystemExit(label+'_STOP')
-          def inspectfmt(fmt):
-              x=subprocess.run(['sudo','-n','docker','inspect','--format',fmt,'supabase-edge-functions'],capture_output=True,text=True,timeout=20)
-              check(x.returncode==0,'DOCKER_READ_ONLY_INSPECT_UNAVAILABLE')
-              return x.stdout.strip()
-          root=pathlib.Path('/root/supabase-project/volumes/functions')
-          cli=pathlib.Path('/root/supabase-project/supabase/config.toml')
-          check(not cli.exists() and not cli.is_symlink(),'CLI_CONFIG_MUST_BE_ABSENT')
-          running=inspectfmt('{{.State.Running}}')
-          imageid=inspectfmt('{{.Image}}')
-          imagetag=inspectfmt('{{.Config.Image}}')
-          command=inspectfmt('{{.Path}}')
-          args=json.loads(inspectfmt('{{json .Args}}'))
-          mounts=json.loads(inspectfmt('{{json .Mounts}}'))
-          check(running=='true','EDGE_NOT_RUNNING')
-          check(re.fullmatch('sha256:[a-f0-9]{64}',imageid) is not None and imagetag.startswith('supabase/edge-runtime:'),'EDGE_IMAGE_NOT_REVIEWED')
-          check(pathlib.PurePath(command).name=='edge-runtime','WRAPPED_RUNTIME_COMMAND')
-          check(args and args[0]=='start' and args.count('--main-service')==1,'EDGE_COMMAND')
-          check(args[args.index('--main-service')+1]=='/home/deno/functions/main','ROUTER_MAIN_SERVICE')
-          check(len(args)%2==1 and all(args[i] in {'--main-service','--user-worker-request-idle-timeout','--port','--ip'} for i in range(1,len(args),2)),'UNEXPECTED_RUNTIME_FLAG')
-          check(not any('--config' in a or 'config.toml' in a for a in args),'CLI_CONFIG_REFERENCED')
-          fnmount=[m for m in mounts if m.get('Destination')=='/home/deno/functions']
-          check(len(fnmount)==1 and fnmount[0].get('Type')=='bind' and fnmount[0].get('Source')==str(root),'UNEXPECTED_EDGE_BIND_MOUNT')
-          check(not any((m.get('Destination') or '').startswith('/home/deno/functions/') for m in mounts),'OVERLAPPING_EDGE_MOUNTS')
-          router=root/'main/index.ts'
-          check(router.is_file() and not router.is_symlink() and router.stat().st_size<=192*1024,'ROUTER_UNAVAILABLE')
-          routerbytes=router.read_bytes()
-          check(b'config.toml' not in routerbytes,'ROUTER_REFERENCES_CLI_CONFIG')
-          print('EDGE_RUNTIME_METADATA_OK no_cli_config=True direct_runtime=True fixed_bind_mount=True router_sha256='+hashlib.sha256(routerbytes).hexdigest())
-          # Backup feasibility only; this does not create or certify a backup.
-          app=pathlib.Path('/root/supabase-project/volumes/proxy/app')
-          check(app.is_dir() and not app.is_symlink(),'FRONTEND_TARGET_INVALID')
-          count=0; size=0
-          for path, dirs, files in os.walk(app,followlinks=False):
-              count+=len(dirs)+len(files)
-              check(count<=4096,'FRONTEND_TREE_UNBOUNDED')
-              for name in dirs+files: check(not (pathlib.Path(path)/name).is_symlink(),'FRONTEND_SYMLINK')
-              for name in files:
-                  file=pathlib.Path(path)/name
-                  check(file.is_file(),'FRONTEND_FILE_TYPE')
-                  size+=file.stat().st_size
-              check(size<=1024**3,'FRONTEND_TREE_SIZE')
-          home=pathlib.Path.home()
-          free=os.statvfs(home).f_bavail*os.statvfs(home).f_frsize
-          check(free>=2*size+128*1024*1024,'INSUFFICIENT_BACKUP_HEADROOM')
-          print('BACKUP_CAPACITY_METADATA_OK files_or_dirs='+str(count)+' app_bytes='+str(size)+' free_bytes='+str(free)+' actual_backup_created=False')
-          PY
       - name: Compare exact bytes to reviewed baseline and current PR head
         shell: bash
         run: |
@@ -211,3 +152,69 @@ jobs:
           if(configAbsent!==1){console.log('CONFIG_STATE_UNEXPECTED_STOP');stop++;}
           if(stop)process.exitCode=1;
           NODE
+
+      - name: Read-only runtime and backup-capacity diagnostic (metadata only)
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "${PORT:-22}" "$USER@$HOST" python3 - <<'PY'
+          # No source mutations, no production credentials or env values in output.
+          import json, os, subprocess, pathlib, hashlib, re
+          def check(ok,label):
+              if not ok: raise SystemExit(label+'_STOP')
+          def inspectfmt(fmt):
+              for argv in (
+                ['docker','inspect','--format',fmt,'supabase-edge-functions'],
+                ['sudo','-n','docker','inspect','--format',fmt,'supabase-edge-functions'],
+              ):
+                  try:
+                      x=subprocess.run(argv,capture_output=True,text=True,timeout=20)
+                      if x.returncode==0: return x.stdout.strip()
+                  except (OSError,subprocess.TimeoutExpired): pass
+              raise SystemExit('DOCKER_READ_ONLY_INSPECT_UNAVAILABLE_STOP')
+          root=pathlib.Path('/root/supabase-project/volumes/functions')
+          cli=pathlib.Path('/root/supabase-project/supabase/config.toml')
+          check(not cli.exists() and not cli.is_symlink(),'CLI_CONFIG_MUST_BE_ABSENT')
+          running=inspectfmt('{{.State.Running}}')
+          imageid=inspectfmt('{{.Image}}')
+          imagetag=inspectfmt('{{.Config.Image}}')
+          command=inspectfmt('{{.Path}}')
+          args=json.loads(inspectfmt('{{json .Args}}'))
+          mounts=json.loads(inspectfmt('{{json .Mounts}}'))
+          check(running=='true','EDGE_NOT_RUNNING')
+          check(re.fullmatch('sha256:[a-f0-9]{64}',imageid) is not None and imagetag.startswith('supabase/edge-runtime:'),'EDGE_IMAGE_NOT_REVIEWED')
+          check(pathlib.PurePath(command).name=='edge-runtime','WRAPPED_RUNTIME_COMMAND')
+          check(args and args[0]=='start' and args.count('--main-service')==1,'EDGE_COMMAND')
+          check(args[args.index('--main-service')+1]=='/home/deno/functions/main','ROUTER_MAIN_SERVICE')
+          check(len(args)%2==1 and all(args[i] in {'--main-service','--user-worker-request-idle-timeout','--port','--ip'} for i in range(1,len(args),2)),'UNEXPECTED_RUNTIME_FLAG')
+          check(not any('--config' in a or 'config.toml' in a for a in args),'CLI_CONFIG_REFERENCED')
+          fnmount=[m for m in mounts if m.get('Destination')=='/home/deno/functions']
+          check(len(fnmount)==1 and fnmount[0].get('Type')=='bind' and fnmount[0].get('Source')==str(root),'UNEXPECTED_EDGE_BIND_MOUNT')
+          check(not any((m.get('Destination') or '').startswith('/home/deno/functions/') for m in mounts),'OVERLAPPING_EDGE_MOUNTS')
+          router=root/'main/index.ts'
+          check(router.is_file() and not router.is_symlink() and router.stat().st_size<=192*1024,'ROUTER_UNAVAILABLE')
+          routerbytes=router.read_bytes()
+          check(b'config.toml' not in routerbytes,'ROUTER_REFERENCES_CLI_CONFIG')
+          print('EDGE_RUNTIME_METADATA_OK no_cli_config=True direct_runtime=True fixed_bind_mount=True router_sha256='+hashlib.sha256(routerbytes).hexdigest())
+          # Backup feasibility only; this does not create or certify a backup.
+          app=pathlib.Path('/root/supabase-project/volumes/proxy/app')
+          check(app.is_dir() and not app.is_symlink(),'FRONTEND_TARGET_INVALID')
+          count=0; size=0
+          for path, dirs, files in os.walk(app,followlinks=False):
+              count+=len(dirs)+len(files)
+              check(count<=4096,'FRONTEND_TREE_UNBOUNDED')
+              for name in dirs+files: check(not (pathlib.Path(path)/name).is_symlink(),'FRONTEND_SYMLINK')
+              for name in files:
+                  file=pathlib.Path(path)/name
+                  check(file.is_file(),'FRONTEND_FILE_TYPE')
+                  size+=file.stat().st_size
+              check(size<=1024**3,'FRONTEND_TREE_SIZE')
+          home=pathlib.Path.home()
+          free=os.statvfs(home).f_bavail*os.statvfs(home).f_frsize
+          check(free>=2*size+128*1024*1024,'INSUFFICIENT_BACKUP_HEADROOM')
+          print('BACKUP_CAPACITY_METADATA_OK files_or_dirs='+str(count)+' app_bytes='+str(size)+' free_bytes='+str(free)+' actual_backup_created=False')
+          PY
