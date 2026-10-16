@@ -1,0 +1,213 @@
+name: Fizira reconciled schedule read-only preflight
+on:
+  push:
+    branches: [codex/schedule-release-readonly-preflight-20261016]
+    paths:
+      - ".github/workflows/schedule-readonly-timeweb-audit.yml"
+permissions:
+  contents: read
+concurrency:
+  group: fizira-schedule-readonly-timeweb-audit
+  cancel-in-progress: false
+jobs:
+  hash-inventory:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/codex/schedule-release-readonly-preflight-20261016'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify reviewed baseline ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='15b9def8c6460af1d54980a3f0e78a660634a5c2'
+          git cat-file -e "${base}^{commit}"
+          git merge-base --is-ancestor "$base" HEAD
+          git merge-base --is-ancestor 'cab03ade946bc0789aba45327bfe89bef3b92cd9' HEAD
+          printf 'READONLY_AUDIT_BASE_VERIFIED base=%s head=%s\n' "$base" "$GITHUB_SHA"
+      - name: Configure SSH identity without printing credentials
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY"
+          test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Read only known frontend and Edge file SHA-256 hashes
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST"
+          test -n "$USER"
+          # No patient data, writes, service restarts, or backups on Timeweb.
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "${PORT:-22}" "$USER@$HOST" 'bash -s' > "$RUNNER_TEMP/fizira-live-hashes.tsv" <<'REMOTE_READ_ONLY'
+          set -euo pipefail
+          frontend_root='/root/supabase-project/volumes/proxy/app'
+          edge_root='/root/supabase-project/volumes/functions'
+          config_path='/root/supabase-project/supabase/config.toml'
+          hash_known_file() {
+            local category="$1" relative="$2" absolute="$3" value
+            if [[ -L "$absolute" ]]; then
+              printf '%s\t%s\tSYMLINK\n' "$category" "$relative"
+            elif [[ ! -f "$absolute" ]]; then
+              printf '%s\t%s\tMISSING\n' "$category" "$relative"
+            elif value="$(sha256sum -- "$absolute" 2>/dev/null)"; then
+              value="${value%% *}"
+              printf '%s\t%s\t%s\n' "$category" "$relative" "$value"
+            else
+              printf '%s\t%s\tUNREADABLE\n' "$category" "$relative"
+            fi
+          }
+          for file in \
+            app.js cabinet.js styles.css patient-flower.css patient-flower.mjs \
+            patient-overview.mjs media-fallback.css auth-domain.mjs \
+            schedule-domain.mjs schedule-editor.js security-utils.mjs role-gate.mjs \
+            parent.html parent.js parent.css parent-domain.mjs parent-specialist.js \
+            report-pdf-export.mjs favicon.ico fizira-symbol.png index.html; do
+            hash_known_file FRONTEND "$file" "$frontend_root/$file"
+          done
+          for file in \
+            functions/_shared/ai-helpers.ts functions/ptchild-ai/index.ts \
+            functions/create-parent-invitation/index.ts \
+            functions/resend-parent-invitation/index.ts \
+            functions/revoke-parent-access/index.ts \
+            functions/generate-parent-report-pdf/index.ts \
+            functions/parent-report-file/index.ts \
+            functions/_shared/parent-portal.ts \
+            functions/_shared/parent-publication.ts \
+            functions/_shared/parent-pdf.ts \
+            functions/_shared/font-data.ts \
+            functions/_shared/fonts/NotoSans-Regular.ttf \
+            functions/_shared/fonts/OFL.txt; do
+            hash_known_file EDGE "$file" "$edge_root/${file#functions/}"
+          done
+          hash_known_file EDGE config.toml "$config_path"
+          REMOTE_READ_ONLY
+      - name: Read-only runtime and backup-capacity diagnostic (metadata only)
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "${PORT:-22}" "$USER@$HOST" python3 - <<'PY'
+          # No source mutations, no production credentials or env values in output.
+          import json, os, subprocess, pathlib, hashlib, re
+          def check(ok,label):
+              if not ok: raise SystemExit(label+'_STOP')
+          def inspectfmt(fmt):
+              x=subprocess.run(['sudo','-n','docker','inspect','--format',fmt,'supabase-edge-functions'],capture_output=True,text=True,timeout=20)
+              check(x.returncode==0,'DOCKER_READ_ONLY_INSPECT_UNAVAILABLE')
+              return x.stdout.strip()
+          root=pathlib.Path('/root/supabase-project/volumes/functions')
+          cli=pathlib.Path('/root/supabase-project/supabase/config.toml')
+          check(not cli.exists() and not cli.is_symlink(),'CLI_CONFIG_MUST_BE_ABSENT')
+          running=inspectfmt('{{.State.Running}}')
+          imageid=inspectfmt('{{.Image}}')
+          imagetag=inspectfmt('{{.Config.Image}}')
+          command=inspectfmt('{{.Path}}')
+          args=json.loads(inspectfmt('{{json .Args}}'))
+          mounts=json.loads(inspectfmt('{{json .Mounts}}'))
+          check(running=='true','EDGE_NOT_RUNNING')
+          check(re.fullmatch('sha256:[a-f0-9]{64}',imageid) is not None and imagetag.startswith('supabase/edge-runtime:'),'EDGE_IMAGE_NOT_REVIEWED')
+          check(pathlib.PurePath(command).name=='edge-runtime','WRAPPED_RUNTIME_COMMAND')
+          check(args and args[0]=='start' and args.count('--main-service')==1,'EDGE_COMMAND')
+          check(args[args.index('--main-service')+1]=='/home/deno/functions/main','ROUTER_MAIN_SERVICE')
+          check(len(args)%2==1 and all(args[i] in {'--main-service','--user-worker-request-idle-timeout','--port','--ip'} for i in range(1,len(args),2)),'UNEXPECTED_RUNTIME_FLAG')
+          check(not any('--config' in a or 'config.toml' in a for a in args),'CLI_CONFIG_REFERENCED')
+          fnmount=[m for m in mounts if m.get('Destination')=='/home/deno/functions']
+          check(len(fnmount)==1 and fnmount[0].get('Type')=='bind' and fnmount[0].get('Source')==str(root),'UNEXPECTED_EDGE_BIND_MOUNT')
+          check(not any((m.get('Destination') or '').startswith('/home/deno/functions/') for m in mounts),'OVERLAPPING_EDGE_MOUNTS')
+          router=root/'main/index.ts'
+          check(router.is_file() and not router.is_symlink() and router.stat().st_size<=192*1024,'ROUTER_UNAVAILABLE')
+          routerbytes=router.read_bytes()
+          check(b'config.toml' not in routerbytes,'ROUTER_REFERENCES_CLI_CONFIG')
+          print('EDGE_RUNTIME_METADATA_OK no_cli_config=True direct_runtime=True fixed_bind_mount=True router_sha256='+hashlib.sha256(routerbytes).hexdigest())
+          # Backup feasibility only; this does not create or certify a backup.
+          app=pathlib.Path('/root/supabase-project/volumes/proxy/app')
+          check(app.is_dir() and not app.is_symlink(),'FRONTEND_TARGET_INVALID')
+          count=0; size=0
+          for path, dirs, files in os.walk(app,followlinks=False):
+              count+=len(dirs)+len(files)
+              check(count<=4096,'FRONTEND_TREE_UNBOUNDED')
+              for name in dirs+files: check(not (pathlib.Path(path)/name).is_symlink(),'FRONTEND_SYMLINK')
+              for name in files:
+                  file=pathlib.Path(path)/name
+                  check(file.is_file(),'FRONTEND_FILE_TYPE')
+                  size+=file.stat().st_size
+              check(size<=1024**3,'FRONTEND_TREE_SIZE')
+          home=pathlib.Path.home()
+          free=os.statvfs(home).f_bavail*os.statvfs(home).f_frsize
+          check(free>=2*size+128*1024*1024,'INSUFFICIENT_BACKUP_HEADROOM')
+          print('BACKUP_CAPACITY_METADATA_OK files_or_dirs='+str(count)+' app_bytes='+str(size)+' free_bytes='+str(free)+' actual_backup_created=False')
+          PY
+      - name: Compare exact bytes to reviewed baseline and current PR head
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {execFileSync} from 'node:child_process';
+          import {join} from 'node:path';
+          const baseline='15b9def8c6460af1d54980a3f0e78a660634a5c2';
+          const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+          const files={
+            FRONTEND:readFileSync('ops/release/frontend-assets.txt','utf8').trim().split('\n'),
+            EDGE:readFileSync('ops/release/edge-assets.txt','utf8').trim().split('\n')
+          };
+          const expected=new Map();
+          for(const [category,names] of Object.entries(files))for(const file of names){
+            const path=category==='EDGE'?'supabase/'+file:file;
+            const base=sha(execFileSync('git',['show',baseline+':'+path],{maxBuffer:8*1024*1024}));
+            const head=sha(readFileSync(path));
+            expected.set(category+'\t'+file,{base,head});
+          }
+          const lines=readFileSync(join(process.env.RUNNER_TEMP,'fizira-live-hashes.tsv'),'utf8').trim().split('\n');
+          const seen=new Set();
+          let stop=0,baseCount=0,headCount=0,configAbsent=0;
+          for(const line of lines){
+            const [category,file,digest,...extra]=line.split('\t');
+            const key=category+'\t'+file, pair=expected.get(key);
+            if(!pair || seen.has(key) || extra.length || !digest){console.log('AUDIT_PROTOCOL_STOP');process.exitCode=1;stop++;continue}
+            seen.add(key);
+            const state=category==='EDGE'&&file==='config.toml'&&digest==='MISSING'
+              ? 'CLI_CONFIG_ABSENT_RUNTIME_REVIEW_REQUIRED'
+              : digest===pair.head?'MATCH_HEAD':digest===pair.base?'MATCH_BASE':/^[a-f0-9]{64}$/.test(digest)?'UNKNOWN_LIVE_STOP':digest+'_STOP';
+            console.log(category+' '+file+' '+state);
+            if(state==='UNKNOWN_LIVE_STOP' && category==='FRONTEND'){
+              const history=execFileSync('git',['log','--all','--format=%H','--',file],{encoding:'utf8'})
+                .trim().split('\n').filter(Boolean);
+              let match=null,checked=0;
+              for(const commit of history){
+                try{
+                  const bytes=execFileSync('git',['show',commit+':'+file],{maxBuffer:8*1024*1024,stdio:['ignore','pipe','ignore']});
+                  checked++;
+                  if(sha(bytes)===digest){match=commit;break}
+                }catch{}
+              }
+              console.log('PROVENANCE '+file+' '+(match?'MATCH_HISTORY_SHA='+match:'UNMATCHED_IN_HISTORY')+' examined='+checked);
+            }
+            if(state==='CLI_CONFIG_ABSENT_RUNTIME_REVIEW_REQUIRED') configAbsent++;
+            else if(state==='MATCH_HEAD')headCount++;
+            else if(state==='MATCH_BASE')baseCount++;
+            else stop++;
+          }
+          for(const [key] of expected)if(!seen.has(key)){console.log(key.replace('\t',' ')+' NOT_REPORTED_STOP');stop++}
+          console.log('READONLY_AUDIT_SUMMARY files='+expected.size+' matches_base='+baseCount+' matches_head='+headCount+' cli_config_absent='+configAbsent+' unexpected_drift='+stop);
+          if(configAbsent!==1){console.log('CONFIG_STATE_UNEXPECTED_STOP');stop++;}
+          if(stop)process.exitCode=1;
+          NODE
