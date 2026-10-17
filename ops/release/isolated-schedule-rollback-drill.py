@@ -155,9 +155,19 @@ def main():
         print('ROLLBACK_DIRECTORY_METADATA_DIFF_COUNT='+str(sum(
             before_dirs[d] != recovered_dir_meta.get(d) for d in before_dirs)))
         print('ROLLBACK_DIR_NAMES_MATCH='+str(restored_dirs==dirs))
-        require(restored==before and restored_dirs==dirs and
-                recovered_dir_meta==before_dirs,
+        # Atomic replacement changes the containing directory's mtime.
+        # This timestamp is not content or file metadata. Require every byte
+        # and file metadata field unchanged, and permit ONLY root-dir mtime.
+        changed_dir_meta={d for d in before_dirs if before_dirs[d]!=recovered_dir_meta.get(d)}
+        for directory in before_dirs:
+            require({k:v for k,v in before_dirs[directory].items() if k!='mtimeNs'} ==
+                    {k:v for k,v in recovered_dir_meta[directory].items() if k!='mtimeNs'},
+                    'ROLLBACK_DIRECTORY_PERMISSIONS_STOP')
+        require(changed_dir_meta.issubset({'.'}),
+                'ROLLBACK_UNEXPECTED_DIRECTORY_TIMESTAMP_STOP')
+        require(restored==before and restored_dirs==dirs,
                 'ROLLBACK_INVENTORY_MISMATCH_STOP')
+        print('ROOT_DIRECTORY_MTIME_ONLY_CHANGE_OK')
         print('ISOLATED_ROLLBACK_VERIFIED')
         print('ROLLBACK_FULL_TREE_HASH_AND_METADATA_OK')
         # Fail-closed test: intentionally corrupt ONLY the temporary target,
