@@ -146,8 +146,17 @@ def main():
         run(['bash',str(tool),'rollback',str(origin),str(stage),str(backup)],
             'ISOLATED_ROLLBACK')
         restored,restored_dirs=snapshot_module.inventory(origin)
+        recovered_dir_meta=snapshot_module.directory_metadata(origin,restored_dirs)
+        print('ROLLBACK_FILE_CONTENT_DIFF_COUNT='+str(sum(
+            before[n]['sha256'] != restored[n]['sha256'] for n in before if n in restored)))
+        print('ROLLBACK_FILE_METADATA_DIFF_COUNT='+str(sum(
+            before[n] != restored[n] and before[n]['sha256'] == restored[n]['sha256']
+            for n in before if n in restored)))
+        print('ROLLBACK_DIRECTORY_METADATA_DIFF_COUNT='+str(sum(
+            before_dirs[d] != recovered_dir_meta.get(d) for d in before_dirs)))
+        print('ROLLBACK_DIR_NAMES_MATCH='+str(restored_dirs==dirs))
         require(restored==before and restored_dirs==dirs and
-                snapshot_module.directory_metadata(origin,restored_dirs)==before_dirs,
+                recovered_dir_meta==before_dirs,
                 'ROLLBACK_INVENTORY_MISMATCH_STOP')
         print('ISOLATED_ROLLBACK_VERIFIED')
         print('ROLLBACK_FULL_TREE_HASH_AND_METADATA_OK')
