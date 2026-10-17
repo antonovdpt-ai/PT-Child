@@ -1,0 +1,71 @@
+name: Fizira protected frontend backup (no deployment)
+on:
+  push:
+    branches: [codex/schedule-protected-backup-only-20261017]
+    paths:
+      - .github/workflows/fizira-protected-frontend-backup.yml
+permissions:
+  contents: read
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/codex/schedule-protected-backup-only-20261017'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require reviewed release and exact frontend snapshot baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor cab03ade946bc0789aba45327bfe89bef3b92cd9 HEAD
+          git merge-base --is-ancestor 15b9def8c6460af1d54980a3f0e78a660634a5c2 HEAD
+          test "$(wc -l < ops/release/frontend-assets.txt)" -eq 21
+          python3 -m py_compile ops/release/create-protected-frontend-backup.py
+      - name: Establish restricted known-host SSH identity
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY"
+          test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Snapshot current verified frontend into private SSH-home archive
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST" && test -n "$USER"
+          # The expected hashes come only from the verified source baseline,
+          # never from the remote machine or from unreviewed code.
+          expected="$(python3 - <<'PY'
+          import base64,hashlib,json,subprocess
+          files=open('ops/release/frontend-assets.txt',encoding='utf8').read().splitlines()
+          assert len(files)==len(set(files))==21
+          verified={}
+          base='15b9def8c6460af1d54980a3f0e78a660634a5c2'
+          for f in files:
+              value=subprocess.check_output(['git','show',base+':'+f])
+              verified[f]=hashlib.sha256(value).hexdigest()
+          print(base64.b64encode(json.dumps(verified,sort_keys=True).encode()).decode())
+          PY
+          )"
+          # Runs exclusively Python source-verifying backup code.
+          # No root/sudo, no changes to the live frontend, DB, Edge or services.
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -p "${PORT:-22}" "$USER@$HOST" \
+            "FIZIRA_EXPECTED_HASHES_B64='$expected' python3 - '$GITHUB_RUN_ID' '$GITHUB_RUN_ATTEMPT'" \
+            < ops/release/create-protected-frontend-backup.py
