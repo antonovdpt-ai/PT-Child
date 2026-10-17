@@ -80,6 +80,9 @@ test('minute-level calendar works in Chromium at mobile and desktop widths', asy
         assert.equal(await time.inputValue(),'08:00');
         await time.fill('10:20');
         assert.equal(await time.inputValue(),'10:20');
+        if (process.env.SCHEDULE_PREVIEW_DIR && [390,1440].includes(width)) {
+          await page.screenshot({path:`${process.env.SCHEDULE_PREVIEW_DIR}/schedule-${width}-minute-input.png`,fullPage:true});
+        }
         await page.locator('dialog [data-close]').first().click();
         await existing.click();
         assert.equal(await time.inputValue(),'08:30','editing preserves existing minutes');
@@ -88,6 +91,9 @@ test('minute-level calendar works in Chromium at mobile and desktop widths', asy
         await page.waitForFunction(()=>new Date(window.syntheticAppointments[0].starts_at).getMinutes()===45);
         await page.waitForFunction(()=>document.querySelector('[data-edit="fictional-visit"]')?.textContent.includes('09:45'));
         assert.equal(await page.locator('[data-slot="10"]').count(),0,'10:00 also overlaps 09:45–10:45');
+        if (process.env.SCHEDULE_PREVIEW_DIR && [390,1440].includes(width)) {
+          await page.screenshot({path:`${process.env.SCHEDULE_PREVIEW_DIR}/schedule-${width}-edited-0945.png`,fullPage:true});
+        }
         assert.deepEqual(errors,[]);
       } finally { await page.close(); }
     });
