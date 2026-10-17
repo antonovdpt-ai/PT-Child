@@ -24,7 +24,7 @@ test('minute-level calendar works in Chromium at mobile and desktop widths', asy
   try {
     browser = await chromium.launch({ headless:true, args:['--no-sandbox','--disable-dev-shm-usage'] });
     for (const width of [375, 390, 768, 1440]) await t.test(`${width}px`, async () => {
-      const page = await browser.newPage({ viewport:{ width, height:980 } });
+      const page = await browser.newPage({ viewport:{ width, height:980 }, locale:'ru-RU', timezoneId:'Europe/Moscow' });
       const errors = [];
       page.on('pageerror', e => errors.push(e.message));
       try {
