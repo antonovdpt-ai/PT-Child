@@ -4,6 +4,7 @@ on:
     branches: [codex/schedule-rollback-isolated-20261017]
     paths:
       - .github/workflows/schedule-isolated-rollback-drill.yml
+      - ops/release/isolated-schedule-rollback-drill.py
 permissions:
   contents: read
 concurrency:
