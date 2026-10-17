@@ -1,0 +1,47 @@
+name: Fizira schedule visual preview — fictional data only
+on:
+  push:
+    branches: [codex/schedule-minute-preview-20261017]
+    paths:
+      - ".github/workflows/schedule-minute-visual-preview.yml"
+      - "tests/schedule-minute.browser.mjs"
+permissions:
+  contents: read
+jobs:
+  preview:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/codex/schedule-minute-preview-20261017'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm candidate source ancestry and no product-code changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin cab03ade946bc0789aba45327bfe89bef3b92cd9
+          for path in app.js index.html cabinet.js schedule-editor.js schedule-domain.mjs styles.css parent.html; do
+            git show cab03ade946bc0789aba45327bfe89bef3b92cd9:"$path" | cmp -s - "$path"
+          done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked test dependencies
+        run: npm ci
+      - name: Install isolated Chromium
+        run: npx playwright-core install --with-deps chromium
+      - name: Capture 390px and 1440px previews and retest time editor
+        env:
+          SCHEDULE_PREVIEW_DIR: schedule-preview
+        run: |
+          set -euo pipefail
+          mkdir -p schedule-preview
+          node --test tests/schedule-minute.browser.mjs
+          test "$(find schedule-preview -type f -name '*.png' | wc -l)" -eq 4
+      - name: Upload visual preview images with fictional data only
+        uses: actions/upload-artifact@v4
+        with:
+          name: fizira-minute-schedule-previews-390-and-1440
+          path: schedule-preview/*.png
+          retention-days: 14
+          if-no-files-found: error
