@@ -1,0 +1,85 @@
+name: Fizira schedule isolated real activator rollback drill
+on:
+  push:
+    branches: [codex/schedule-rollback-isolated-20261017]
+    paths:
+      - .github/workflows/schedule-isolated-rollback-drill.yml
+permissions:
+  contents: read
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+jobs:
+  rollback-drill:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/codex/schedule-rollback-isolated-20261017'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Pin release candidate and verify exact stage and tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate=cab03ade946bc0789aba45327bfe89bef3b92cd9
+          git merge-base --is-ancestor "$candidate" HEAD
+          python3 -m py_compile ops/release/isolated-schedule-rollback-drill.py
+          python3 -m py_compile ops/release/verify-protected-frontend-restore.py
+          python3 -m py_compile ops/release/frontend-snapshot.py
+          mapfile -t files < ops/release/frontend-assets.txt
+          test "${#files[@]}" -eq 21
+          for f in "${files[@]}" \
+            ops/release/activate-frontend.sh \
+            ops/release/frontend-snapshot.py \
+            ops/release/frontend-assets.txt; do
+            git show "$candidate:$f" | cmp -s - "$f"
+          done
+          python3 - <<'PY'
+          import hashlib,json,subprocess
+          head='cab03ade946bc0789aba45327bfe89bef3b92cd9'
+          base='15b9def8c6460af1d54980a3f0e78a660634a5c2'
+          files=open('ops/release/frontend-assets.txt',encoding='utf-8').read().splitlines()
+          hashes={}
+          for name in files:
+              data=subprocess.check_output(['git','show',head+':'+name])
+              hashes[name]=hashlib.sha256(data).hexdigest()
+          with open('schedule-release-asset-hashes.json','w',encoding='utf-8') as f:
+              json.dump({'head':head,'base':base,'files':hashes},f,sort_keys=True)
+          PY
+      - name: Configure restricted known-host SSH identity
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Dry-run activation and rollback with real archived production bytes only
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST" && test -n "$USER"
+          mapfile -t files < ops/release/frontend-assets.txt
+          test "${#files[@]}" -eq 21
+          # Entire incoming stream is the exact candidate stage and pinned tools.
+          # The verifier creates and deletes a private disposable directory only.
+          script="$(base64 -w0 ops/release/isolated-schedule-rollback-drill.py)"
+          tar -cf - "${files[@]}" \
+            ops/release/activate-frontend.sh \
+            ops/release/frontend-snapshot.py \
+            ops/release/frontend-assets.txt \
+            ops/release/verify-protected-frontend-restore.py \
+            schedule-release-asset-hashes.json |
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+              -p "${PORT:-22}" "$USER@$HOST" \
+              "python3 -c 'import base64; exec(base64.b64decode(\"$script\"))'"
