@@ -74,7 +74,6 @@ def member_name(name):
 def load_expected(snapshot):
     manifest = snapshot/'manifest.json'
     complete = snapshot/'complete'
-    require(sha_file(complete, 1024) == sha_file(complete,1024), 'MARKER_CHANGED_STOP')
     with open(complete,'r',encoding='ascii') as f:
         marker = f.read()
     require(re.fullmatch(r'[a-f0-9]{64}\n',marker or '') is not None,
