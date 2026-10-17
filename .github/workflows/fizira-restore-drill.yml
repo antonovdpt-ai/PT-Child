@@ -1,0 +1,53 @@
+name: Fizira isolated archive restoration drill (no deployment)
+on:
+  push:
+    branches: [codex/schedule-protected-backup-only-20261017]
+    paths:
+      - .github/workflows/fizira-restore-drill.yml
+permissions:
+  contents: read
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+jobs:
+  restore-drill:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/codex/schedule-protected-backup-only-20261017'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify test source is based on the reviewed release
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor cab03ade946bc0789aba45327bfe89bef3b92cd9 HEAD
+          python3 -m py_compile ops/release/verify-protected-frontend-restore.py
+      - name: Authenticate using known-host restricted SSH identity
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Restore verified archive only into throwaway private directory
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST" && test -n "$USER"
+          # Only the immutable snapshot is read; only a new private temp
+          # sibling is written and cleaned up. Production source is never used.
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -p "${PORT:-22}" "$USER@$HOST" 'python3 -' \
+            < ops/release/verify-protected-frontend-restore.py
