@@ -123,3 +123,5 @@ jobs:
             ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
               -p "${PORT:-22}" "$USER@$HOST" \
               "python3 -c 'import base64; exec(base64.b64decode(\"$script\"))'"
+
+# Post-aborted-deployment read-only verification, 2026-10-18; never deploy.
