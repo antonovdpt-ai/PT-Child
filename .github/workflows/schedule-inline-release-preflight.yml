@@ -1,0 +1,115 @@
+name: Fizira PR36 release safety preflight (read-only and isolated)
+on:
+  push:
+    branches: [codex/schedule-inline-release-preflight-20261018]
+    paths:
+      - .github/workflows/schedule-inline-release-preflight.yml
+permissions:
+  contents: read
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+jobs:
+  preflight:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/codex/schedule-inline-release-preflight-20261018'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Pin release source and limit changed frontend files
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ops/release/inline-release-readonly-audit.py
+          python3 -m py_compile ops/release/isolated-schedule-rollback-drill.py
+          base=15b9def8c6460af1d54980a3f0e78a660634a5c2
+          head=d19fe0ce21fe18c1f3003ebe33af65b8870178fb
+          test "$(git rev-parse "$head^")" = "$base"
+          git merge-base --is-ancestor "$head" HEAD
+          test "$(git rev-parse "$base:supabase")" = "$(git rev-parse "$head:supabase")"
+          python3 - <<'PY'
+          import subprocess
+          base='15b9def8c6460af1d54980a3f0e78a660634a5c2'
+          head='d19fe0ce21fe18c1f3003ebe33af65b8870178fb'
+          files=open('ops/release/frontend-assets.txt',encoding='utf-8').read().splitlines()
+          assert len(set(files))==len(files)==21
+          changed={f for f in files if subprocess.check_output(['git','show',base+':'+f])!=subprocess.check_output(['git','show',head+':'+f])}
+          assert changed=={'app.js','cabinet.js','index.html','schedule-domain.mjs','schedule-editor.js','styles.css'},changed
+          for f in files+['ops/release/activate-frontend.sh','ops/release/frontend-snapshot.py','ops/release/frontend-assets.txt']:
+              subprocess.run(['git','show',head+':'+f],stdout=subprocess.PIPE,check=True)
+              assert open(f,'rb').read()==subprocess.check_output(['git','show',head+':'+f]),f
+          print('PR36_SCOPE_SIX_ASSETS_OK')
+          print('BACKEND_TREE_UNCHANGED_OK')
+          PY
+      - name: Configure restricted SSH
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Verify Timeweb production base and existing protected archive without writes
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST" && test -n "$USER"
+          expected="$(python3 - <<'PY'
+          import base64,hashlib,json,subprocess
+          base='15b9def8c6460af1d54980a3f0e78a660634a5c2'
+          head='d19fe0ce21fe18c1f3003ebe33af65b8870178fb'
+          front=open('ops/release/frontend-assets.txt',encoding='utf-8').read().splitlines()
+          edge=[x for x in open('ops/release/edge-assets.txt',encoding='utf-8').read().splitlines() if x!='config.toml']
+          assert len(front)==21 and len(edge)==13
+          data={'base':base,'head':head,'frontend':{},'edge':{}}
+          for type,files in (('frontend',front),('edge',edge)):
+            for name in files:
+              gitpath=('supabase/'+name) if type=='edge' else name
+              payload=subprocess.check_output(['git','show',base+':'+gitpath])
+              data[type][name]=hashlib.sha256(payload).hexdigest()
+              head_payload=subprocess.check_output(['git','show',head+':'+gitpath])
+              if type=='edge': assert payload==head_payload,name
+          print(base64.b64encode(json.dumps(data,sort_keys=True).encode()).decode())
+          PY
+          )"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -p "${PORT:-22}" "$USER@$HOST" \
+            "FIZIRA_EXPECTED_BASE_HASHES_B64='$expected' python3 -" \
+            < ops/release/inline-release-readonly-audit.py
+      - name: Rehearse exact candidate activate and rollback in private disposable copy
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST" && test -n "$USER"
+          mapfile -t files < ops/release/frontend-assets.txt
+          test "${#files[@]}" -eq 21
+          python3 - <<'PY'
+          import hashlib,json,subprocess
+          head='d19fe0ce21fe18c1f3003ebe33af65b8870178fb'
+          base='15b9def8c6460af1d54980a3f0e78a660634a5c2'
+          files=open('ops/release/frontend-assets.txt',encoding='utf-8').read().splitlines()
+          hashes={f:hashlib.sha256(subprocess.check_output(['git','show',head+':'+f])).hexdigest() for f in files}
+          with open('schedule-release-asset-hashes.json','w',encoding='utf-8') as stream:
+            json.dump({'head':head,'base':base,'files':hashes},stream,sort_keys=True)
+          PY
+          script="$(base64 -w0 ops/release/isolated-schedule-rollback-drill.py)"
+          tar -cf - "${files[@]}" \
+            ops/release/activate-frontend.sh \
+            ops/release/frontend-snapshot.py \
+            ops/release/frontend-assets.txt \
+            ops/release/verify-protected-frontend-restore.py \
+            schedule-release-asset-hashes.json |
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+              -p "${PORT:-22}" "$USER@$HOST" \
+              "python3 -c 'import base64; exec(base64.b64decode(\"$script\"))'"
