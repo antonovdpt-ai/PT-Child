@@ -1,0 +1,39 @@
+name: Validate PR36 root-console release helper (no deployment)
+on:
+  push:
+    branches: [codex/schedule-inline-release-activate-20261018]
+    paths: [".github/workflows/schedule-inline-root-helper-validation.yml"]
+permissions:
+  contents: read
+jobs:
+  validate:
+    if: github.repository == 'antonovdpt-ai/PT-Child'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Syntax check and verify pinned Git blob manifests
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ops/release/manual-pr36-root-activation.py
+          python3 - <<'PY'
+          import hashlib,importlib.util,subprocess
+          spec=importlib.util.spec_from_file_location('fizira_root_release',
+              'ops/release/manual-pr36-root-activation.py')
+          m=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          base='15b9def8c6460af1d54980a3f0e78a660634a5c2'
+          head='d19fe0ce21fe18c1f3003ebe33af65b8870178fb'
+          assert len(m.ASSETS)==21 and len(m.EDGES)==13 and len(m.TOOL_BLOBS)==3
+          for name,(old,new) in m.ASSETS.items():
+            assert m.blob(subprocess.check_output(['git','show',base+':'+name]))==old,name
+            assert m.blob(subprocess.check_output(['git','show',head+':'+name]))==new,name
+          for name,blob in m.TOOL_BLOBS.items():
+            assert m.blob(subprocess.check_output(['git','show',head+':ops/release/'+name]))==blob,name
+          for name,blob in m.EDGES.items():
+            assert m.blob(subprocess.check_output(['git','show',base+':supabase/'+name]))==blob,name
+            assert m.blob(subprocess.check_output(['git','show',head+':supabase/'+name]))==blob,name
+          print('ROOT_RELEASE_HELPER_SYNTAX_AND_PINNED_CONTENT_OK')
+          PY
