@@ -1,0 +1,61 @@
+name: PR36 read-only SSH staging locator
+on:
+  push:
+    branches: [codex/schedule-pr36-staging-location-diagnostic-20261018]
+    paths: [".github/workflows/pr36-staging-location-readonly.yml"]
+permissions:
+  contents: read
+jobs:
+  locate:
+    if: github.repository == 'antonovdpt-ai/PT-Child'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Configure existing read-only SSH login
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Locate exact prior staging folder without writes
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST" && test -n "$USER"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "${PORT:-22}" "$USER@$HOST" 'python3 -' <<'PY'
+          import os, pwd, stat
+          from pathlib import Path
+          name='pr36-39152537485-1'
+          user=pwd.getpwuid(os.geteuid())
+          home=Path(user.pw_dir)
+          candidates=[Path.cwd(), Path.home(), home, Path('/home/ftransfer'), Path('/root'), Path('/root/supabase-project'), Path('/var/www')]
+          print('SSH_EFFECTIVE_USER='+user.pw_name)
+          print('SSH_CWD='+str(Path.cwd()))
+          print('SSH_LOGIN_HOME='+str(home))
+          print('SSH_ENV_HOME='+str(os.environ.get('HOME','')))
+          checked=set()
+          for base in candidates:
+              relative=base/'.cache/fizira-frontend/releases'/name
+              if str(relative) in checked: continue
+              checked.add(str(relative))
+              ok=relative.is_dir() and not relative.is_symlink()
+              print('CANDIDATE='+str(relative)+' EXISTS='+str(ok))
+              if ok:
+                  print('STAGE_EXISTS='+str((relative/'stage').is_dir()))
+                  print('TOOLS_EXISTS='+str((relative/'tools/ops/release').is_dir()))
+                  print('SOURCE_ASSETS_EXIST='+str((relative/'stage/app.js').is_file()))
+                  print('SOURCE_TOOL_EXISTS='+str((relative/'tools/ops/release/activate-frontend.sh').is_file()))
+                  print('SOURCE_OWNER_UID='+str(os.lstat(relative).st_uid))
+                  print('STAGE_LOCATED_READONLY_OK')
+          PY
