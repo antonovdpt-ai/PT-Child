@@ -1,0 +1,165 @@
+name: Fizira PR36 guarded frontend-only production release
+on:
+  push:
+    branches: [codex/schedule-inline-release-activate-20261018]
+    paths: [".github/workflows/schedule-inline-frontend-production-release.yml"]
+permissions:
+  contents: read
+concurrency:
+  group: fizira-frontend-production
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.repository == 'antonovdpt-ai/PT-Child' && github.ref == 'refs/heads/codex/schedule-inline-release-activate-20261018'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify release is exactly the user-approved PR36 frontend commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=15b9def8c6460af1d54980a3f0e78a660634a5c2
+          head=d19fe0ce21fe18c1f3003ebe33af65b8870178fb
+          test "$(git rev-parse "$head^")" = "$base"
+          git merge-base --is-ancestor "$head" HEAD
+          test "$(git rev-parse "$base:supabase")" = "$(git rev-parse "$head:supabase")"
+          python3 - <<'PY'
+          import subprocess
+          base='15b9def8c6460af1d54980a3f0e78a660634a5c2'
+          head='d19fe0ce21fe18c1f3003ebe33af65b8870178fb'
+          names=open('ops/release/frontend-assets.txt',encoding='utf8').read().splitlines()
+          assert len(names)==len(set(names))==21
+          changed={f for f in names if subprocess.check_output(['git','show',base+':'+f])!=subprocess.check_output(['git','show',head+':'+f])}
+          assert changed=={'app.js','cabinet.js','index.html','styles.css','schedule-domain.mjs','schedule-editor.js'},changed
+          for p in names+['ops/release/activate-frontend.sh','ops/release/frontend-snapshot.py','ops/release/frontend-assets.txt']:
+            assert open(p,'rb').read()==subprocess.check_output(['git','show',head+':'+p]),p
+          print('EXACT_SIX_FILE_APPROVED_RELEASE_OK')
+          PY
+      - name: Prepare exact-asset package and expected source SHA-256s
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mapfile -t names < ops/release/frontend-assets.txt
+          for f in "${names[@]}"; do test -f "$f" && test ! -L "$f"; done
+          sha256sum "${names[@]}" > release-assets.sha256
+          tar -czf frontend.tar.gz "${names[@]}"
+          tar -czf tools.tar.gz ops/release/activate-frontend.sh \
+            ops/release/frontend-snapshot.py ops/release/frontend-assets.txt \
+            ops/release/inline-release-readonly-audit.py ops/release/inline-release-actions.sh
+          python3 - <<'PY' > expected-source-hashes.b64
+          import base64,hashlib,json,subprocess
+          base='15b9def8c6460af1d54980a3f0e78a660634a5c2'
+          head='d19fe0ce21fe18c1f3003ebe33af65b8870178fb'
+          front=open('ops/release/frontend-assets.txt',encoding='utf8').read().splitlines()
+          edge=[x for x in open('ops/release/edge-assets.txt',encoding='utf8').read().splitlines() if x!='config.toml']
+          assert len(front)==21 and len(edge)==13
+          data={'base':base,'head':head,'frontend':{},'edge':{}}
+          for group,items in (('frontend',front),('edge',edge)):
+            for f in items:
+              ref=('supabase/'+f) if group=='edge' else f
+              source=subprocess.check_output(['git','show',base+':'+ref])
+              if group=='edge': assert source==subprocess.check_output(['git','show',head+':'+ref])
+              data[group][f]=hashlib.sha256(source).hexdigest()
+          print(base64.b64encode(json.dumps(data,sort_keys=True).encode()).decode())
+          PY
+      - name: Configure existing restricted SSH identity
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Stage artifacts outside production
+        id: stage
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$HOST" && test -n "$USER"
+          remote=".cache/fizira-frontend/releases/pr36-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${PORT:-22}" "$USER@$HOST" \
+            "set -eu; umask 077; install -d -m 700 .cache/fizira-frontend/releases; test ! -e '$remote' && test ! -L '$remote'; install -d -m 700 '$remote' '$remote/stage' '$remote/tools'"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -P "${PORT:-22}" \
+            frontend.tar.gz tools.tar.gz release-assets.sha256 expected-source-hashes.b64 \
+            "$USER@$HOST:$remote/"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${PORT:-22}" "$USER@$HOST" \
+            "set -eu; cd '$remote'; tar -xzf frontend.tar.gz -C stage --no-same-owner; tar -xzf tools.tar.gz -C tools --no-same-owner; cd stage; sha256sum -c ../release-assets.sha256"
+          echo 'EXACT_PR36_STAGING_OK'
+      - name: Final read-only production source and archive guard
+        id: gate
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          remote=".cache/fizira-frontend/releases/pr36-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${PORT:-22}" "$USER@$HOST" \
+            "set -eu; cd '$remote'; bash tools/ops/release/inline-release-actions.sh preflight"
+      - name: Snapshot complete frontend and activate six changed files
+        id: activate
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          remote=".cache/fizira-frontend/releases/pr36-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${PORT:-22}" "$USER@$HOST" \
+            "set -eu; cd '$remote'; bash tools/ops/release/inline-release-actions.sh activate"
+      - name: Confirm live files and publicly served HTTPS assets exactly match PR36
+        id: verify
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          remote=".cache/fizira-frontend/releases/pr36-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${PORT:-22}" "$USER@$HOST" \
+            "set -eu; cd '$remote'; bash tools/ops/release/inline-release-actions.sh verify"
+          mkdir -p public
+          while IFS= read -r asset; do
+            curl --fail --silent --show-error --max-time 25 --retry 3 --retry-delay 2 \
+              -H 'Cache-Control: no-cache' \
+              "https://app.fizira.com/$asset?release=d19fe0ce21fe18c1f3003ebe33af65b8870178fb&run=$GITHUB_RUN_ID" \
+              -o "public/$asset"
+          done < ops/release/frontend-assets.txt
+          (cd public; sha256sum -c ../release-assets.sha256)
+          echo 'PUBLIC_PRODUCTION_FRONTEND_MATCHES_PR36_OK'
+      - name: Run guarded rollback only if activation or verification failed
+        if: ${{ failure() && (steps.activate.outcome == 'failure' || steps.verify.outcome == 'failure') }}
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          remote=".cache/fizira-frontend/releases/pr36-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p "${PORT:-22}" "$USER@$HOST" \
+            "set -eu; cd '$remote'; bash tools/ops/release/inline-release-actions.sh rollback"
+      - name: Retain hashes for audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr36-release-hashes
+          path: release-assets.sha256
+          retention-days: 30
+          if-no-files-found: warn
