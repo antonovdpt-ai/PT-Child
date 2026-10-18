@@ -164,6 +164,10 @@ def main():
     require(tools['frontend-assets.txt'].decode('ascii').splitlines()==list(ASSETS),
             'UNEXPECTED_ASSET_ORDER_STOP')
     print('REVIEWED_STAGING_CONTENT_AND_STOCK_TOOLS_OK',flush=True)
+    if sys.argv[1:] == ['--check']:
+        print('ROOT_READONLY_PREFLIGHT_ONLY_OK',flush=True)
+        return
+    require(len(sys.argv)==1,'UNKNOWN_RELEASE_ARGUMENT_STOP')
     os.umask(0o077)
     parent=Path('/root/fizira-release-backups')
     parent.mkdir(mode=0o700,exist_ok=True)
