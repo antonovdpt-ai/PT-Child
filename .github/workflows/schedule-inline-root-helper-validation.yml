@@ -2,7 +2,9 @@ name: Validate PR36 root-console release helper (no deployment)
 on:
   push:
     branches: [codex/schedule-inline-release-activate-20261018]
-    paths: [".github/workflows/schedule-inline-root-helper-validation.yml"]
+    paths:
+      - ".github/workflows/schedule-inline-root-helper-validation.yml"
+      - "ops/release/manual-pr36-root-activation.py"
 permissions:
   contents: read
 jobs:
@@ -35,6 +37,10 @@ jobs:
           for name,blob in m.EDGES.items():
             assert m.blob(subprocess.check_output(['git','show',base+':supabase/'+name]))==blob,name
             assert m.blob(subprocess.check_output(['git','show',head+':supabase/'+name]))==blob,name
-          assert 'ROOT_READONLY_PREFLIGHT_ONLY_OK' in open('ops/release/manual-pr36-root-activation.py',encoding='utf8').read()
+          content=open('ops/release/manual-pr36-root-activation.py',encoding='utf8').read()
+          assert 'ROOT_READONLY_PREFLIGHT_ONLY_OK' in content
+          assert 'STAGED_RELEASE_NOT_UNIQUE_STOP' in content
+          assert 'STAGED_PATH_SYMLINK_STOP' in content
+          assert "candidates.append(candidate)" in content
           print('ROOT_RELEASE_HELPER_SYNTAX_AND_PINNED_CONTENT_OK')
           PY
