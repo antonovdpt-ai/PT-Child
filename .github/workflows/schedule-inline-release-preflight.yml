@@ -84,6 +84,16 @@ jobs:
             -p "${PORT:-22}" "$USER@$HOST" \
             "FIZIRA_EXPECTED_BASE_HASHES_B64='$expected' python3 -" \
             < ops/release/inline-release-readonly-audit.py
+      - name: Check that restricted deployment identity can write the frontend directory (no write performed)
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            -p "${PORT:-22}" "$USER@$HOST" \
+            'if test -w /root/supabase-project/volumes/proxy/app; then echo FRONTEND_DIRECTORY_WRITABLE_OK; else echo FRONTEND_DIRECTORY_NOT_WRITABLE_STOP; exit 1; fi'
       - name: Rehearse exact candidate activate and rollback in private disposable copy
         env:
           HOST: ${{ secrets.TIMEWEB_HOST }}
