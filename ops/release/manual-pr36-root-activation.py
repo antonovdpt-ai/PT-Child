@@ -145,12 +145,31 @@ def verify_public():
 def main():
     require(os.geteuid()==0,'ROOT_REQUIRED_STOP')
     require(len(ASSETS)==21 and len(EDGES)==13,'MANIFEST_INVALID_STOP')
-    passwd=pwd.getpwnam('ftransfer')
-    source=Path(passwd.pw_dir)/'.cache'/'fizira-frontend'/'releases'/STAGING_ID
+    # GitHub Actions uses the connected SSH identity, which need not be named
+    # ftransfer. Discover ONLY the exact pinned release inside /home/*.
+    # Fail closed on missing/multiple matches, symlinks, or mismatched ownership.
+    homes=Path('/home')
+    require(homes.is_dir() and not homes.is_symlink(),
+            'USER_HOMES_UNAVAILABLE_STOP')
+    candidates=[]
+    for item in homes.iterdir():
+        if item.is_symlink() or not item.is_dir():
+            continue
+        candidate=item/'.cache'/'fizira-frontend'/'releases'/STAGING_ID
+        if candidate.is_dir() and not candidate.is_symlink():
+            candidates.append(candidate)
+    require(len(candidates)==1,'STAGED_RELEASE_NOT_UNIQUE_STOP')
+    source=candidates[0]
+    for node in [source.parent.parent.parent.parent,source.parent.parent.parent,
+                 source.parent.parent,source.parent,source]:
+        require(node.is_dir() and not node.is_symlink(),
+                'STAGED_PATH_SYMLINK_STOP')
     srcstage=source/'stage'
     srctools=source/'tools'/'ops'/'release'
-    require(source.is_dir() and srcstage.is_dir() and srctools.is_dir(),
-            'STAGED_RELEASE_MISSING_STOP')
+    require(srcstage.is_dir() and not srcstage.is_symlink() and
+            srctools.is_dir() and not srctools.is_symlink() and
+            source.stat().st_uid==srcstage.stat().st_uid,
+            'STAGED_RELEASE_INVALID_STOP')
     # Validates the original state, all unchanged server-side files, and every
     # staged byte independently of the SSH user's writable hash manifest.
     verify_live(0)
