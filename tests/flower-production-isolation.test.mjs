@@ -8,6 +8,13 @@ const root=new URL('../',import.meta.url),base='51e18c88377a7b20d06eef24b0db9fcb
 const source=await readFile(new URL('app.js',root),'utf8');
 const baseline=JSON.parse(await readFile(new URL('fixtures/production-source-51e18c8.json',import.meta.url),'utf8'));
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
+// The deployed Flower files were independently identified by hash-only Timeweb
+// audit, not generated from a stale snapshot. Pin their exact Git blob bytes.
+const publishedFlowerBlobs = {
+  'patient-flower.css':'28371d13895e1e5f2c1f6e751859ed6fab3a899d',
+  'patient-flower.mjs':'5fd023baa415541890be27c583a9ada8cfb41ea0'
+};
+const gitBlob=bytes=>createHash('sha1').update(Buffer.from('blob '+bytes.length+String.fromCharCode(0))).update(bytes).digest('hex');
 // This follow-up changes only these release tools to check the actual self-hosted
 // runtime instead of requiring an unused CLI packaging file. Product/backend
 // parity remains pinned; runtime fail-closed behavior has integration coverage.
@@ -22,7 +29,9 @@ test('isolated Flower release leaves all backend and PDF export bytes at product
  assert.equal(baseline.baseSha,base);
  for(const [file,expected] of Object.entries({...baseline.unchangedFiles,...baseline.approvedFlowerAssets})) {
   if(adaptedAuditTools.has(file))continue;
-  assert.equal(sha256(await readFile(new URL(file,root))),expected,file);
+  const bytes=await readFile(new URL(file,root));
+  if (publishedFlowerBlobs[file]) assert.equal(gitBlob(bytes),publishedFlowerBlobs[file],file+' must match hash-audited 15 October production');
+  else assert.equal(sha256(bytes),expected,file);
  }
  for(const {start,source:block} of baseline.preservedReportHandlers){
   const preserved=source.replace(/    box\.refreshReportHistory\?\.\(\);\n    overviewRoot\?\.refreshOverview\?\.\(\);\n/g,'').replace(/box\.querySelectorAll\(/g,'document.querySelectorAll(').replace(/box\n  \.querySelectorAll\(/g,'document\n  .querySelectorAll(').replace(/if \(navigateSection\?\.refresh\) await navigateSection\.refresh\('overview'\); else renderPatient\(\);/g,'renderPatient();');

@@ -52,6 +52,14 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Provision immutable source fixtures for isolated tests
+        run: bash ops/release/ensure-schedule-test-fixtures.sh
+      - name: Install PDF verification tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
       - name: Run security, AI, deletion and schedule checks
         shell: bash
         run: |

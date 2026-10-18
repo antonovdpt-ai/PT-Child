@@ -17,24 +17,32 @@ test('returning from another section retains the production report handler and u
 });
 
 
-test('mobile starts compact and uses its own presentation preference without changing desktop',()=>{
-  const saved=new Map([['fizira:flower-compact','0']]);
+test('mobile opens expanded by default and v2 preferences remain separate from desktop',()=>{
+  const saved=new Map([['fizira:flower-compact','1'],['fizira:flower-mobile-compact','1']]);
   const view={matchMedia:q=>({matches:q==='(max-width:700px)'}),localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,v)}};
+  assert.equal(readFlowerCompact(view),false,'legacy compact flags do not collapse the updated mobile interface');
+  saveFlowerCompact(view,true);
   assert.equal(readFlowerCompact(view),true);
+  assert.equal(saved.get('fizira:flower-mobile-compact-v2'),'1');
+  view.matchMedia=()=>({matches:false});
+  assert.equal(readFlowerCompact(view),false,'mobile preference must not change desktop');
+  saveFlowerCompact(view,true);
+  assert.equal(readFlowerCompact(view),true);
+  assert.equal(saved.get('fizira:flower-compact-v2'),'1');
+  view.matchMedia=q=>({matches:q==='(max-width:700px)'});
   saveFlowerCompact(view,false);
   assert.equal(readFlowerCompact(view),false);
-  assert.equal(saved.get('fizira:flower-compact'),'0');
-  assert.equal(saved.get('fizira:flower-mobile-compact'),'0');
-  view.matchMedia=()=>({matches:false});assert.equal(readFlowerCompact(view),false);
+  assert.equal(saved.get('fizira:flower-compact-v2'),'1','mobile expanding must not affect desktop preference');
 });
 
 test('tapping the mobile patient cap expands the existing flower without replacing its live form',async()=>{
   const h=await flowerFixture();
   try {
     h.window.matchMedia=query=>({matches:query==='(max-width:700px)'||query==='(prefers-reduced-motion: reduce)'});
+    h.window.localStorage.setItem('fizira:flower-mobile-compact-v2','1');
     h.render();
     const root=h.document.querySelector('.patient-flower'),panel=h.document.getElementById('tabContent');
-    assert.ok(root.classList.contains('is-compact'));
+    assert.ok(root.classList.contains('is-compact'),'saved v2 mobile preference folds the card');
     panel.innerHTML='<form><textarea>Несохранённая оценка</textarea></form>';
     const form=panel.querySelector('form'),field=form.querySelector('textarea');
     h.document.querySelector('[data-flower-expand]').click();
@@ -42,7 +50,7 @@ test('tapping the mobile patient cap expands the existing flower without replaci
     assert.equal(h.document.querySelector('.patient-flower'),root);
     assert.equal(h.document.getElementById('tabContent'),panel);
     assert.equal(panel.querySelector('form'),form);assert.equal(field.value,'Несохранённая оценка');
-    assert.equal(h.window.localStorage.getItem('fizira:flower-mobile-compact'),'0');
+    assert.equal(h.window.localStorage.getItem('fizira:flower-mobile-compact-v2'),'0');
   } finally {await h.close();}
 });
 
@@ -177,7 +185,7 @@ test('patient navigation exposes seven petals linked to existing sections', asyn
       assert.equal(h.state.tab,key);
       assert.equal(h.document.querySelector('#tabContent').dataset.patientSection,key);
       assert.equal(h.document.querySelector('[aria-current="page"]').dataset.tab,key);
-      assert.equal(h.document.querySelector('[data-flower-toggle]').getAttribute('aria-expanded'),'false');
+      assert.equal(h.document.querySelector('[data-flower-toggle]').getAttribute('aria-expanded'),'true','production keeps expanded flower across section navigation');
     }
   } finally {await h.close();}
 });
@@ -208,7 +216,7 @@ test('folding keeps the current form DOM and stores only a layout preference', a
     assert.equal(content.querySelector('input').value,'Несохранённая запись');
     assert.equal(h.state.tab,'overview');
     const stored=Object.fromEntries(Array.from({length:h.window.localStorage.length},(_,i)=>{const key=h.window.localStorage.key(i);return [key,h.window.localStorage.getItem(key)];}));
-    assert.deepEqual(stored,{'fizira:flower-compact':'1'});
+    assert.deepEqual(stored,{'fizira:flower-compact-v2':'1'});
     h.render();
     assert.equal(h.document.querySelector('[data-flower-toggle]').getAttribute('aria-expanded'),'false');
     h.document.querySelector('[data-flower-toggle]').click();

@@ -54,6 +54,32 @@ test('migration executes and schedule writes are isolated, atomic and debt-safe'
     result = await db.query(`select starts_at,paid_kopecks from public.appointments where patient_id='${patient}' order by starts_at`);
     assert.deepEqual(result.rows.map(r => r.paid_kopecks), [300000, 0, 250000, 0], 'selected visit and completed debt are paid, other future visit is untouched');
 
+    // Actual SQL function + exclusion constraint: arbitrary minutes round-trip,
+    // move only the chosen row, reject overlaps atomically, accept exact edges.
+    const minuteEntry = entry('2030-01-14T11:30:00Z', { paid_kopecks: 100000, note: 'Синтетические минуты' });
+    await db.query(`select public.save_schedule_entries(${asJson([minuteEntry, entry('2030-01-14T13:00:00Z')])}, false)`);
+    const readMinutes = async () => (await db.query(`select * from public.appointments where starts_at >= '2030-01-14T00:00:00Z' order by starts_at`)).rows;
+    const original = await readMinutes();
+    assert.equal(original[0].starts_at.toISOString(), new Date(minuteEntry.starts_at).toISOString());
+    assert.equal(original[0].ends_at - original[0].starts_at, 3600000);
+    const moving = (await readMinutes())[0]; // independently reload persisted row
+    const move = { ...moving, starts_at: '2030-01-14T11:45:00Z', ends_at: '2030-01-14T12:45:00Z', expected_updated_at: moving.updated_at };
+    await db.query(`select public.save_schedule_entries(${asJson([move])}, false)`);
+    const moved = await readMinutes();
+    assert.equal(moved[0].starts_at.toISOString(), new Date(move.starts_at).toISOString());
+    assert.equal(moved[0].paid_kopecks, 100000);
+    assert.deepEqual(moved[1], original[1], 'neighbor row including updated_at remains byte-for-byte equivalent');
+    const collision = { ...move, starts_at: '2030-01-14T12:01:00Z', ends_at: '2030-01-14T13:01:00Z', expected_updated_at: moved[0].updated_at };
+    await assert.rejects(db.query(`select public.save_schedule_entries(${asJson([collision])}, false)`), /appointments_no_active_overlap|conflicting key/i);
+    assert.deepEqual(await readMinutes(), moved, 'rejected move leaves both persisted rows unchanged');
+    await assert.rejects(db.query(`select public.save_schedule_entries(${asJson([entry('2030-01-14T12:30:00Z')])}, false)`), /appointments_no_active_overlap|conflicting key/i);
+    await assert.rejects(db.query(`select public.save_schedule_entries(${asJson([entry('2030-01-15T11:30:00Z'), entry('2030-01-14T12:30:00Z')])}, false)`), /appointments_no_active_overlap|conflicting key/i);
+    assert.equal((await db.query(`select count(*)::int as n from public.appointments where starts_at='2030-01-15T11:30:00Z'`)).rows[0].n, 0, 'a conflicting repeat batch is atomic');
+    const touching = { ...move, starts_at: '2030-01-14T12:00:00Z', ends_at: '2030-01-14T13:00:00Z', expected_updated_at: moved[0].updated_at };
+    await db.query(`select public.save_schedule_entries(${asJson([touching])}, false)`);
+    assert.equal((await readMinutes())[0].starts_at.toISOString(), new Date(touching.starts_at).toISOString());
+    await assert.rejects(db.query(`select public.save_schedule_entries(${asJson([{ ...move, expected_updated_at: original[0].updated_at }])}, false)`), /SCHEDULE_STALE/);
+
     await db.exec(`set "request.jwt.claim.sub"='${user2}'`);
     result = await db.query('select count(*)::int as count from public.appointments');
     assert.equal(result.rows[0].count, 0, 'RLS hides another specialist schedule');

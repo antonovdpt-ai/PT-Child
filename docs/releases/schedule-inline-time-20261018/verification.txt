@@ -1,0 +1,52 @@
+Fizira inline schedule verification — 2026-10-18
+Source baseline: 15b9def8c6460af1d54980a3f0e78a660634a5c2
+Branch: codex/schedule-inline-time-20261018
+Local runtime: Node v24.19.0; Chromium 153.0.8010.0; PGlite 0.5.8
+No production connection; synthetic data only. GitHub CI uses Node 22.
+
+$ npm test
+ℹ tests 386
+ℹ pass 386
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+
+$ TZ=Europe/Moscow node --test tests/schedule-domain.test.mjs tests/schedule-inline-time.test.mjs
+ℹ tests 19
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+
+$ CHROMIUM_EXECUTABLE_PATH=/tmp/fizira-chromium node --test tests/schedule-inline.browser.mjs
+ℹ tests 5
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+
+$ node --test ops/release/parent-portal-ci-baseline.test.mjs ops/release/parent-portal-release.test.mjs tests/schedule-release-scope.test.mjs
+ℹ tests 11
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+
+Browser baseline comparison:
+ℹ 375px initial layout {"width":375,"scroll":375,"slot":[{"width":343,"height":73.6875}],"overflow":[]}
+ℹ 390px initial layout {"width":390,"scroll":390,"slot":[{"width":358,"height":73.6875}],"overflow":[]}
+ℹ 768px initial layout {"width":768,"scroll":797,"slot":[{"width":476,"height":73.6875}],"overflow":["BUTTON.btn secondary"]}
+ℹ 1440px initial layout {"width":1440,"scroll":1440,"slot":[{"width":1014,"height":73.6875}],"overflow":[]}
+
+Unchanged existing 768px overflow is copy-week button, not introduced by this delta.
+All 15 protected frontend assets match 15b9def exact Git blob hashes.
+Deployment workflow, backend and parent/Flower code are unchanged.
+Independent review: initial two findings fixed; follow-up found no residual issue.
+
+SHA-256 of six runtime delta files:
+88296a90f823b8c7742bb03f2fe29d5b1b2dafe1c340c36eead66863fc6c40f0  app.js
+bb6e469283b5a5de7bb65029aad8d03f0c39a1d087db200e74d3712e8812d171  cabinet.js
+b0c2a8653b3dccc7c358f19d88834379500431769a0ede14b119d89e1fb2f0df  index.html
+84b85ef06dd900c1346b0c6b80d8a35426a027bac48d29d6a2f99fad52d4bc6b  schedule-domain.mjs
+e227a30ced498c79bce121cb1c68ec441f2250ff7ad5a84223724c8971e690a7  schedule-editor.js
+6adba8ae1ecdae4b55e0bb8e438062d03c37d2e8750b0a7ef6c286fac426a466  styles.css
