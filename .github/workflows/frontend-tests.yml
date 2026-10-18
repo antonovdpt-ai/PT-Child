@@ -64,5 +64,15 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Provision immutable source fixtures for isolated tests
+        run: bash ops/release/ensure-schedule-test-fixtures.sh
+      - name: Install PDF verification tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
       - name: Run regression tests
         run: npm test
+      - name: Install Chromium for isolated schedule checks
+        run: npx playwright-core install --with-deps chromium
+      - name: Check inline schedule time at mobile and desktop widths
+        run: node --test tests/schedule-inline.browser.mjs

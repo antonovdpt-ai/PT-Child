@@ -8,7 +8,7 @@ export const localDate = value => new Date(`${dayKey(value)}T12:00:00`);
 export function addDays(value, amount) { const d = new Date(value); d.setDate(d.getDate() + amount); return d; }
 export function scheduleError(error) {
   const message = String(error?.message || 'Не удалось сохранить. Попробуй ещё раз.');
-  if (error?.code === '23P01' || message.includes('appointments_no_active_overlap')) return 'Это время уже занято. Изменения не сохранены: выбери другой час или дни повторения.';
+  if (error?.code === '23P01' || message.includes('appointments_no_active_overlap')) return 'Это время уже занято. Изменения не сохранены: выбери другое время или дни повторения.';
   if (message.includes('SCHEDULE_STALE')) return 'Запись или сумма долга уже изменились. Закрой окно и обнови расписание перед повторной попыткой.';
   if (['42703', 'PGRST202', 'PGRST204'].includes(error?.code)) return 'Для нового расписания нужно применить обновление базы 006. Затем нажми «Обновить».';
   return message;
@@ -38,7 +38,22 @@ export function debt(rows, patientId, excludeId = null) {
   return rows.filter(r => r.patient_id === patientId && r.id !== excludeId && r.kind === 'appointment' && r.status === 'completed')
     .reduce((s, r) => s + Math.max(0, r.price_kopecks - r.paid_kopecks), 0);
 }
-export function hourSlot(date, hour) { const d = new Date(`${dayKey(date)}T00:00:00`); d.setHours(Number(hour), 0, 0, 0); return d; }
+export function hourSlot(date, hour, minute = 0) {
+  if (!Number.isInteger(Number(hour)) || Number(hour) < 0 || Number(hour) > 23 || !Number.isInteger(Number(minute)) || Number(minute) < 0 || Number(minute) > 59) throw new Error('Проверь время: часы и минуты.');
+  const d = new Date(`${dayKey(date)}T00:00:00`); d.setHours(Number(hour), Number(minute), 0, 0); return d;
+}
+export const timeLabel = value => { const d = new Date(value); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+export function timeSlot(date, time) {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('Введи время в формате ЧЧ:ММ, например 11:30.');
+  const [hour, minute] = time.split(':'); return hourSlot(date, hour, minute);
+}
+export function scheduleConflicts(entries, appointments) {
+  const active = r => ['planned', 'completed'].includes(r.status);
+  const overlaps = (a, b) => new Date(a.starts_at) < new Date(b.ends_at) && new Date(a.ends_at) > new Date(b.starts_at);
+  const replaced = new Set(entries.map(r => r.id).filter(Boolean));
+  const existing = appointments.filter(r => active(r) && !replaced.has(r.id));
+  return entries.some((entry, index) => active(entry) && (existing.some(row => overlaps(entry, row)) || entries.slice(0, index).some(row => active(row) && overlaps(entry, row))));
+}
 export function repeatDates(start, weekdays, weeks) {
   if (!Number.isInteger(weeks) || weeks < 1 || weeks > 12) throw new Error('Выбери от 1 до 12 недель.');
   const result = [new Date(start)];
@@ -49,12 +64,12 @@ export function repeatDates(start, weekdays, weeks) {
   return result;
 }
 export function appointmentPayload(values, therapistId) {
-  const start = hourSlot(values.date, values.hour);
+  const start = hourSlot(values.date, values.hour, values.minute ?? 0);
   const price = Math.round(Number(values.price) * 100);
   if (!Number.isFinite(start.getTime()) || !Number.isInteger(Number(values.hour)) || Number(values.hour) < 0 || Number(values.hour) > 23) throw new Error('Проверь дату и час.');
   if (!Number.isSafeInteger(price) || price < 0 || price > 100000000) throw new Error('Проверь стоимость занятия.');
   const kind = values.kind || 'appointment';
-  const end = new Date(start); end.setHours(end.getHours() + 1);
+  const end = new Date(start.getTime() + 3600000);
   const priorPaid = Number(values.previous_paid || 0);
   if (!Number.isSafeInteger(priorPaid) || priorPaid < 0 || priorPaid > price) throw new Error('Проверь ранее внесённую оплату.');
   return { therapist_id: therapistId, patient_id: kind === 'appointment' ? values.patient_id || null : null,
