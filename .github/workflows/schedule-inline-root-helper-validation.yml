@@ -35,5 +35,6 @@ jobs:
           for name,blob in m.EDGES.items():
             assert m.blob(subprocess.check_output(['git','show',base+':supabase/'+name]))==blob,name
             assert m.blob(subprocess.check_output(['git','show',head+':supabase/'+name]))==blob,name
+          assert 'ROOT_READONLY_PREFLIGHT_ONLY_OK' in open('ops/release/manual-pr36-root-activation.py',encoding='utf8').read()
           print('ROOT_RELEASE_HELPER_SYNTAX_AND_PINNED_CONTENT_OK')
           PY
