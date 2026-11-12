@@ -1,5 +1,5 @@
-import { rub, dayKey, localDate, addDays, periodBounds, periodRows, totals, scheduleError } from './schedule-domain.mjs?v=2';
-import { openScheduleEditor } from './schedule-editor.js?v=6';
+import { rub, dayKey, localDate, addDays, periodBounds, periodRows, totals, scheduleError, scheduleTimeZone } from './schedule-domain.mjs?v=3';
+import { openScheduleEditor } from './schedule-editor.js?v=7';
 
 const dateLabel = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
 const monthLabel = new Intl.DateTimeFormat('ru-RU', { month: 'long' });
@@ -43,28 +43,19 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     }
   }
   const statusEntry = (row, status) => {
-    const entry = { ...row, status, expected_updated_at: row.updated_at };
+    const entry = { ...row, status, confirm_completed: status === 'completed', expected_updated_at: row.updated_at };
     delete entry.updated_at;
     return entry;
   };
-  async function completeDueAppointments(rows) {
-    const today = dayKey(new Date());
-    const due = rows.filter(row => row.kind === 'appointment' && row.status === 'planned' && dayKey(row.starts_at) <= today);
-    if (!due.length) return rows;
-    const { error } = await sb.rpc('save_schedule_entries', { entries: due.map(row => statusEntry(row, 'completed')), save_tariff: false });
-    if (error) throw error;
-    return allRows('appointments', 'id,patient_id,starts_at,ends_at,kind,status,price_kopecks,paid_kopecks,note,initial_name,updated_at');
-  }
   async function refresh() {
     if (loading) return;
     loading = true; const owner = page;
     if (page?.isConnected) page.querySelector('[data-refresh]')?.setAttribute('disabled', '');
     try {
-      let [a, p] = await Promise.all([
-        allRows('appointments', 'id,patient_id,starts_at,ends_at,kind,status,price_kopecks,paid_kopecks,note,initial_name,updated_at'),
+      const [a, p] = await Promise.all([
+        allRows('appointments', 'id,patient_id,session_id,starts_at,ends_at,kind,status,price_kopecks,paid_kopecks,note,initial_name,updated_at'),
         allRows('patients', 'id,display_name,schedule_price_kopecks')
       ]);
-      a = await completeDueAppointments(a);
       appointments = a.sort((x, y) => x.starts_at.localeCompare(y.starts_at)); patients = p; loaded = true; notice = '';
     } catch (error) { notice = scheduleError(error); }
     finally { loading = false; if (owner?.isConnected) draw(); }
@@ -196,7 +187,7 @@ export async function renderCabinet({ app, sb, state, user, esc, renderPatients,
     if (!window.confirm(`Скопировать ${source.length} записей на следующую неделю? Стоимость сохранится, отметки оплаты и проведения будут сброшены. При занятом времени ничего не скопируется.`)) return;
     button.disabled = true;
     try {
-      const entries = source.map(r => ({ ...r, id: undefined, updated_at: undefined, starts_at: addDays(r.starts_at, 7).toISOString(), ends_at: addDays(r.ends_at, 7).toISOString(), status: 'planned', paid_kopecks: 0 }));
+      const entries = source.map(r => ({ ...r, id: undefined, session_id: undefined, updated_at: undefined, schedule_timezone: scheduleTimeZone(), starts_at: addDays(r.starts_at, 7).toISOString(), ends_at: addDays(r.ends_at, 7).toISOString(), status: 'planned', paid_kopecks: 0 }));
       const { error } = await sb.rpc('save_schedule_entries', { entries, save_tariff: false }); if (error) throw error;
       date = addDays(date, 7); await refresh();
     } catch (error) { notice = scheduleError(error); draw(); }
