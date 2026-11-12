@@ -4,11 +4,15 @@ export function dayKey(value) {
   const d = new Date(value), pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+export const scheduleTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Moscow';
 export const localDate = value => new Date(`${dayKey(value)}T12:00:00`);
 export function addDays(value, amount) { const d = new Date(value); d.setDate(d.getDate() + amount); return d; }
 export function scheduleError(error) {
   const message = String(error?.message || 'Не удалось сохранить. Попробуй ещё раз.');
   if (error?.code === '23P01' || message.includes('appointments_no_active_overlap')) return 'Это время уже занято. Изменения не сохранены: выбери другой час или дни повторения.';
+  if (message.includes('SCHEDULE_SESSION_PATIENT')) return 'У визита уже есть запись в карточке. Для другого пациента отмените этот визит и создайте новую запись.';
+  if (message.includes('SCHEDULE_CONFIRM_COMPLETED')) return 'Обновите страницу, затем подтвердите, что занятие проведено.';
+  if (message.includes('SCHEDULE_TIME_ZONE')) return 'Не удалось определить часовой пояс. Проверьте настройки даты и времени устройства.';
   if (message.includes('SCHEDULE_STALE')) return 'Запись или сумма долга уже изменились. Закрой окно и обнови расписание перед повторной попыткой.';
   if (['42703', 'PGRST202', 'PGRST204'].includes(error?.code)) return 'Для нового расписания нужно применить обновление базы 006. Затем нажми «Обновить».';
   return message;
@@ -59,7 +63,7 @@ export function appointmentPayload(values, therapistId) {
   if (!Number.isSafeInteger(priorPaid) || priorPaid < 0 || priorPaid > price) throw new Error('Проверь ранее внесённую оплату.');
   return { therapist_id: therapistId, patient_id: kind === 'appointment' ? values.patient_id || null : null,
     initial_name: kind === 'appointment' && !values.patient_id ? String(values.initial_name || '').trim() || null : null,
-    starts_at: start.toISOString(), ends_at: end.toISOString(), kind, status: values.status || 'planned',
+    starts_at: start.toISOString(), ends_at: end.toISOString(), schedule_timezone: scheduleTimeZone(), kind, status: values.status || 'planned',
     price_kopecks: kind === 'appointment' ? price : 0,
     paid_kopecks: kind === 'appointment' ? (values.paid ? price : priorPaid) : 0,
     note: String(values.note || '').trim() || null };

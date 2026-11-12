@@ -116,3 +116,13 @@ test('global AI kill switch is checked before provider secrets are loaded', () =
   assert.notEqual(providerSecret, -1);
   assert.ok(enabledCheck < providerSecret);
 });
+
+test('server AI filters clinical visits before limiting and passes volume separately', () => {
+  const start = edge.indexOf('const [assessmentResult');
+  const end = edge.indexOf('const blockedValues', start);
+  const queries = edge.slice(start, end);
+  assert.match(queries, /\.from\("sessions"\)[\s\S]*?\.is\("voided_at", null\)\s*\.eq\("has_clinical_data", true\)[\s\S]*?\.limit\(sessionLimit\)/);
+  assert.match(queries, /\.select\("id", \{ count: "exact", head: true \}\)[\s\S]*?\.is\("voided_at", null\)/);
+  assert.match(edge, /completed_visit_count: attendanceResult\.count/);
+  assert.match(edge, /Отсутствие записи об изменениях не означает отсутствие прогресса/);
+});
