@@ -83,6 +83,9 @@ jobs:
           print("PWA_ICON_GENERATION_OK")
           PY
 
+      - name: Test non-destructive live HTML overlay
+        run: python -m unittest ops/pwa/test_patch_live_index.py
+
       - name: Check that live production matches main baseline
         if: ${{ github.event_name == 'pull_request' }}
         env:
