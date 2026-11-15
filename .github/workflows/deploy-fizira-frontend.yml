@@ -31,6 +31,13 @@ jobs:
           npm ci
           npm test
 
+      - name: Stop if public production differs from checked-in source
+        shell: bash
+        run: |
+          # Full deploy replaces the whole frontend. It is forbidden while live
+          # differs from main (including the separately installed PWA overlay).
+          bash ops/release/test-public-production.sh
+
       - name: Require production legal recorder before registration deploy
         shell: bash
         run: |
