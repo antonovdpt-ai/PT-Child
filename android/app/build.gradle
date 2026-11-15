@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.fizira.app'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.fizira.app'
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.3'
+}
+
+// Release signing is only configured when all credentials are supplied securely.
+// Debug APK from CI must never be uploaded as the first RuStore release.
+def signingFile = rootProject.file('release-signing.properties')
+if (signingFile.exists()) {
+    def creds = new Properties()
+    signingFile.withInputStream { creds.load(it) }
+    ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].each { key ->
+        if (!creds.getProperty(key)) throw new GradleException("Missing signing property: " + key)
+    }
+    android.signingConfigs {
+        create('rustore') {
+            storeFile rootProject.file(creds.getProperty('storeFile'))
+            storePassword creds.getProperty('storePassword')
+            keyAlias creds.getProperty('keyAlias')
+            keyPassword creds.getProperty('keyPassword')
+        }
+    }
+    android.buildTypes.release.signingConfig android.signingConfigs.rustore
+}
