@@ -83,6 +83,12 @@ jobs:
           print("PWA_ICON_GENERATION_OK")
           PY
 
+      - name: Check that live production matches main baseline
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          FIZIRA_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash ops/pwa/check-live-baseline.sh
+
       - name: Install locked dependencies
         run: npm ci
 
