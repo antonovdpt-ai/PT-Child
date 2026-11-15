@@ -66,6 +66,23 @@ jobs:
           node-version: 22
           cache: npm
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate generated PWA icons
+        run: |
+          python -m pip install --disable-pip-version-check Pillow==12.0.0
+          python ops/pwa/generate-icons.py
+          python - <<'PY'
+          from PIL import Image
+          for size in (180, 192, 512):
+              with Image.open(f"icons/icon-{size}.png") as icon:
+                  assert icon.size == (size, size)
+                  icon.verify()
+          print("PWA_ICON_GENERATION_OK")
+          PY
+
       - name: Install locked dependencies
         run: npm ci
 
