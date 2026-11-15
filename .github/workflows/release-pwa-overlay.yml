@@ -78,8 +78,8 @@ jobs:
 
       - name: Configure restricted Timeweb SSH
         env:
-          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY } }
-          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS } }
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
@@ -92,9 +92,9 @@ jobs:
         id: activate
         shell: bash
         env:
-          HOST: ${{ secrets.TIMEWEB_HOST } }
-          PORT: ${{ secrets.TIMEWEB_PORT } }
-          USER: ${{ secrets.TIMEWEB_USER } }
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
         run: |
           set -euo pipefail
           ssh -p "${PORT:-22}" -i ~/.ssh/id_ed25519 -o BatchMode=yes \
@@ -140,12 +140,12 @@ jobs:
           PY
 
       - name: Roll back public PWA assets after a failed verification
-        if: ${{ failure() && steps.activate.outcome == 'success' } }
+        if: ${{ failure() && steps.activate.outcome == 'success' }}
         shell: bash
         env:
-          HOST: ${{ secrets.TIMEWEB_HOST } }
-          PORT: ${{ secrets.TIMEWEB_PORT } }
-          USER: ${{ secrets.TIMEWEB_USER } }
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
         run: |
           set -euo pipefail
           ssh -p "${PORT:-22}" -i ~/.ssh/id_ed25519 -o BatchMode=yes \
