@@ -1,0 +1,152 @@
+name: Release Fizira PWA overlay (one-time guarded)
+
+on:
+  push:
+    branches:
+      - feature/pwa-ios-rustore-prep-20261115
+    paths:
+      - ".github/workflows/release-pwa-overlay.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fizira-pwa-overlay-production
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: "${{ github.event.head_commit.message == 'release(pwa): one-time guarded iPhone overlay' }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      EXPECTED_INDEX_SHA256: b0c2a8653b3dccc7c358f19d88834379500431769a0ede14b119d89e1fb2f0df
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify frontend regression tests
+        run: |
+          npm ci
+          npm test
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify patch logic and generate original-brand icons
+        run: |
+          python -m unittest ops/pwa/test_patch_live_index.py
+          python -m pip install --disable-pip-version-check Pillow==12.0.0
+          python ops/pwa/generate-icons.py
+          python - <<'PY'
+          from PIL import Image
+          for size in (180, 192, 512):
+              with Image.open(f"icons/icon-{size}.png") as im:
+                  assert im.size == (size, size)
+                  im.verify()
+          print("FIZIRA_PWA_ICONS_OK")
+          PY
+
+      - name: Preflight public index exact checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 3 --retry-delay 2 \
+            --max-time 30 "https://app.fizira.com/?pwa-release-preflight=${GITHUB_SHA}" \
+            -o live-index-before.html
+          actual="$(sha256sum live-index-before.html | cut -d' ' -f1)"
+          if [[ "$actual" != "$EXPECTED_INDEX_SHA256" ]]; then
+            echo "STOP: public index changed after audit" >&2
+            echo "expected=$EXPECTED_INDEX_SHA256 actual=$actual"
+            exit 1
+          fi
+          echo "FIZIRA_PWA_PUBLIC_PRECHECK_OK"
+
+      - name: Prepare PWA-only payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf pwa-overlay.tar.gz \
+            manifest.webmanifest service-worker.js offline.html \
+            icons/icon-180.png icons/icon-192.png icons/icon-512.png \
+            ops/pwa/patch-live-index.py ops/pwa/install-live-overlay.sh
+
+      - name: Configure restricted Timeweb SSH
+        env:
+          SSH_KEY: ${{ secrets.TIMEWEB_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TIMEWEB_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Activate PWA overlay without touching live app JS or schedule
+        id: activate
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "${PORT:-22}" -i ~/.ssh/id_ed25519 -o BatchMode=yes \
+            "$USER@$HOST" "mkdir -p '.cache/fizira-pwa'"
+          scp -P "${PORT:-22}" -i ~/.ssh/id_ed25519 -o BatchMode=yes \
+            pwa-overlay.tar.gz "$USER@$HOST:.cache/fizira-pwa/$GITHUB_SHA.tar.gz"
+          ssh -p "${PORT:-22}" -i ~/.ssh/id_ed25519 -o BatchMode=yes \
+            "$USER@$HOST" "set -eu
+              stage=\$(mktemp -d)
+              trap 'rm -rf \"\$stage\"' EXIT
+              tar -xzf \"\$HOME/.cache/fizira-pwa/$GITHUB_SHA.tar.gz\" -C \"\$stage\"
+              bash \"\$stage/ops/pwa/install-live-overlay.sh\" \"\$stage\" '$EXPECTED_INDEX_SHA256' '$GITHUB_SHA'"
+
+      - name: Confirm live PWA assets and public installability
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 4 --retry-delay 2 \
+            "https://app.fizira.com/?pwa-verify=$GITHUB_SHA" -o deployed-index.html
+          grep -F '<!-- Fizira PWA overlay v1 -->' deployed-index.html
+          grep -F "serviceWorker.register('/service-worker.js')" deployed-index.html
+          curl --fail --silent --show-error \
+            "https://app.fizira.com/manifest.webmanifest?pwa-verify=$GITHUB_SHA" -o deployed-manifest.webmanifest
+          python - <<'PY'
+          import json
+          data = json.load(open("deployed-manifest.webmanifest", encoding="utf-8"))
+          assert data["display"] == "standalone"
+          assert data["start_url"] == "/"
+          print("FIZIRA_PWA_MANIFEST_OK")
+          PY
+          curl --fail --silent --show-error \
+            "https://app.fizira.com/service-worker.js?pwa-verify=$GITHUB_SHA" -o deployed-sw.js
+          grep -F "fizira-offline-v1" deployed-sw.js
+          curl --fail --silent --show-error \
+            "https://app.fizira.com/icons/icon-180.png?pwa-verify=$GITHUB_SHA" -o deployed-icon.png
+          python - <<'PY'
+          from PIL import Image
+          with Image.open("deployed-icon.png") as im:
+              assert im.size == (180, 180)
+              im.verify()
+          print("FIZIRA_PWA_PUBLIC_ASSETS_OK")
+          PY
+
+      - name: Roll back public PWA assets after a failed verification
+        if: ${{ failure() && steps.activate.outcome == 'success' }}
+        shell: bash
+        env:
+          HOST: ${{ secrets.TIMEWEB_HOST }}
+          PORT: ${{ secrets.TIMEWEB_PORT }}
+          USER: ${{ secrets.TIMEWEB_USER }}
+        run: |
+          set -euo pipefail
+          ssh -p "${PORT:-22}" -i ~/.ssh/id_ed25519 -o BatchMode=yes \
+            "$USER@$HOST" "bash -s -- '$GITHUB_SHA'" < ops/pwa/rollback-live-overlay.sh
