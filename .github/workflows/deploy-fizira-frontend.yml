@@ -51,6 +51,15 @@ jobs:
             esac
           fi
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate PWA launcher icons
+        run: |
+          python -m pip install --disable-pip-version-check Pillow==12.0.0
+          python ops/pwa/generate-icons.py
+
       - name: Package public frontend assets
         shell: bash
         run: |
@@ -67,6 +76,12 @@ jobs:
             security-utils.mjs
             favicon.ico
             fizira-symbol.png
+            manifest.webmanifest
+            service-worker.js
+            offline.html
+            icons/icon-180.png
+            icons/icon-192.png
+            icons/icon-512.png
           )
           for asset in "${assets[@]}"; do
             test -f "$asset"
@@ -129,7 +144,7 @@ jobs:
              trap cleanup_stage EXIT HUP INT TERM
              stage=\"\$(mktemp -d \"\$target/.fizira-stage.XXXXXX\")\"
              tar -xzf \"\$archive\" -C \"\$stage\"
-             for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png index.html; do
+             for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png manifest.webmanifest service-worker.js offline.html icons/icon-180.png icons/icon-192.png icons/icon-512.png index.html; do
                test -f \"\$stage/\$asset\"
              done
              mkdir -p \"\$backup_root\"
@@ -138,10 +153,12 @@ jobs:
                  app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png index.html
                sha256sum \"\$backup\" > \"\$backup.sha256\"
              fi
-             for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png; do
+             mkdir -p \"\$target/icons\"
+             for asset in app.js cabinet.js styles.css media-fallback.css auth-domain.mjs schedule-domain.mjs schedule-editor.js security-utils.mjs favicon.ico fizira-symbol.png manifest.webmanifest service-worker.js offline.html icons/icon-180.png icons/icon-192.png icons/icon-512.png; do
                mv \"\$stage/\$asset\" \"\$target/\$asset\"
              done
              mv \"\$stage/index.html\" \"\$target/index.html\"
+             rmdir \"\$stage/icons\"
              rmdir \"\$stage\"
              stage=''
              rm -f \"\$archive\"
@@ -158,6 +175,10 @@ jobs:
             "https://app.fizira.com/?release=$SHA" \
             -o deployed-index.html
           grep -F "$expected_marker" deployed-index.html
+          curl --fail --silent --show-error "https://app.fizira.com/manifest.webmanifest" -o deployed-manifest.webmanifest
+          grep -F '"display": "standalone"' deployed-manifest.webmanifest
+          curl --fail --silent --show-error "https://app.fizira.com/icons/icon-180.png" -o deployed-icon-180.png
+          test "$(wc -c < deployed-icon-180.png)" -gt 1000
 
       - name: Roll back frontend after a failed activation or verification
         if: ${{ failure() && (steps.activate.outcome == 'failure' || steps.verify.outcome == 'failure') }}
