@@ -8,7 +8,7 @@ Android-приложение открывает существующую PWA Fiz
 debug APK в RuStore. Публикация возможна только после финальной подписи,
 Digital Asset Links, реальных Android-тестов и модерации.
 
-## Сборка на Android SDK / JDK 17 / Gradle 8.11.1
+## Сборка на Android SDK / JDK 17 / Gradle 8.13
 
 ```bash
 python3 -m pip install Pillow==12.0.0
