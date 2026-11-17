@@ -71,10 +71,11 @@ test('calendar supports patient search, parent contacts, debt and profile naviga
   appointmentDay.open = true;
   appointmentDay.dispatchEvent(new Event('toggle'));
   await waitFor(() => app.querySelector('[data-edit="next"]'));
-  assert.equal(appointments.find(row => row.id === 'next').status, 'completed', 'today and past appointments become completed automatically');
+  assert.equal(appointments.find(row => row.id === 'next').status, 'planned', 'opening the calendar does not confirm a visit');
+  assert.equal(rpcs.length, 0, 'loading the schedule is read-only');
   assert.equal(appointments.find(row => row.id === 'future').status, 'planned', 'future appointments stay planned');
   const visitStatus = app.querySelector('[data-status="next"]');
-  assert.equal(visitStatus.value, 'completed');
+  assert.equal(visitStatus.value, 'planned');
   visitStatus.value = 'cancelled'; visitStatus.dispatchEvent(new Event('change'));
   await waitFor(() => appointments.find(row => row.id === 'next').status === 'cancelled');
   assert.equal(app.querySelector('dialog'), null, 'inline status does not open the editor');

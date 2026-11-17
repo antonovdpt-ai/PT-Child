@@ -2,7 +2,8 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/+esm';
 import { escapeHtml, safeSameOriginHttpsUrl } from './security-utils.mjs';
 import { shouldRenderAuthEvent } from './auth-domain.mjs?v=1';
-import { renderCabinet } from './cabinet.js?v=6';
+import { renderCabinet } from './cabinet.js?v=7';
+import { dayKey, scheduleTimeZone } from './schedule-domain.mjs?v=3';
 
 const SUPABASE_URL = "https://auth.fizira.com";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg5NjU2NzI5LCJleHAiOjE5NDczMzY3Mjl9.gWkGsKODazY419TdwTGoSL9InQK3Yzt5YYC7UGVFllo";
@@ -56,6 +57,7 @@ const createEmptyState = () => ({
   aiDocumentIdsByPatient: {}
 });
 let state = createEmptyState();
+let patientDataLoadRevision = 0;
 
 const esc = escapeHtml;
 const safeStorageUrl = value =>
@@ -90,6 +92,15 @@ const ageFromDob = dob => {
     ? `${y} ${yearWord} ${r} мес.`
     : `${y} ${yearWord}`;
 };
+function sessionTime(entry) {
+  if (!entry.scheduled_at) return 'Время не указано';
+  const timeZone = entry.schedule_timezone;
+  return new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit', minute: '2-digit', timeZone,
+    ...(timeZone === scheduleTimeZone() ? {} : { timeZoneName: 'short' })
+  }).format(new Date(entry.scheduled_at));
+}
+
 const sexLabel = v => v === 'male' ? 'Мальчик' : v === 'female' ? 'Девочка' : 'Не указано';
 const toleranceLabel = v => ({ good: 'Хорошая', medium: 'Средняя', low: 'Низкая', unclear: 'Трудно оценить' }[v] || 'Не указана');
 
@@ -257,6 +268,7 @@ function buildNextSessionContext(p) {
     }));
 
   const recentSessions = state.sessions
+    .filter(session => session.has_clinical_data)
     .slice(0, 3)
     .map(session => ({
       date: session.session_date,
@@ -299,6 +311,7 @@ function buildParentReportContext(p) {
   }));
 
   const recentSessions = (state.sessions || [])
+    .filter(session => session.has_clinical_data)
     .slice(0, 5)
     .map(session => ({
       date: session.session_date || null,
@@ -371,7 +384,7 @@ function buildGeneralAnalysisContext(
     status: goal.status || null
   }));
 
-  const sessions = (state.sessions || []).map(session => ({
+  const sessions = (state.sessions || []).filter(session => session.has_clinical_data).map(session => ({
     date: session.session_date || null,
     note: session.note || null,
     tolerance: session.tolerance || null,
@@ -840,6 +853,7 @@ function enableVoiceInput(root) {
     'textarea, input[type="text"]'
   );
 
+  const stopFields = [];
   fields.forEach(field => {
     if (field.dataset.voiceReady === '1') return;
     if (field.disabled || field.readOnly) return;
@@ -897,7 +911,6 @@ function enableVoiceInput(root) {
     wrapper.appendChild(voiceBtn);
 
     let recognition = null;
-    let listening = false;
 
     let baseText = '';
     let recognizedText = '';
@@ -910,7 +923,7 @@ function enableVoiceInput(root) {
     };
 
     voiceBtn.onclick = () => {
-      if (listening && recognition) {
+      if (recognition) {
         voiceBtn.textContent = '⏳';
         voiceBtn.title = 'Завершаю запись';
         recognition.stop();
@@ -930,8 +943,6 @@ function enableVoiceInput(root) {
       recognitionError = false;
 
       recognition.onstart = () => {
-        listening = true;
-
         voiceBtn.textContent = '🔴';
         voiceBtn.title =
           'Идёт запись. Нажмите для остановки';
@@ -997,7 +1008,7 @@ function enableVoiceInput(root) {
       };
 
       recognition.onend = () => {
-        listening = false;
+        recognition = null;
 
         if (
           !recognitionError &&
@@ -1035,7 +1046,7 @@ function enableVoiceInput(root) {
       } catch (error) {
         console.error(error);
 
-        listening = false;
+        recognition = null;
         voiceBtn.textContent = '⚠️';
         voiceBtn.title =
           'Не удалось запустить микрофон';
@@ -1046,7 +1057,17 @@ function enableVoiceInput(root) {
         );
       }
     };
+
+    stopFields.push(() => {
+      if (!recognition) return;
+      const active = recognition;
+      recognition = null;
+      active.onstart = active.onresult = active.onerror = active.onend = null;
+      active.abort();
+      resetButton();
+    });
   });
+  return () => stopFields.forEach(stop => stop());
 }
 
 function enableAssessmentSectionCollapse(form) {
@@ -2517,7 +2538,7 @@ async function countsForPatients() {
 
   const [g, s] = await Promise.all([
     sb.from("goals").select("patient_id").in("patient_id", ids),
-    sb.from("sessions").select("patient_id").in("patient_id", ids),
+    loadActiveSessions(query => query.select("patient_id").in("patient_id", ids).order("id")),
   ]);
 
   const out = {};
@@ -2530,7 +2551,7 @@ async function countsForPatients() {
     out[x.patient_id].goals++;
   });
 
-  (s.data || []).forEach((x) => {
+  s.forEach(x => {
     out[x.patient_id].sessions++;
   });
 
@@ -2543,20 +2564,13 @@ async function activityForPatients() {
   if (!ids.length) return {};
 
   const [sessionsResult, assessmentsResult] = await Promise.all([
-    sb
-      .from('sessions')
-      .select('patient_id, created_at')
-      .in('patient_id', ids),
+    loadActiveSessions(query => query.select('patient_id, created_at').in('patient_id', ids).order('id')),
 
     sb
       .from('assessments')
       .select('patient_id, created_at')
       .in('patient_id', ids)
   ]);
-
-  if (sessionsResult.error) {
-    throw new Error(sessionsResult.error.message);
-  }
 
   if (assessmentsResult.error) {
     throw new Error(assessmentsResult.error.message);
@@ -2568,7 +2582,7 @@ async function activityForPatients() {
     activity[id] = null;
   });
 
-  [...(sessionsResult.data || []), ...(assessmentsResult.data || [])]
+  [...sessionsResult, ...(assessmentsResult.data || [])]
     .forEach(item => {
       if (!item.created_at) return;
 
@@ -2856,7 +2870,13 @@ if (patientSearch) {
   };
 }
 
-  document.querySelectorAll('[data-pid]').forEach(b => b.onclick = async () => { state.patientId = b.dataset.pid; state.tab = 'overview'; await loadPatientData(); renderPatient() });
+  document.querySelectorAll('[data-pid]').forEach(button => {
+    button.onclick = async () => {
+      state.patientId = button.dataset.pid;
+      state.tab = 'overview';
+      if (await loadPatientData()) renderPatient();
+    };
+  });
 }
 
 function renderNewPatient() {
@@ -2970,8 +2990,22 @@ function renderEditPatient() {
   };
 }
 
+async function loadActiveSessions(buildQuery) {
+  const rows = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await buildQuery(sb.from('sessions'))
+      .is('voided_at', null)
+      .range(offset, offset + pageSize - 1);
+    if (error) throw new Error(error.message);
+    rows.push(...data);
+    if (data.length < pageSize) return rows;
+  }
+}
+
 async function loadPatientData() {
   const pid = state.patientId;
+  const revision = ++patientDataLoadRevision;
 
   const [g, s, a, c, r] = await Promise.all([
     sb
@@ -2980,11 +3014,11 @@ async function loadPatientData() {
       .eq('patient_id', pid)
       .order('created_at', { ascending: false }),
 
-    sb
-      .from('sessions')
-      .select('*')
-      .eq('patient_id', pid)
-      .order('session_date', { ascending: false }),
+    loadActiveSessions(query => query.select('*').eq('patient_id', pid)
+      .order('session_date', { ascending: false })
+      .order('scheduled_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .order('id')),
 
     sb
       .from('assessments')
@@ -3008,9 +3042,10 @@ async function loadPatientData() {
   .order('created_at', { ascending: false })
   ]);
 
+  if (revision !== patientDataLoadRevision || state.patientId !== pid) return false;
+
  const loadError =
   g.error ||
-  s.error ||
   a.error ||
   c.error ||
   r.error;
@@ -3020,10 +3055,11 @@ async function loadPatientData() {
   }
 
   state.goals = g.data || [];
-  state.sessions = s.data || [];
+  state.sessions = s;
   state.assessment = (a.data || [])[0] || null;
   state.contacts = c.data || [];
   state.parentReports = r.data || [];
+  return true;
 }
 
 function goalsHtml(goals, deletable = false) {
@@ -4751,6 +4787,7 @@ const setParentReportStatus = (status, message) => {
 
 if (state.tab === 'overview') {
   box.insertAdjacentHTML('beforeend', `
+    <p class="patient-session-count">Проведено занятий: <strong>${state.sessions.length}</strong></p>
     <section class="card parent-report-launch">
       <div class="parent-report-launch-copy">
         <div class="workspace-eyebrow">Обратная связь</div>
@@ -7358,7 +7395,45 @@ document.querySelectorAll('[data-edit-goal]').forEach(editBtn => {
 document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () => { const { error } = await sb.from('goals').delete().eq('id', b.dataset.delGoal); if (error) return flash('error', error.message); await loadPatientData(); renderPatient() });
   }
   if (state.tab === 'sessions') {
-    box.innerHTML = `<form class="card session-form-card" id="sessionForm"><div class="form-heading"><div><h3>Новое занятие</h3><p>Зафиксируйте наблюдения, переносимость и функциональные изменения.</p></div></div>
+    const currentMonth = dayKey(new Date()).slice(0, 7);
+    const describedCount = state.sessions.filter(entry => entry.has_clinical_data).length;
+    const monthCount = state.sessions.filter(entry => entry.session_date.startsWith(currentMonth)).length;
+    box.innerHTML = `
+<section class="card session-history-card">
+  <header class="workspace-heading session-history-heading">
+    <h3>История занятий</h3>
+    <button type="button" class="btn" id="newManualSession">Добавить вручную</button>
+  </header>
+  <dl class="session-counts">
+    <div><dt>Проведено</dt><dd>${state.sessions.length}</dd></div>
+    <div><dt>С описанием</dt><dd>${describedCount}</dd></div>
+    <div><dt>За этот месяц</dt><dd>${monthCount}</dd></div>
+  </dl>
+  <div id="manualSessionEditor"></div>
+  ${state.sessions.map(entry => `
+    <details class="item session-history-entry" data-session="${esc(entry.id)}">
+      <summary class="item-title">
+        <span class="session-history-date">${fmtDate(entry.session_date)} <small>${esc(sessionTime(entry))}</small></span>
+        <span class="session-history-badges">
+          <span class="badge session-completed">Проведено</span>
+          <span class="badge">${entry.has_clinical_data ? 'Заполнено' : 'Без описания'}</span>
+        </span>
+      </summary>
+      <div class="session-history-description">
+        ${entry.note ? `<div class="item-sub session-history-note">${esc(entry.note)}</div>` : ''}
+        ${entry.tolerance ? `<div class="item-sub"><b>Переносимость</b> · ${esc(toleranceLabel(entry.tolerance))}</div>` : ''}
+        ${sessionDynamicsHtml(entry)}${plannedSessionHtml(entry.planned_session)}
+      </div>
+      <div class="session-history-actions">
+        <button type="button" class="link" data-edit-session="${esc(entry.id)}">${entry.has_clinical_data ? 'Изменить' : 'Добавить описание'}</button>
+        ${entry.origin === 'manual' ? `<button type="button" class="link" data-del-session="${esc(entry.id)}">Удалить</button>` : ''}
+      </div>
+      <div data-session-editor></div>
+    </details>
+  `).join('') || '<div class="empty compact-empty">Занятий пока нет.</div>'}
+</section>
+<form class="card session-form-card" id="sessionForm" hidden>
+  <div class="form-heading"><div><h3>Новое занятие</h3><p>Наблюдения, переносимость и функциональные изменения можно заполнить позже.</p></div></div>
 
 <div
   class="session-ai-intake"
@@ -7381,6 +7456,7 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
   <textarea
     name="session_transcript"
     id="sessionTranscript"
+    aria-label="Рассказ о занятии"
     placeholder="Надиктуйте или напишите рассказ о занятии..."
   ></textarea>
 
@@ -7409,8 +7485,11 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
   или заполните занятие вручную
 </div>
 
-<label>Дата</label><input type="date" name="session_date" value="${new Date().toISOString().slice(0, 10)}"><label>Запись занятия</label><textarea name="note" required></textarea><label>Переносимость</label>
-    <select name="tolerance">
+<label for="sessionDate">Дата</label><input id="sessionDate" type="date" name="session_date" required>
+<p class="help" id="sessionScheduleHint" hidden></p>
+<label for="sessionNote">Наблюдения</label><textarea id="sessionNote" name="note"></textarea>
+<label for="sessionTolerance">Переносимость</label>
+    <select name="tolerance" id="sessionTolerance">
   <option value="">Не указано</option>
   <option value="good">Хорошая</option>
   <option value="medium">Средняя</option>
@@ -7418,8 +7497,8 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
   <option value="unclear">Трудно оценить</option>
 </select>
 
-<label>Динамика</label>
-<select name="dynamics_status">
+<label for="sessionDynamics">Динамика</label>
+<select name="dynamics_status" id="sessionDynamics">
   <option value="">Не указано</option>
   <option value="improved">Улучшение</option>
   <option value="stable">Без значимых изменений</option>
@@ -7427,13 +7506,21 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
   <option value="unclear">Трудно оценить</option>
 </select>
 
-<label>Изменения функции</label>
+<label for="sessionFunctionChanges">Изменения функции</label>
 <textarea
+  id="sessionFunctionChanges"
   name="function_changes"
   placeholder="Например: стал отпускать опору на 3–4 секунды, появились самостоятельные шаги"
 ></textarea>
 
-<div class="actions"><button id="sessionSaveBtn" class="btn primary full" type="submit">Сохранить занятие</button></div><div id="sessionStatus" class="save-status"></div></form>
+<label class="session-plan-option" id="sessionPlanOption" hidden>
+  <input type="checkbox" name="attach_plan"> Прикрепить сохранённый план к этому занятию
+</label>
+<div class="actions session-editor-actions">
+  <button id="sessionSaveBtn" class="btn primary" type="submit">Сохранить занятие</button>
+  <button id="sessionCancelBtn" class="btn" type="button">Закрыть</button>
+</div>
+<div id="sessionStatus" class="save-status" role="status"></div></form>
 
 <section class="card next-session-card">
   <div class="workspace-heading"><div><h3>Следующее занятие</h3><p>План создаётся только как черновик для проверки специалистом.</p></div></div>
@@ -7461,40 +7548,30 @@ document.querySelectorAll('[data-del-goal]').forEach(b => b.onclick = async () =
     id="nextSessionPlan"
     class="next-session-plan"
   ></div>
-</section>
+</section>`;
+    const form = box.querySelector('#sessionForm');
+    const btn = form.querySelector('#sessionSaveBtn');
+    const status = form.querySelector('#sessionStatus');
+    const manualEditor = box.querySelector('#manualSessionEditor');
+    const manualButton = box.querySelector('#newManualSession');
+    const scheduleHint = form.querySelector('#sessionScheduleHint');
+    const planOption = form.querySelector('#sessionPlanOption');
+    let editingSession = null;
+    let editorVersion = 0;
+    let editorTrigger = null;
+    let savingSession = false;
+    let offeredPlan = null;
 
-<section class="card session-history-card"><div class="workspace-heading"><div><h3>История занятий</h3><p>Последовательность проведённых занятий и изменений функции.</p></div><span class="badge">${state.sessions.length}</span></div>
+    const saveLabel = () => editingSession ? 'Сохранить изменения' : 'Сохранить занятие';
+    const markDirty = () => {
+      if (savingSession) return;
+      form.dataset.dirty = 'true';
+      setButtonDirty(btn, saveLabel());
+    };
+    form.addEventListener('input', markDirty);
+    form.addEventListener('change', markDirty);
 
-${state.sessions.map(s => `
-  
-  <details class="item session-history-entry"><summary class="item-title">${fmtDate(s.session_date)} · ${esc(toleranceLabel(s.tolerance))}</summary>
-  
- <div class="item-sub">${esc(s.note || '')}</div>${sessionDynamicsHtml(s)}${plannedSessionHtml(s.planned_session)}
-
-<div
-  class="session-history-actions"
->
-  <button
-    type="button"
-    class="link"
-    data-edit-session="${s.id}"
-  >
-    Изменить
-  </button>
-
-  <button
-    type="button"
-    class="link"
-    style="color:#9b3333"
-    data-del-session="${s.id}"
-  >
-    Удалить
-  </button>
-</div>
-</details>`).join('') || `<div class="empty compact-empty">Занятий пока нет.</div>`}</section>`;
-    const form = document.getElementById('sessionForm'), btn = document.getElementById('sessionSaveBtn'), status = document.getElementById('sessionStatus'); watchFormDirty(form, btn, 'Сохранить занятие');
-
-    enableVoiceInput(form);
+    const stopVoiceInput = enableVoiceInput(form);
 
     const analyzeSessionBtn =
   document.getElementById('analyzeSessionBtn');
@@ -7519,6 +7596,8 @@ sessionAiStatus.insertAdjacentElement(
 let pendingGoalUpdates = [];
 
 analyzeSessionBtn.onclick = async () => {
+  if (savingSession) return;
+  stopVoiceInput?.();
   const transcript = sessionTranscript.value.trim();
 
   if (!transcript) {
@@ -7527,36 +7606,15 @@ analyzeSessionBtn.onclick = async () => {
     return;
   }
 
+  const version = editorVersion;
   analyzeSessionBtn.disabled = true;
+  btn.disabled = true;
   analyzeSessionBtn.textContent = 'Анализируем…';
-  sessionAiStatus.textContent =
-    'Fizira разбирает запись занятия...';
+  sessionAiStatus.textContent = 'Fizira разбирает запись занятия...';
 
   try {
-    const activeGoals = state.goals
-      .filter(goal => goal.status === 'active')
-      .map(goal => ({
-        id: goal.id,
-        title: goal.title,
-        progress: goal.progress,
-        baseline: goal.baseline,
-        criterion: goal.criterion
-      }));
-
-    const recentSessions = state.sessions
-      .slice(0, 3)
-      .map(session => ({
-        note: session.note,
-        dynamics_status: session.dynamics_status,
-        function_changes: session.function_changes
-      }));
-
-    const result = await analyzeSessionDraft({
-      patientId: p.id,
-      transcript,
-      goals: activeGoals,
-      recentSessions
-    });
+    const result = await analyzeSessionDraft({ patientId: p.id, transcript });
+    if (version !== editorVersion || !form.isConnected) return;
 
     form.elements.note.value =
       result.session_note || transcript;
@@ -7700,17 +7758,14 @@ if (!sessionGoalSuggestions.children.length) {
     sessionAiStatus.textContent =
       '✓ Черновик подготовлен. Проверьте данные перед сохранением.';
   } catch (error) {
-    console.error(
-      'Ошибка разбора занятия ИИ:',
-      error
-    );
-
-    sessionAiStatus.textContent =
-      `Ошибка ИИ: ${error.message}`;
+    if (version !== editorVersion) return;
+    sessionAiStatus.textContent = `Ошибка ИИ: ${error.message}`;
   } finally {
-    analyzeSessionBtn.disabled = false;
-    analyzeSessionBtn.textContent =
-      'Разобрать с ИИ';
+    if (version === editorVersion) {
+      btn.disabled = false;
+      analyzeSessionBtn.disabled = false;
+      analyzeSessionBtn.textContent = 'Разобрать с ИИ';
+    }
   }
 };
 
@@ -8102,158 +8157,146 @@ if (useNextSessionPlanBtn) {
   };
 }
 
-let editingSessionId = null;
+    function canSwitchSessionEditor() {
+      return !savingSession && (!form.dataset.dirty || confirm('Закрыть без сохранения изменений?'));
+    }
 
+    function openSessionEditor(entry, trigger, target) {
+      if (editorTrigger === trigger && !form.hidden) {
+        form.elements.note.focus();
+        return;
+      }
+      if (!canSwitchSessionEditor()) return;
+      stopVoiceInput?.();
+      editorVersion++;
+      editingSession = entry;
+      editorTrigger = trigger;
+      pendingGoalUpdates = [];
+      sessionGoalSuggestions.replaceChildren();
+      form.reset();
+      delete form.dataset.dirty;
+      status.textContent = '';
+      analyzeSessionBtn.disabled = false;
+      analyzeSessionBtn.textContent = 'Разобрать с ИИ';
+      sessionAiStatus.textContent = 'ИИ ничего не сохранит без вашего подтверждения.';
+      form.querySelector('h3').textContent = entry ? 'Описание занятия' : 'Новое занятие';
+      const scheduled = entry?.origin === 'schedule';
+      form.elements.session_date.value = entry?.session_date || dayKey(new Date());
+      form.elements.session_date.readOnly = scheduled;
+      offeredPlan = scheduled && !entry.planned_session ? p.next_session_plan : null;
+      planOption.hidden = !offeredPlan;
+      scheduleHint.hidden = !scheduled;
+      scheduleHint.textContent = scheduled ? `${sessionTime(entry)} · Дату и время можно изменить в расписании.` : '';
+      form.elements.note.value = entry?.note || '';
+      form.elements.tolerance.value = entry?.tolerance || '';
+      form.elements.dynamics_status.value = entry?.dynamics_status || '';
+      form.elements.function_changes.value = entry?.function_changes || '';
+      setButtonDirty(btn, saveLabel());
+      target.append(form);
+      form.hidden = false;
+      form.scrollIntoView({ block: 'nearest' });
+      form.elements.note.focus({ preventScroll: true });
+    }
 
-document.querySelectorAll('[data-edit-session]').forEach(editBtn => {
-  editBtn.onclick = () => {
-    const session = state.sessions.find(
-      s => s.id === editBtn.dataset.editSession
-    );
-
-    if (!session) return;
-
-    editingSessionId = session.id;
-
-    form.querySelector('h3').textContent =
-      'Изменить занятие';
-
-    form.elements.session_date.value =
-      session.session_date || '';
-
-    form.elements.note.value =
-      session.note || '';
-
-    form.elements.tolerance.value =
-      session.tolerance || '';
-
-    form.elements.dynamics_status.value =
-      session.dynamics_status || '';
-
-    form.elements.function_changes.value =
-      session.function_changes || '';
-
-    btn.textContent =
-      'Сохранить изменения';
-
-    form.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start'
+    manualButton.onclick = () => openSessionEditor(null, manualButton, manualEditor);
+    form.querySelector('#sessionCancelBtn').onclick = () => {
+      if (!canSwitchSessionEditor()) return;
+      stopVoiceInput?.();
+      editorVersion++;
+      form.hidden = true;
+      delete form.dataset.dirty;
+      editorTrigger?.focus();
+    };
+    box.querySelectorAll('[data-edit-session]').forEach(trigger => {
+      trigger.onclick = () => {
+        const entry = state.sessions.find(item => item.id === trigger.dataset.editSession);
+        if (entry) openSessionEditor(entry, trigger, trigger.closest('details').querySelector('[data-session-editor]'));
+      };
     });
-  };
-});
 
-   form.onsubmit = async e => {
-  e.preventDefault();
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (savingSession || analyzeSessionBtn.disabled) return;
+      savingSession = true;
+      stopVoiceInput?.();
+      setButtonSaving(btn);
 
-  setButtonSaving(btn);
+      const fd = new FormData(form);
+      const payload = {
+        note: fd.get('note').trim() || null,
+        tolerance: fd.get('tolerance') || null,
+        dynamics_status: fd.get('dynamics_status') || null,
+        function_changes: fd.get('function_changes').trim() || null
+      };
+      if (editingSession?.origin !== 'schedule') payload.session_date = fd.get('session_date');
+      const plan = editingSession ? (fd.get('attach_plan') ? offeredPlan : null) : p.next_session_plan;
+      if (plan) payload.planned_session = plan;
 
-  const fd = new FormData(e.target);
+      const { data: saved, error } = editingSession
+        ? await sb.from('sessions').update(payload)
+            .eq('id', editingSession.id).eq('patient_id', p.id)
+            .eq('updated_at', editingSession.updated_at).is('voided_at', null)
+            .select('id').maybeSingle()
+        : await sb.from('sessions').insert({ ...payload, patient_id: p.id }).select('id').single();
 
-  const payload = {
-    patient_id: p.id,
-    session_date: fd.get('session_date'),
-    note: fd.get('note').trim(),
-    tolerance: fd.get('tolerance') || null,
-    dynamics_status:
-      fd.get('dynamics_status') || null,
-    function_changes:
-      fd.get('function_changes').trim() || null
-  };
+      if (error || !saved) {
+        savingSession = false;
+        setButtonError(btn, saveLabel());
+        status.textContent = !error || error.message.includes('SESSION_VOIDED')
+          ? 'Занятие изменилось. Скопируйте заметки и заново откройте карточку перед сохранением.'
+          : error.message;
+        return;
+      }
 
-  if (!editingSessionId && p.next_session_plan) {
-  payload.planned_session = p.next_session_plan;
-}
+      let goalUpdateFailed = false;
+      for (const update of pendingGoalUpdates) {
+        const { error: goalError } = await sb.from('goals')
+          .update({ progress: update.progress })
+          .eq('id', update.goal_id).eq('patient_id', p.id).eq('status', 'active')
+          .select('id').single();
+        if (goalError) {
+          console.error('Не удалось обновить прогресс цели:', goalError);
+          goalUpdateFailed = true;
+          break;
+        }
+      }
 
-  const { error } = editingSessionId
-    ? await sb
-        .from('sessions')
-        .update(payload)
-        .eq('id', editingSessionId)
-    : await sb
-        .from('sessions')
-        .insert(payload);
+      if (plan) {
+        const { data: clearedPlanRows, error: clearPlanError } = await sb.from('patients')
+          .update({ next_session_plan: null }).eq('id', p.id)
+          .eq('next_session_plan', JSON.stringify(plan)).select('id');
+        if (clearPlanError) {
+          console.error('Занятие сохранено, но план не удалось закрыть:', clearPlanError);
+        } else if (clearedPlanRows?.length) {
+          p.next_session_plan = null;
+        }
+      }
 
-  if (error) {
-    setButtonError(
-      btn,
-      editingSessionId
-        ? 'Сохранить изменения'
-        : 'Сохранить занятие'
-    );
+      setButtonSaved(btn, editingSession ? '✓ Изменения сохранены' : '✓ Занятие сохранено');
+      const feedback = goalUpdateFailed
+        ? 'Занятие сохранено, но прогресс цели обновить не удалось.'
+        : 'Данные сохранены в облаке';
+      status.textContent = feedback;
 
-    return flash(
-      'error',
-      error.message
-    );
-  }
+      if (!form.isConnected || state.patientId !== p.id) return;
+      try {
+        if (!await loadPatientData()) return;
+        if (!form.isConnected || state.patientId !== p.id) return;
+        renderPatient();
+        const savedEntry = app.querySelector(`[data-session="${CSS.escape(saved.id)}"]`);
+        if (savedEntry) savedEntry.open = true;
+        flash(goalUpdateFailed ? 'error' : 'ok', feedback);
+      } catch (loadError) {
+        savingSession = false;
+        form.hidden = true;
+        editorTrigger?.focus();
+        flash('error', `Занятие сохранено. Обновите карточку: ${loadError.message}`);
+      }
+    };
 
-  let goalUpdateFailed = false;
-
-for (const update of pendingGoalUpdates) {
-  const { error: goalError } = await sb
-    .from('goals')
-    .update({
-      progress: update.progress
-    })
-    .eq('id', update.goal_id)
-    .eq('patient_id', p.id)
-    .eq('status', 'active')
-    .select('id')
-    .single();
-
-  if (goalError) {
-    console.error(
-      'Не удалось обновить прогресс цели:',
-      goalError
-    );
-
-    goalUpdateFailed = true;
-    break;
-  }
-}
-
-if (!editingSessionId && p.next_session_plan) {
-  const { data: clearedPlanRows, error: clearPlanError } = await sb
-    .from('patients')
-    .update({
-      next_session_plan: null
-    })
-    .eq('id', p.id)
-    .select('id');
-
-  if (clearPlanError) {
-    console.error(
-      'Занятие сохранено, но план не удалось закрыть:',
-      clearPlanError
-    );
-  } else if (!clearedPlanRows || !clearedPlanRows.length) {
-    console.error(
-      'Занятие сохранено, но строка пациента не была обновлена.'
-    );
-  } else {
-    p.next_session_plan = null;
-  }
-}
-
-  setButtonSaved(
-    btn,
-    editingSessionId
-      ? '✓ Изменения сохранены'
-      : '✓ Занятие сохранено'
-  );
-
-  status.textContent = goalUpdateFailed
-  ? '⚠️ Занятие сохранено, но прогресс цели обновить не удалось.'
-  : '✓ Данные сохранены в облаке';
-
-  await sleep(700);
-  await loadPatientData();
-  renderPatient();
-};
-     
-document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
+box.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
   deleteBtn.onclick = async () => {
+    if (!canSwitchSessionEditor()) return;
     const confirmed = confirm(
       'Удалить это занятие? Действие нельзя отменить.'
     );
@@ -8266,7 +8309,9 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
     const { error } = await sb
       .from('sessions')
       .delete()
-      .eq('id', deleteBtn.dataset.delSession);
+      .eq('id', deleteBtn.dataset.delSession)
+      .eq('patient_id', p.id)
+      .eq('origin', 'manual');
 
     if (error) {
       deleteBtn.disabled = false;
@@ -8288,7 +8333,7 @@ document.querySelectorAll('[data-del-session]').forEach(deleteBtn => {
 
   if (state.tab === 'progress') {
   const sessionsWithDynamics = state.sessions.filter(
-    s => s.dynamics_status || s.function_changes
+    s => s.has_clinical_data && (s.dynamics_status || s.function_changes)
   );
 
   const improvedCount = sessionsWithDynamics.filter(
@@ -8586,7 +8631,7 @@ if (aiDynamicsBtn) {
           status: g.status
         })),
 
-        sessions: state.sessions.map(s => ({
+        sessions: state.sessions.filter(s => s.has_clinical_data).map(s => ({
           date: s.session_date,
           note: s.note,
           tolerance: toleranceLabel(s.tolerance),
